@@ -5,13 +5,14 @@
 import numpy as np
 from numpy.random import normal, random_sample
 
-import graph_tool as gt
-from graph_tool.generation import geometric_graph
+import graph_tool.all as gt
+from graph_tool.generation import geometric_graph, triangulation
 from graph_tool.draw import graph_draw
 
 import pylab as plt
 from mpl_toolkits.mplot3d import Axes3D
 
+# TODO: proper parameter handling
 RHO_0 = 60.
 RHO_NOISE = 0.01
 LAMBDA0 = 6
@@ -20,22 +21,41 @@ LAMBDA0 = 6
 def compute_vertices_coordinates(rho_0=RHO_0,
                                  rho_noise=RHO_NOISE,
                                  lambda_avg=LAMBDA0):
+    """
+    Parameters:
+    ===========
+
+    rho_0: float,
+        average radius of the central cylinder (`body`) and the caps
+    rho_noise: float, the position noise along rho
+    lambda_avg: float, th target average edge length
+
+    Returns:
+    =======
+    rtz_all: (3, num_vertices) ndarray giving
+        the rho, theta, zed positons of the vertices
+    num_vertices: the number of vertices
+    """
 
     surface = 8 * np.pi * rho_0**2
-    num_vertices = np.int(surface / (lambda_avg**2))
+    cell_surface = 3 * np.sqrt(3) * lambda_avg**2 / 2
+    num_vertices = 4 * (np.int(surface / cell_surface) // 4)
     params = num_vertices, rho_0, rho_noise
 
     rhos_body = normal(rho_0, rho_noise, num_vertices // 2)
-    thetas_body = random_sample(num_vertices // 2) * 2 * np.pi 
+    thetas_body = random_sample(num_vertices // 2) * 2 * np.pi - np.pi
     zeds_body = np.linspace(-rho_0, rho_0, num_vertices // 2)
     rtz_body = np.array([rhos_body, thetas_body, zeds_body])
     rtz_capA = generate_cap(-1, params)
     rtz_capB = generate_cap(1, params)
+    rtz_all = np.hstack([rtz_capA, rtz_body, rtz_capB])
     
-    return rtz_body, rtz_capA, rtz_capB
+    return rtz_all, num_vertices
 
 def generate_cap(sign, params):
-
+    """
+    building apA and capB
+    """
     num_vertices, rho_0, rho_noise = params
     phis_cap = np.linspace(0, np.pi / 2., num_vertices // 4) 
     r_cap = normal(rho_0, rho_noise, num_vertices // 4)
@@ -67,23 +87,19 @@ def vertices_projections(rtz):
     Plots a figure with the various 2D projections
     """
 
-    figure, axes = plt.subplots(3)
-    figure.set_size_inches(6, 12)
+    figure, axes = plt.subplots(2, sharex=True)
     basalapical_ax = axes[0]
-    basalapical_ax.plot(rtz[2,:], rtz[0,:], '.', alpha=0.5)
-    basalapical_ax.set_xlabel(r'Proximo -- distal axis $z$')
-    basalapical_ax.set_ylabel(r'Basal -- apical axis, $\rho$')
+    basalapical_ax.plot(rtz[2,:], rtz[0,:], 'r.', alpha=0.1, ms=2)
+    basalapical_ax.set_xlabel(r'Proximo - distal axis $z$')
+    basalapical_ax.set_ylabel(r'Basal - apical axis, $\rho$')
     basalapical_ax.set_aspect('equal')
 
-    hist_ax = axes[1]
-    rho_hist = hist_ax.hist(rtz[0,:] * rtz[1,:], bins=50)
-    hist_ax.set_xlabel(r'$\rho$')
-
-    curv_ax = axes[2]
-    curv_ax.plot(rtz[2,:], rtz[1,:] *  rtz[2,:],'.',alpha=0.5)
+    curv_ax = axes[1]
+    curv_ax.plot(rtz[2,:], rtz[0,:] *  rtz[1,:] / (2 * np.pi),
+                 'o-', alpha=0.3)
     curv_ax.set_aspect('equal')
     curv_ax.set_xlabel(r"Proximo - distal axis $z$")
-    curv_ax.set_ylabel(r"Curvilinear coordiante $\sigma = \rho\theta$")
+    curv_ax.set_ylabel(r"Curvilinear $\sigma = \rho\theta/2\pi$")
 
 
 
