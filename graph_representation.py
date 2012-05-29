@@ -54,7 +54,7 @@ def compute_vertices_coordinates(rho_0=RHO_0,
 
 def generate_cap(sign, params):
     """
-    building apA and capB
+    building capA and capB. We place them on a regular grid
     """
     num_vertices, rho_0, rho_noise = params
     phis_cap = np.linspace(0, np.pi / 2., num_vertices // 4) 
