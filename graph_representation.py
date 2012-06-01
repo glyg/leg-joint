@@ -4,176 +4,66 @@
 import os
 import numpy as np
 from numpy.random import normal, random_sample
-
 import graph_tool.all as gt
-from graph_tool.generation import geometric_graph, triangulation
-from graph_tool.draw import graph_draw
-
 import pylab as plt
+
 from mpl_toolkits.mplot3d import Axes3D
 
-from xml_handler import ParamTree
-
 FLOAT = np.dtype('float64')
-
-
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
 
-def compute_vertices_coordinates(paramtree=None, paramfile=PARAMFILE):
-    """
-    Parameters:
-    ===========
-    random: bool, optional
-        if `False` return regularly ordered vertices
-    rho_0: float, optional
-        average radius of the central cylinder (`body`) and the caps
-    rho_noise: float, the position noise along rho
-    lambda_0: float, th target average edge length
 
-    Returns:
-    =======
-    rtz_all: (3, num_vertices) ndarray giving
-        the rho, theta, zed positons of the vertices
-    num_vertices: the number of vertices
-    """
-    if paramtree == None:
-        paramtree = ParamTree(paramfile)
-    params = paramtree.absolute_dic
-    rho_0 = params['rho_0']
-    lambda_0 = params['lambda_0']
-    pos_noise = params['pos_noise']
-    
-    rhos_body, thetas_body, zeds_body = generate_body(params, random=False)
-    num_vertices = rhos_body.shape[0]
-    rtz_dtype = np.dtype([('rho', FLOAT),
-                          ('theta', FLOAT),
-                          ('zed', FLOAT)])
-    rtz_all = np.zeros((num_vertices,), dtype=rtz_dtype)
-    rtz_all['rho'] = rhos_body
-    rtz_all['theta'] = thetas_body
-    rtz_all['zed'] = zeds_body
-
-    num_vertices = rhos_body.shape[0]
-    return rtz_all, num_vertices
-
-def generate_body(params, random=False):
-    """
-    Return the vertices on the cylindrical part of the
-    epithelium
-    """
-    rho_0 = params['rho_0']
-    lambda_0 = params['lambda_0']
-    pos_noise = params['pos_noise']
-
-    if random:
-        surface = 8 * np.pi * rho_0**2
-        cell_surface = 3 * np.sqrt(3) * lambda_0**2 / 2
-        num_vertices = 4 * (np.int(surface / cell_surface) // 4)
-        rhos_body = normal(rho_0, pos_noise, num_vertices // 2)
-        thetas_body = random_sample(num_vertices // 2) * 2 * np.pi - np.pi
-        zeds_body = np.linspace(-rho_0, rho_0, num_vertices // 2)
-    else:
-        n_zeds = int(4 * rho_0 / lambda_0)
-        n_zeds -= n_zeds % 3
-
-        delta_theta = 2 * np.arcsin(lambda_0 / (2 * rho_0))
-        n_thetas = int(2 * np.pi / delta_theta)
-        n_thetas -= n_thetas % 3
-        print 'there are %i and %i slices along ' % (n_zeds,
-                                                     n_thetas)
-        print  'theta and zed, respectively ' 
-
-        rhos_body = np.ones(n_thetas * n_zeds) * rho_0 
-        zt_grid = np.mgrid[:n_zeds, :n_thetas]
-
-        thetas_body = zt_grid[1].astype(FLOAT)
-        thetas_body[::2, ...] += 0.5
-        thetas_body *= delta_theta
-        zeds_body = zt_grid[0].astype(FLOAT)
-        zeds_body *= lambda_0
-        zeds_body -= 2 * rho_0
-
-    return rhos_body, thetas_body.flatten(), zeds_body.flatten()
-
-def generate_cap(sign, params, random=False):
-    """
-    building capA and capB.
-    """
-
-    
-    num_vertices, lambda_0, rho_0, pos_noise = params
-    if random:
-        phis_cap = np.linspace(0, np.pi / 2., num_vertices // 4) 
-        r_cap = normal(rho_0, pos_noise, num_vertices // 4)
-        rhos_cap = r_cap * np.cos(phis_cap)
-        thetas_cap = random_sample(num_vertices // 4) * 2 * np.pi - np.pi
-        zeds_cap = sign * r_cap * np.sin(phis_cap) + sign * rho_0 
-    else:
-        m = int(0.5 * np.pi * rho_0 / lambda_0)
-        rtz_cap = np.array([[rho_0], [0], [sign * 2 * rho_0]])
-        for i in range(m):
-            psi_i = (m - i) * lambda_0 / rho_0
-            n_i = np.floor(2 * np.pi * rho_0 * np.sin(psi_i) / lambda_0)
-            n_i = int(n_i)
-            theta_i = np.array([k * 2 * np.pi / n_i
-                                for k in range(n_i)]) - np.pi
-            rho_i =  np.ones(n_i) * rho_0 * np.sin(psi_i)
-            zed_i = rho_0 * np.ones(n_i)  * np.cos(psi_i)
-            zed_i = sign * (zed_i + rho_0)
-            rtz_i = np.array([rho_i, theta_i, zed_i])
-            rtz_cap = np.hstack((rtz_cap, rtz_i))
-    return rtz_cap
-
-    
 
 def cylindrical2cartesian(rtz):
     """
-    Transforms cylindrical coordinates ::math:(\rho, \theta, z)
-    into cartesian ::math:(x, y, z).
+    Transforms cylindrical coordinates
+    ::math:(\rho, \theta, z):
+    into cartesian ::math:(x, y, z):
     """
     
     xs = rtz['rho'] * np.cos(rtz['theta'])
     ys = rtz['rho'] * np.sin(rtz['theta'])
-    zed = rtz['zed']
-
+    zeds = rtz['zed']
+    num_points = rtz.shape[0]
+    
     xyz_dtype = np.dtype([('ix', FLOAT),
                           ('wy', FLOAT),
                           ('zed',FLOAT)])
-    
-    return xs, ys, zed
+    xyz = np.zeros((num_points,), dtype=xyz_dtype)
+    xyz['ix'] = xs
+    xyz['wy'] = ys
+    xyz['zed'] = zeds   
+    return xyz
 
-
-
-def vertices_projections(rtz):
+def vertices_projections(rtz, **kwards):
     """
     Plots a figure with the various 2D projections
     """
 
-    figure, axes = plt.subplots(3, sharex=True)
-    basalapical_ax = axes[0]
+    figure, axes = plt.subplots((2,2))
+    basalapical_ax = axes[1,0]
     basalapical_ax.plot(rtz['zed'], rtz['rho'],
-                        'r.', alpha=0.1, ms=2)
+                        'ro', alpha=0.3)
     basalapical_ax.set_xlabel(r'Proximo - distal axis $z$')
     basalapical_ax.set_ylabel(r'Basal - apical axis, $\rho$')
     basalapical_ax.set_aspect('equal')
     
-    curv_ax = axes[1]
+    curv_ax = axes[1,1]
     curv_ax.plot(rtz['zed'], rtz['rho'] *  rtz['theta'],
                  'o-', alpha=0.3)
     curv_ax.set_aspect('equal')
     curv_ax.set_xlabel(r"Proximo - distal axis $z$")
     curv_ax.set_ylabel(r"Curvilinear $\sigma = \rho\theta$")
 
-    cut_ax =  axes[2]
+    cut_ax =  axes[0,0]
     cut_ax.plot(rtz['rho'] * np.cos(rtz['theta']),
                  rtz['rho'] * np.sin(rtz['theta']),
                  'o-', alpha=0.3)
     cut_ax.set_aspect('equal')
-    cut_ax.set_xlabel('Anterior - posterior axis (µm)')
-    cut_ax.set_ylabel('Ventral - dorsal axis (µm)')
-
+    cut_ax.set_xlabel(u'Anterior - posterior axis (µm)')
+    cut_ax.set_ylabel(u'Ventral - dorsal axis (µm)')
 
 def vertices_scatterplot(rtz, **kwargs):
     """
@@ -185,9 +75,14 @@ def vertices_scatterplot(rtz, **kwargs):
     ax_3d = fig.add_subplot(111, projection='3d')
     xyz = cylindrical2cartesian(rtz)
 
-    ax_3d.scatter(xyz[0], xyz[1], xyz[2], 'ko-')
+    ax_3d.scatter(xyz['ix'], #Named after F.Herbert
+                  xyz['wy'],
+                  xyz['zed'],
+                  **kwargs)
     ax_3d.set_aspect('equal')
-    ax_3d.set_xlabel('Anterior - posterior axis (µm)')
-    ax_3d.set_ylabel('Ventral - dorsal axis (µm)')
-    ax_3d.set_zlabel('Proximal - distal axis (µm)')    
+    ax_3d.set_xlabel(u'Anterior - posterior axis (µm)')
+    ax_3d.set_ylabel(u'Ventral - dorsal axis (µm)')
+    ax_3d.set_zlabel(u'Proximal - distal axis (µm)')    
     plt.show()
+
+    return fig, ax_3d 
