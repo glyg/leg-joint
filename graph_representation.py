@@ -42,22 +42,37 @@ def vertices_projections(rtz, **kwards):
     Plots a figure with the various 2D projections
     """
 
-    figure, axes = plt.subplots((2,2))
-    basalapical_ax = axes[1,0]
+    figure, axes = plt.subplots(2,2)
+    basalapical_ax = axes[1,1]
     basalapical_ax.plot(rtz['zed'], rtz['rho'],
                         'ro', alpha=0.3)
+
+    basalapical_ax.axis((rtz['zed'].min() * 1.1, rtz['zed'].max() * 1.1,
+                         0, rtz['rho'].max() * 1.1))
     basalapical_ax.set_xlabel(r'Proximo - distal axis $z$')
     basalapical_ax.set_ylabel(r'Basal - apical axis, $\rho$')
     basalapical_ax.set_aspect('equal')
+
+
+    ax_3d = figure.add_subplot(2, 2, 1, projection='3d')
+    xyz = cylindrical2cartesian(rtz)
+
+    ax_3d.scatter(xyz['ix'], #Named after F.Herbert
+                  xyz['wy'],
+                  xyz['zed'])
+    ax_3d.set_aspect('equal')
+    ax_3d.set_xlabel(u'Anterior - posterior axis (µm)')
+    ax_3d.set_ylabel(u'Ventral - dorsal axis (µm)')
+    ax_3d.set_zlabel(u'Proximal - distal axis (µm)')    
     
-    curv_ax = axes[1,1]
+    curv_ax = axes[0,1]
     curv_ax.plot(rtz['zed'], rtz['rho'] *  rtz['theta'],
                  'o-', alpha=0.3)
     curv_ax.set_aspect('equal')
     curv_ax.set_xlabel(r"Proximo - distal axis $z$")
     curv_ax.set_ylabel(r"Curvilinear $\sigma = \rho\theta$")
 
-    cut_ax =  axes[0,0]
+    cut_ax =  axes[1,0]
     cut_ax.plot(rtz['rho'] * np.cos(rtz['theta']),
                  rtz['rho'] * np.sin(rtz['theta']),
                  'o-', alpha=0.3)
