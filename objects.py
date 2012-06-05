@@ -7,7 +7,7 @@ import graph_tool.all as gt
 from xml_handler import ParamTree
 
 
-FLOAT = np.dtype('float64')
+
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
@@ -22,171 +22,215 @@ class Epithelium():
             self.paramtree = ParamTree(paramfile)
         else:
             self.paramtree = paramtree
-
         self.params = self.paramtree.absolute_dic
-        rhos, thetas, zeds = self.generate_rtz_cells()
-        self.num_cells = rhos.shape[0]
-        self.rtz_dtype = np.dtype([('rho', FLOAT),
-                                   ('theta', FLOAT),
-                                   ('zed', FLOAT)])
-        self.rtz_cells = np.zeros((self.num_cells,),
-                                  dtype=self.rtz_dtype)
-        self.rtz_cells['rho'] = rhos
-        self.rtz_cells['theta'] = thetas
-        self.rtz_cells['zed'] = zeds
-
-        self.cell_network = CellGraph(self)
+        self.cells = CellGraph(self)
         self.apical_junctions = AppicalJunctions(self)
 
-    def generate_rtz_cells(self):
+        
+class AbstractRTZGraph(object):
+    '''
+    For both the cells and the junctions (hence abstract)
+    Wraps `graph-tool` in the rho, theta, zed
+    coordinate system.
 
+    '''
+
+    def __init__(self, rhos, thetas, zeds,
+                 graph, pos_cutoff=1e-3):
+        #Position in the rho theta zed space
+        #Instanciation
+        self.rhos = self.graph.new_vertex_property('float')
+        self.thetas = self.graph.new_vertex_property('float')
+        self.zeds = self.graph.new_vertex_property('float')
+        #sigmas = rhos * thetas
+        self.sigmas = self.graph.new_vertex_property('float')
+        self.calc_sigmas()
+        
+        self.vecinos_indexes = self.graph.new_vertex_property('vector<int>')
+        self.vecinos_pos = self.graph.new_vertex_property('vector<double>')
+
+        #Assignation
+        self.rhos.a = rhos
+        self.thetas.a = thetas
+        self.zeds.a = zeds
+        self.sigmas.a = rhos * thetas
+
+        #Grouping
+        rtzs = [self.rhos, self.thetas, self.zeds]
+        self.rtz_pos = gt.group_vector_property(rtzs, value_type='float')
+        del rtzs
+
+    def calc_sigmas(self):
+        self.sigmas.a = self.rhos.a * self.thetas.a
+
+    def get_sigmazs(self):
+        """Should be understood by `gt.geometric_graph`
+        """
+        return np.array([self.sigmas.a,
+                         self.zeds.a]).T
+
+
+    def inv_sigma(self, sigmas):
+        """
+        to calculate theta from sigma. 
+        cuts off rho values under `self.params['pos_cutoff']`
+        """
+        rho = self.rho.a.copy()
+        cutoff = self.params['pos_cutoff']
+        rho = rho.clip(cutoff, rho.max())
+        self.theta.a = sigmas / rho % (2 * np.pi)
+
+
+    def order_neighbours(self, ndim=3):
+        """
+        for each cell, retrives the positions of
+        the neighbours by turning counter-clockwise
+        around the cell vertex
+        
+        """
+
+        #We work in the (sigma, z) plane
+
+        # in the (z, \sigma) coordinate system with it's origin
+        # at the cell position, sort the neighbours counter-clockwise
+
+        self.calc_sigmas()
+        for vertex in self.graph.vertices():
+            zetas = [np.arctan2(self.zeds[vecino] - self.zeds[vertex],
+                                self.sigmas[vecino] - self.sigmas[vertex])
+                     for vecino in vertex.all_neighbours()]
+            zetas = np.array(zetas)
+            indexes = np.argsort(zetas)
+            self.vecinos_indexes[vertex] = indexes
+
+            vecinos = np.array([vecino for vecino in vertex.all_neighbours()])
+            vecinos = vecinos.take(indexes)
+            
+            vecinos_pos = np.array([self.rtz_pos[vecino] for vecino in vecinos])
+            self.vecinos_pos[vertex] =  vecinos_pos.flatten()
+
+    def all_vecinos(self, vertex):
+        """
+        Returns a array of neighbours with ordered counter-clockwise
+        """
+        vecinos = np.array([vecino for vecino in vertex.all_neighbours()])
+        indexes = self.vecinos_indexes[vertex].a
+        return vecinos.take(indexes)
+        
+    def _calc_zetas(self, vertex):
+        self.zetas[vertex].a = zetas.flatten()
+
+    def degree(self, vertex):
+        return vertex.in_degree() + vertex.out_degree()
+
+
+    
+class CellGraph(AbstractRTZGraph):
+    '''
+    
+    '''
+    def __init__(self, epithelium):
+        
+        self.epithelium = epithelium
+        #Each vertex of `cell.graph` represents a cell
+        
+        rhos, thetas, zeds = self.generate_rtz()
+        num_vertices = rhos.shape[0]
+
+        sigmazs = np.array([rhos * thetas, zeds]).T
+
+        radius = self.epithelium.params['lambda_0'] * 1.4
+        rho_0 = self.epithelium.params['rho_0']
+        
+        # Boundary conditions
+        s_min, s_max = 0, 2 * np.pi * rho_0
+        z_min, z_max = -2 * rho_0, 2 * rho_0
+
+        #Graph instanciation
+        self.graph, geom_pos = gt.geometric_graph(sigmazs, radius, 
+                                                  [(s_min, s_max),
+                                                   (z_min, z_max)])
+        del geom_pos 
+        cutoff = self.epithelium.params['pos_cutoff']
+
+        AbstractRTZGraph.__init__(self, rhos, thetas, zeds,
+                                  self.graph, cutoff)
+
+        self.order_neighbours()
+        self.rhos_voronoi = self.graph.new_vertex_property('vector<double>')
+        self.thetas_voronoi = self.graph.new_vertex_property('vector<double>')
+        self.zeds_voronoi = self.graph.new_vertex_property('vector<double>')
+        
+
+    def generate_rtz(self):
         """
         Returns hexagonaly packed vertices on a cylindre, in
         the ::math:(\rho, \theta, z): coordinate system
         """
-        rho_0 = self.params['rho_0']
-        lambda_0 = self.params['lambda_0']
-        pos_noise = self.params['pos_noise']
+        rho_0 = self.epithelium.params['rho_0']
+        lambda_0 = self.epithelium.params['lambda_0']
+        pos_noise = self.epithelium.params['pos_noise']
 
-        n_zeds = np.floor(4 * rho_0 / lambda_0)
+        n_zeds = np.int(4 * rho_0 / lambda_0)
         #n_zeds -= n_zeds % 3
         delta_theta = 2 * np.arcsin(lambda_0 / (2 * rho_0))
-        n_thetas = np.floor(2 * np.pi / delta_theta)
+        n_thetas = np.int(2 * np.pi / delta_theta)
         #n_thetas -= n_thetas % 3
 
         self.n_zeds = int(n_zeds)
         self.n_thetas = int(n_thetas)
 
-        rhos = np.ones(n_thetas * n_zeds) * rho_0 
+        rhos = np.ones(n_thetas * n_zeds
+                       ) * (n_thetas * delta_theta)
         zt_grid = np.mgrid[:n_zeds, :n_thetas]
-        thetas = zt_grid[1].astype(FLOAT)
+        thetas = zt_grid[1].astype('float')
         thetas[::2, ...] += 0.5
         thetas *= delta_theta
-        zeds = zt_grid[0].astype(FLOAT)
+        zeds = zt_grid[0].astype('float')
         zeds *= lambda_0
         zeds -= 2 * rho_0
         return rhos, thetas.flatten(), zeds.flatten()
-        
 
-class CellGraph():
-
-    def __init__(self, epithelium):
-        
-        self.epithelium = epithelium
-
-        sigma = epithelium.rtz_cells['rho'] * epithelium.rtz_cells['theta']
-        sigmaz = np.array([sigma, epithelium.rtz_cells['zed']]).T
-        radius = self.epithelium.params['lambda_0'] * 1.4
-        rho_0 = self.epithelium.params['rho_0']
-
-        # Boundary conditions
-        s_min, s_max = 0, 2 * np.pi * rho_0
-        z_min, z_max = -2 * rho_0, 2 * rho_0
-
-        #Each vertex of `cell.graph` represents a cell
-        self.graph, self.sigmaz_pos = gt.geometric_graph(sigmaz, radius, 
-                                                         [(s_min, s_max),
-                                                          (z_min, z_max)])
-
-        #Position in the rho theta zed space
-        
-        self.rhos = self.graph.new_vertex_property('float')
-        self.thetas = self.graph.new_vertex_property('float')
-        self.zeds = self.graph.new_vertex_property('float')
-
-        self.rhos.a = epithelium.rtz_cells['rho']
-        self.thetas.a = epithelium.rtz_cells['theta']
-        self.zeds.a = epithelium.rtz_cells['zed']
-
-        rtzs = [self.rhos, self.thetas, self.zeds]
-        self.rtz_pos = gt.group_vector_property(rtzs, value_type='float')
-
-        self.vecinos = self.graph.new_vertex_property('vector<double>')
-        self.rhos_faces = self.graph.new_vertex_property('vector<double>')
-        self.thetas_faces = self.graph.new_vertex_property('vector<double>')
-        self.zeds_faces = self.graph.new_vertex_property('vector<double>')
-
-
-        self.compute_faces()
-
-        self.rhos_voronoi = self.graph.new_vertex_property('vector<double>')
-        self.thetas_voronoi = self.graph.new_vertex_property('vector<double>')
-        self.zeds_voronoi = self.graph.new_vertex_property('vector<double>')
-
-
-        
-
-    def compute_faces(self, ndim=3):
-        """
-        for each cell, retrives the positions of
-        the three summits of all the triangles
-        with the current cell at one summit
-
-        it goes through the neighbours by turning counter-clockwise
-        around the vertex
-        
-        """
-
-        for cell in self.graph.vertices():
-
-            pos=self.rtz_pos[cell].a
-            degree = self.degree(cell)
-
-            assert pos.shape[0] == ndim
-
-            #neighbours
-            vecinos = np.array([self.rtz_pos[vecino].a
-                                for vecino in cell.all_neighbours()])
-
-            # in the (z, \sigma) coordinate system with it's origin
-            # at the cell position, sort the neighbours counter-clockwise
-
-            vecinos_local = vecinos - pos
-            vecinos_zangle = np.arctan2(vecinos_local[:, 0] * vecinos_local[:, 1],
-                                        vecinos_local[:, 2])
-            indexes = np.argsort(vecinos_zangle)
-
-            vecinos = vecinos.take(indexes, axis=0)
-            self.vecinos[cell] = vecinos.flatten()
-
-            faces = np.zeros((3, degree, ndim))
-            faces[0, :, :] = pos
-            faces[1, :, :] = vecinos
-            faces[2, :-1, :] = vecinos[:-1]
-            faces[2, -1, :] = vecinos[0]
-            faces = faces.reshape((degree * 3, ndim))
-
-            self.rhos_faces[cell] = faces[..., 0].ravel()
-            self.thetas_faces[cell] = faces[..., 1].ravel()
-            self.zeds_faces[cell] = faces[..., 2].ravel()
-
-    def degree(self, cell):
-        return cell.in_degree() + cell.out_degree()
             
     def compute_voronoi(self):
+
+        #We work in the sigma, zed plane
+        
+        self.calc_sigmas()
+        self.order_neighbours()
         for cell in self.graph.vertices():
             degree = self.degree(cell)
-
-            sigmas = self.rhos_faces[cell].a * self.thetas_faces[cell].a
-            faces_sigmas = sigmas.reshape((degree, 3))
-            faces_zeds = self.zeds_faces[cell].a.reshape((degree, 3))
+            pos = self.rtz_pos[cell].a
             
+            rho = (self.rhos[cell],) * np.ones(degree)
 
-            faces_sigmas -= self.rhos[cell] * self.thetas[cell]
-            faces_zeds  -= self.zeds[cell]
+            sigmazs = np.ones((degree, 2))
+            sigmazs[:, 0] *= self.sigmas[cell]
+            sigmazs[:, 1] *= self.zeds[cell]
+            
+            rhos_vecinos = np.array([self.rhos[vecino]
+                                     for vecino in self.all_vecinos(cell)])
+            sigmazs_vecinos = np.array([(self.sigmas[vecino], self.zeds[vecino])
+                                        for vecino in self.all_vecinos(cell)])
+            sigmazs_voronoi = np.zeros((degree, 2))
+            sigmazs_voronoi[:-1] = circumcircle(sigmazs[:-1], 
+                                                   sigmazs_vecinos[:-1],
+                                                   sigmazs_vecinos[1:])
+            sigmazs_voronoi[-1] =  circumcircle(sigmazs[-1], 
+                                                sigmazs_vecinos[-1],
+                                                sigmazs_vecinos[0])
+            rhos_voronoi = np.zeros(degree)
+            rhos_voronoi[:-1] = np.array([rho[:-1],
+                                          rhos_vecinos[:-1],
+                                          rhos_vecinos[1:]]).mean(axis=0)
+            rhos_voronoi[-1] = np.mean([rho[-1],
+                                        rhos_vecinos[-1],
+                                        rhos_vecinos[0]])
 
-            transfo = lambda x, y : (x**2 + y**2) / 2 * (x + y)  
-            sigmas_voronoi =  transfo(faces_sigmas[:, 1], faces_sigmas[:, 2]
-                                      ) + self.rhos[cell] * self.thetas[cell]
-            zeds_voronoi =  transfo(faces_zeds[:, 1], faces_zeds[:, 2]
-                                    ) + self.zeds[cell]
-
-            self.zeds_voronoi[cell] = zeds_voronoi.ravel()
-
-            rhos = self.rhos_faces[cell].a.reshape((degree, 3)).mean(axis=1)
-            self.rhos_voronoi[cell] = rhos.ravel()
-            self.thetas_voronoi[cell] = sigmas_voronoi.ravel()/rhos.ravel()
-        
+            thetas_voronoi = sigmazs_voronoi[:, 0]/rhos_voronoi
+            self.rhos_voronoi[cell] = rhos_voronoi.ravel()
+            self.thetas_voronoi[cell] = thetas_voronoi.ravel()
+            self.zeds_voronoi[cell] = sigmazs_voronoi[:, 1].ravel()
 
     def draw(self, output='cell_graph.pdf', **kwargs):
         """
@@ -198,9 +242,7 @@ class CellGraph():
                              output=output, **kwargs)
     
     def sfdp_draw(self):
-
         self.sfdp_pos = gt.graph_draw(self.graph,
-                                      # self.rtz_pos,
                                       pos=gt.sfdp_layout(self.graph,
                                                          cooling_step=0.95,
                                                          epsilon=1e-3,
@@ -209,14 +251,16 @@ class CellGraph():
                                       output="lattice_3d.pdf")
 
 
-
 class AppicalJunctions():
 
     def __init__(self, epithelium):
-        
         self.epithelium = epithelium
+        cells = epithelium.cells
+        self.graph = gt.Graph(directed=False)
         
         
+
+
 
     def draw(self, output='junction_graph.pdf', **kwargs):
         """
@@ -226,13 +270,38 @@ class AppicalJunctions():
                              output=output)
 
 
-    
-    # for vecino0, vecino1, vecino2 in zip(cell0_vecinos:
-    #     vrn = vornoi.add_vertex()  
-    #     pos0 = cells.pos[cell0].a
 
+def circumcircle(u0, u1, u2):
+    u1d = u1 - u0
+    u2d = u2 - u0
+    if len(u0.shape) == 2:
+        centers = np.array([med_intersect(u1d[k,0], u1d[k,1],
+                                          u2d[k,0], u2d[k,1])
+                            for k in range(u0.shape[0])])
+    else:
+        centers = med_intersect(u1d[0], u1d[1],
+                                u2d[0], u2d[1])
 
-    # for seed in input_graph.vertices():
-    #     for neighbour_seed in v.all_neighbours():
-            
-        
+    uc = centers + u0
+    return uc
+
+def med_intersect(x1, y1, x2, y2):
+    if y1**2 < 1e-12 and y2**2 > 1e-12:
+        xc = x1 / 2.
+        yc = (x2**2 + y2**2 - 2 * x2 * xc) / (2 * y2)  
+        return xc, yc
+    if y2**2 < 1e-12 and y1**2 > 1e-12:
+        xc = x2 / 2.
+        yc = (x1**2 + y1**2 - 2 * x1 * xc) / (2 * y1)  
+        return xc, yc
+    if y1**2 < 1e-12 and y2**2 < 1e-12:
+        return np.inf, np.inf
+    #Equation des mediatrices
+    a1,  a2 = - x1/y1, - x2/y2
+    if (a1 - a2)**2 < 1e-12:
+        return np.inf, np.inf
+    b1 = y1 / 2 - a1 * x1 / 2
+    b2 = y2 / 2 - a2 * x2 / 2
+    xc = (b2 - b1) / (a1 - a2)
+    yc = a1 * xc + b1
+    return xc, yc

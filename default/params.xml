@@ -12,4 +12,12 @@
     <unit>&#181;m</unit>
     <description>vertex position noise</description>
   </param>
+  <param max="10." min="0.1" name="pos_cutoff" step="0.01" value="0.01">
+    <unit>&#181;m</unit>
+    <description>Distance cut-off </description>
+  </param>
+  <param max="10." min="0.1" name="theta_cutoff" step="0.01" value="0.01">
+    <unit>&#181;m</unit>
+    <description>Angular cut-off </description>
+  </param>
 </parameters>
