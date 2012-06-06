@@ -9,7 +9,7 @@ import pylab as plt
 
 from mpl_toolkits.mplot3d import Axes3D
 
-FLOAT = np.dtype('float64')
+FLOAT = np.dtype('float32')
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
@@ -37,15 +37,13 @@ def cylindrical2cartesian(rtz):
     xyz['zed'] = zeds   
     return xyz
 
-def vertices_projections(rtz, **kwards):
+def vertices_projections(rtz, figure, axes, **kwards):
     """
     Plots a figure with the various 2D projections
     """
-
-    figure, axes = plt.subplots(2,2)
     basalapical_ax = axes[1,1]
     basalapical_ax.plot(rtz['zed'], rtz['rho'],
-                        'ro', alpha=0.3)
+                        'o', alpha=0.3)
 
     basalapical_ax.axis((rtz['zed'].min() * 1.1, rtz['zed'].max() * 1.1,
                          0, rtz['rho'].max() * 1.1))
