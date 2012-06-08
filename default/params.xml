@@ -26,7 +26,11 @@
   </param>
   <param max="10." min="0.1" name="contractility" step="0.01" value="1.">
     <unit>pN/um</unit>
-    <description>Prefered Area</description>
+    <description>Cell contractility</description>
+  </param>
+  <param max="10." min="0.1" name="prefered_area" step="0.01" value="1.">
+    <unit>pN/um</unit>
+    <description>Prefered area</description>
   </param>
   <param max="10." min="0.1" name="line_tension" step="0.01" value="1.">
     <unit>pN</unit>
