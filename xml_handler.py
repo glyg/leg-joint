@@ -95,26 +95,17 @@ class ParamTree(object):
         adimentionalized  dictionnary won"t change any thing
         '''
 
-        Vk = self.absolute_dic["Vk"]
-        Fk = self.absolute_dic["Fk"]
-        dt = self.absolute_dic["dt"]
-        lambda_0 = self.absolute_dic["lambad_0"]
+        prefered_area = self.absolute_dic["prefered_area"]
+        elasticity = self.absolute_dic["elasticity"]
+        contractility = self.absolute_dic["contractility"]
+        line_tension = self.absolute_dic["line_tension"]
         params = self.root.findall("param")
 
-        for param in params:
-            key = param.get("name")
-            val = self.absolute_dic[key]
-            if self.has_unit(param, SPRING_UNIT):
-                val /= Fk
-            elif self.has_unit(param, DRAG_UNIT):
-                val *= Vk/Fk  
-            elif self.has_unit(param, SPEED_UNIT):
-                val /=  Vk
-            elif self.has_unit(param, FREQ_UNIT):
-                val *= dt
-            elif self.has_unit(param, FORCE_UNIT):
-                val /= Fk
-            self.relative_dic[key] = val
+        self.relative_dic["line_tension"] = line_tension / (
+            elasticity * prefered_area**(3 / 2))
+        self.relative_dic["contractility"] = contractility /(
+            elasticity * prefered_area)
+
 
     def change_dic(self, key, new_value, write=False,
                    back_up=False, verbose=False):

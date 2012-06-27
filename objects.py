@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import os
+import os, time
 import numpy as np
 from numpy.random import normal, random_sample
 import graph_tool.all as gt
@@ -11,51 +11,6 @@ CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
 
-
-class Epithelium():
-    
-    def __init__(self, paramtree=None, paramfile=PARAMFILE):
-        if paramtree == None:
-            self.paramtree = ParamTree(paramfile)
-        else:
-            self.paramtree = paramtree
-        self.params = self.paramtree.absolute_dic
-        self.cells = CellGraph(self)
-        self.junctions = AppicalJunctions(self)
-
-    def calc_apical_geometry(self):
-        """
-        The area is approximated as the sum
-        of the areas of the triangles
-        formed by the cell position and each junction
-        """
-        self.cells.rtz_group()
-        self.junctions.rtz_group()
-        for cell in self.cells.graph.vertices():
-            area = 0.
-            perimeter = 0.
-            for edge in self.cells.junctions_edges[cell]:
-                rtz0 = self.cells.rtz_pos[cell]
-                rtz1 = self.junctions.rtz_pos[edge.source()]
-                rtz2 = self.junctions.rtz_pos[edge.target()]
-                d01, d02, d12, area012 = triangle_geometry(rtz0, rtz1, rtz2)
-                area += area012
-                self.junctions.edge_lengths[edge] = d12
-                perimeter += d12
-                self.cells.areas[cell] = area
-                self.cells.perimeters[cell] = perimeter
-    
-    def calc_total_energy(self):
-        
-        self.calc_apical_geometry()
-        prefered_area =  self.params['prefered_area']
-        elastic_term = 0.5 * self.cells.elasticities.a * (
-            self.cells.areas.a - prefered_area)**2
-        contractile_term = 0.5 * self.cells.contractilities.a * (
-            self.cells.perimeters.a**2)     
-        tension_term = self.junctions.line_tensions.a * self.junctions.edge_lengths.a
-        self.total_energy = elastic_term.sum() + contractile_term.sum() + tension_term.sum()
-        
         
 class AbstractRTZGraph(object):
     '''
@@ -92,6 +47,10 @@ class AbstractRTZGraph(object):
         self.sz_dtype = np.dtype([('sigma', np.float32),
                                   ('zed', np.float32)])
 
+        self.is_local = self.graph.new_vertex_property('bool')
+        self.is_local.a[:] = 0
+
+
     def rtz_group(self):
         
         rtzs = [self.rhos, self.thetas, self.zeds]
@@ -100,7 +59,6 @@ class AbstractRTZGraph(object):
         sigmazs = [self.sigmas, self.zeds]
         self.sz_pos = gt.group_vector_property(sigmazs, value_type='float')
         del sigmazs
-
         
     def rtz_record_array(self):
         num_vertices = self.rhos.a.size
@@ -156,7 +114,7 @@ class AbstractRTZGraph(object):
         #We work in the (sigma, z) plane
 
         # in the (z, \sigma) coordinate system with it's origin
-        # at the cell position, sort the neighbours counter-clockwise
+        # at the vertex position, sort the neighbours counter-clockwise
 
         self.calc_sigmas()
         for vertex in self.graph.vertices():
@@ -164,7 +122,8 @@ class AbstractRTZGraph(object):
             self.at_boundary[vertex]
             for vecino in vertex.all_neighbours():
                 theta = self.periodic_theta(vecino, vertex)
-                if theta != self.thetas[vecino] : self.at_boundary[vertex] = 1
+                if theta != self.thetas[vecino] :
+                    self.at_boundary[vertex] = 1
                 zeta = np.arctan2(self.zeds[vecino] - self.zeds[vertex],
                                   theta - self.thetas[vertex])
                 zetas.append(zeta)
@@ -205,20 +164,18 @@ class AbstractRTZGraph(object):
         print 'graph view saved to %s' %output
         return sfdp_pos
 
-    def pseudo3d_draw(self, output="lattice_3d.pdf", rot=0.1, z_angle=0.2, **kwargs):
-
-        output = os.path.join('drawings', output)
-        pseudo_x = self.graph.new_vertex_property('float')
-        pseudo_y = self.graph.new_vertex_property('float')
-
-        pseudo_x.a = self.rhos.a * np.cos(self.thetas.a)
-        pseudo_y.a = z_angle * self.rhos.a * np.sin(self.thetas.a) + self.zeds.a 
-        xy = [pseudo_x, pseudo_y]
-        self.pseudo3d_pos = gt.group_vector_property(xy, value_type='float')
-        pmap = gt.graph_draw(self.graph, self.pseudo3d_pos,
-                             output=output, **kwargs)
+    def add_position_noise(self, noise_amplitude):
         
-        
+        self.rhos.a += normal(0, noise_amplitude,
+                              self.rhos.a.size)
+        self.zeds.a += normal(0, noise_amplitude,
+                              self.rhos.a.size)
+        theta_noise = 2 * np.pi * noise_amplitude / self.rhos.a.mean()
+        self.thetas.a += normal(0, theta_noise,
+                                self.rhos.a.size)
+        self.rtz_group()
+        return self.rhos.a, self.thetas.a, self.zeds.a
+
     
 class CellGraph(AbstractRTZGraph):
     '''
@@ -230,23 +187,11 @@ class CellGraph(AbstractRTZGraph):
         cutoff = self.epithelium.params['pos_cutoff']
         contractility0 = self.epithelium.params['contractility']        
         elasticity0 = self.epithelium.params['elasticity']        
+        prefered_area0 =  self.epithelium.params['prefered_area']
 
-        rhos, thetas, zeds = self.generate_rtz()
-        num_vertices = rhos.shape[0]
-        sigmas = rhos * thetas
-        sigmazs = np.array([sigmas, zeds]).T
-        radius = self.epithelium.params['lambda_0'] + cutoff
-        rho_0 = self.epithelium.params['rho_0']
-        rho_c = rhos[0]
-        
-        # Boundary conditions
-        s_min, s_max = 0, 2 * np.pi * rho_c
-        z_min, z_max = -100 * rho_0, 100 * rho_0
-        self.boundaries = [(s_min, s_max), (z_min, z_max)]
-        #Graph instanciation
-        self.graph, self.geom_pos = gt.geometric_graph(sigmazs, radius, 
-                                                       [(s_min, s_max),
-                                                        (z_min, z_max)])
+        rtz = self.generate_rtz()
+        self.generate_graph(rtz)
+        rhos, thetas, zeds = rtz
         AbstractRTZGraph.__init__(self, rhos, thetas, zeds,
                                   self.graph, cutoff)
 
@@ -262,19 +207,55 @@ class CellGraph(AbstractRTZGraph):
         self.elasticities = self.graph.new_vertex_property('float')
         self.elasticities.a[:] = elasticity0
 
+        self.prefered_area =  self.graph.new_vertex_property('float')
+        self.prefered_area.a[:] = prefered_area0
+
         for cell in self.graph.vertices():
             self.junctions_vertices[cell] = []
             self.junctions_edges[cell] = []
 
+    def generate_graph(self, rtz):
 
+        rhos, thetas, zeds = rtz
+        
+        num_vertices = rhos.shape[0]
+        sigmas = rhos * thetas
+        sigmazs = np.array([sigmas, zeds]).T
+        sigmas_shift = rhos * ((thetas + np.pi) % (2 * np.pi))
+        sigmazs_shift = np.array([sigmas_shift, zeds]).T
+
+        #Graph instanciation
+        t0 = time.time()
+        graph1, pos1 = gt.triangulation(sigmazs, type='delaunay')
+        graph2, pos2 = gt.triangulation(sigmazs_shift, type='delaunay')
+        if not hasattr(self, 'graph'):
+            self.graph = graph1.copy()
+        else:
+            self.rhos.a = rhos
+            self.thetas.a = thetas
+            self.zeds.a = zeds
+        self.graph.clear_edges()
+        for cell1, cell2 in zip(graph1.vertices(), graph2.vertices()):
+            if cell1.out_degree() >= cell2.out_degree():
+                for n1 in cell1.all_neighbours():
+                    if self.graph.edge(cell1, n1) is None:
+                        self.graph.add_edge(cell1, n1) 
+            else:
+                for n2 in cell2.all_neighbours():
+                    if self.graph.edge(cell2, n2) is None:
+                        self.graph.add_edge(cell2, n2)
+        
+
+        
     def generate_rtz(self):
         """
         Returns hexagonaly packed vertices on a cylindre, in
-        the :math:`(\rho, \theta, z)` coordinate system
+        the :math:`(\rho, \theta, z)` coordinate system.
+       
+        
         """
         rho_0 = self.epithelium.params['rho_0']
         lambda_0 = self.epithelium.params['lambda_0']
-        pos_noise = self.epithelium.params['pos_noise']
 
         delta_z = lambda_0 * np.sqrt(3) / 2.
         n_zeds = np.int(4 * rho_0 / delta_z)
@@ -295,20 +276,24 @@ class CellGraph(AbstractRTZGraph):
         zeds = zt_grid[0].astype('float')
         zeds *= delta_z
         zeds -= zeds.max() / 2
-        return rhos, thetas.flatten(), zeds.flatten()
-
-
+        return rhos, thetas.T.flatten(), zeds.T.flatten()
 
 class AppicalJunctions(AbstractRTZGraph):
 
     def __init__(self, epithelium):
         self.epithelium = epithelium
+
         self.graph = gt.Graph(directed=False)
         line_tension0 = self.epithelium.params['line_tension']
 
         cutoff = self.epithelium.params['pos_cutoff']
 
+        self.adjacent_cells = self.graph.new_edge_property('object')
+        # for edge in self.graph.edges():
+        #     self.adjacent_cells[edge] = []
+
         self.compute_voronoi()
+        
         AbstractRTZGraph.__init__(self, self.raw_rtzs[:, 0],
                                   self.raw_rtzs[:, 1],
                                   self.raw_rtzs[:, 2],
@@ -316,14 +301,21 @@ class AppicalJunctions(AbstractRTZGraph):
         self.edge_lengths = self.graph.new_edge_property('float')
         self.line_tensions = self.graph.new_edge_property('float')
         self.line_tensions.a[:] = line_tension0
-        
+        epithelium.junctions = self
 
     def compute_voronoi(self):
         n_dropped = 0
         cutoff = self.epithelium.params['pos_cutoff']
         rtzs = []
         cells = self.epithelium.cells
+        cells.order_neighbours()
+
         visited_cells = []
+        self.graph.clear()
+        for cell in cells.graph.vertices():
+            cells.junctions_vertices[cell] = []
+            cells.junctions_edges[cell] = []
+        
         for cell in cells.graph.vertices():
             visited_cells.append(cell)
             vecinos = cells.all_vecinos(cell) #that's ordered
@@ -344,18 +336,17 @@ class AppicalJunctions(AbstractRTZGraph):
                 v0_rho = cells.rhos[vecino0]
                 v0_theta = cells.periodic_theta(vecino0, cell)
                 v0_zed = cells.zeds[vecino0]
-
+                
                 v1_rho = cells.rhos[vecino1]
                 v1_theta = cells.periodic_theta(vecino1, cell)
                 v1_zed = cells.zeds[vecino1]
                     
                 v0_sz = [v0_rho * v0_theta, v0_zed]
                 v1_sz = [v1_rho * v1_theta, v1_zed]
-                sigma, zed = circumcircle(cell_sz, v0_sz,
-                                          v1_sz, cutoff)
+                sigma, zed = c_circumcircle(cell_sz, v0_sz,
+                                            v1_sz, cutoff)
                 if not np.isfinite(sigma):
                     n_dropped += 1
-                    # raise ValueError
                     continue
                 rho = (cell_rho + v0_rho + v1_rho) / 3.
                 theta = (sigma / rho) % (2 * np.pi)
@@ -375,11 +366,79 @@ class AppicalJunctions(AbstractRTZGraph):
                         if j_vert0 == None:
                             j_vert0 = jv
                         else:
-                            junction = self.graph.add_edge(j_vert0, jv)
-                            cells.junctions_edges[cell].append(junction)
-                            cells.junctions_edges[vecino].append(junction)
+                            j_edge = self.graph.add_edge(j_vert0, jv)
+                            cells.junctions_edges[cell].append(j_edge)
+                            cells.junctions_edges[vecino].append(j_edge)
+                            self.adjacent_cells[j_edge] = (cell, vecino)
+
         print n_dropped
         self.raw_rtzs = np.array(rtzs)
+
+def c_circumcircle(sz0, sz1, sz2, cutoff):
+
+    c_code = '''
+    double sigma0 = sz0[0];
+    double sigma1 = sz1[0];
+    double sigma2 = sz2[0];
+
+    double zed0 = sz0[1];
+    double zed1 = sz1[1];
+    double zed2 = sz2[1];
+
+    
+    double x1 = sigma1 - sigma0;
+    double y1 = zed1 - zed0;
+    double x2 = sigma2 - sigma0;
+    double y2 = zed2 - zed0;
+
+    double xc;
+    double yc;
+
+    if (y1*y1 < cutoff*cutoff
+        && y2*y2 > cutoff*cutoff) 
+        {
+        xc = x1 / 2.;
+        yc = (x2*x2 + y2*y2 - 2*x2*xc)/(2*y2);
+        }
+    else if (y2*y2 < cutoff*cutoff
+             && y1*y1 > cutoff*cutoff) 
+        {
+        xc = x2 / 2.;
+        yc = (x1*x1 + y1*y1 - 2*x1*xc)/(2*y1);
+        }
+    else if (y1*y1 + y2*y2 < cutoff*cutoff)
+        {
+        if (x1*x1 + x2*x2 < cutoff*cutoff)
+            {
+            xc = x1 / 2.;
+            yc = y1 / 2.;
+            }
+        else
+            {
+            xc = 0.;
+            yc = 0.;
+            }
+        }
+    else
+       {
+       double a1 = -x1/y1;
+       double a2 = -x2/y2;
+       double b1 = y1/2.;
+       double b2 = y2/2.;
+            
+       xc = (b2 - b1) / (a1 - a2);
+       yc = a1 * xc + b1;
+       } 
+       py::tuple results(2);
+       results[0] = xc + sigma0;
+       results[1] = yc + zed0;
+
+    return_val = results;
+    '''
+    return weave.inline(c_code,
+                        arg_names=['sz0', 'sz1', 'sz2', 'cutoff'],
+                        headers=['<math.h>'])
+
 
 
 def circumcircle(u0, u1, u2, cutoff):
@@ -404,7 +463,7 @@ def med_intersect(x1, y1, x2, y2, cutoff):
             print 'points are superimposed'
             return x1 / 2., y1 / 2.
         else:
-            return np.nan, np.nan
+            return np.inf, np.inf
     #Equation des mediatrices
     a1,  a2 = - x1/y1, - x2/y2
     if (a1 - a2)**2 < cutoff**2:
@@ -434,37 +493,4 @@ def dist_rtz(rtz0, rtz1):
     return weave.inline(c_code,
                         arg_names=['rtz0', 'rtz1'],
                         headers=['<math.h>'])
-
-def triangle_geometry(rtz0, rtz1, rtz2):
-    c_code = """
-    double r0 = rtz0[0];
-    double t0 = rtz0[1];
-    double z0 = rtz0[2];
-
-    double r1 = rtz1[0];
-    double t1 = rtz1[1];
-    double z1 = rtz1[2];
-
-    double r2 = rtz2[0];
-    double t2 = rtz2[1];
-    double z2 = rtz2[2];
-
-    double d01 = sqrt(r0*r0 + r1*r1 - 2*r0*r1*cos(t1-t0) + (z1-z0)*(z1-z0));
-    double d02 = sqrt(r0*r0 + r2*r2 - 2*r0*r2*cos(t2-t0) + (z2-z0)*(z2-z0));
-    double d12 = sqrt(r1*r1 + r2*r2 - 2*r1*r2*cos(t2-t1) + (z2-z1)*(z2-z1));
-    double p = d01 + d02 + d12;
-    double area012 = sqrt(p * (p-d01) * (p-d02) * (p-d12));
-
-    py::tuple results(4);
-    results[0] = d01;
-    results[1] = d02;
-    results[2] = d12;
-    results[3] = area012;
-    return_val = results;
-    
-    """
-    return weave.inline(c_code,
-                        arg_names=['rtz0', 'rtz1', 'rtz2'],
-                        headers=['<math.h>'])
-
 

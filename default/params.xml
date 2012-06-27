@@ -1,14 +1,14 @@
 <?xml version="1.0"?>
 <parameters>
-  <param max="10." min="0.1" name="lambda_0" step="0.1" value="15.">
+  <param max="10." min="0.1" name="lambda_0" step="0.1" value="4.">
     <unit>um</unit>
     <description>Average cell to cell distance</description>
   </param>
-  <param max="100." min="0.1" name="rho_0" step="0.1" value="30.">
+  <param max="100." min="0.1" name="rho_0" step="0.1" value="12.">
     <unit>um</unit>
     <description>epithelium radius</description>
   </param>
-  <param max="10." min="0.1" name="pos_noise" step="0.01" value="0.01">
+  <param max="10." min="0." name="pos_noise" step="0.01" value="0.01">
     <unit>um</unit>
     <description>vertex position noise</description>
   </param>
@@ -20,19 +20,19 @@
     <unit>um</unit>
     <description>Angular cut-off </description>
   </param>
-  <param max="10." min="0.1" name="elasticity" step="0.01" value="1.">
+  <param max="10." min="0.1" name="elasticity" step="0.01" value="0.">
     <unit>pN/um2</unit>
     <description>Area elasticity</description>
   </param>
-  <param max="10." min="0.1" name="contractility" step="0.01" value="1.">
+  <param max="10." min="0.1" name="contractility" step="0.01" value="0.">
     <unit>pN/um</unit>
     <description>Cell contractility</description>
   </param>
-  <param max="10." min="0.1" name="prefered_area" step="0.01" value="1.">
-    <unit>pN/um</unit>
+  <param max="10." min="0.1" name="prefered_area" step="0.01" value="10.">
+    <unit>um2</unit>
     <description>Prefered area</description>
   </param>
-  <param max="10." min="0.1" name="line_tension" step="0.01" value="1.">
+  <param max="10." min="0.1" name="line_tension" step="0.01" value="32.">
     <unit>pN</unit>
     <description>Line tension</description>
   </param>

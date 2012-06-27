@@ -14,6 +14,180 @@ CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
 
+def sfdp_draw(self, output="lattice_3d.pdf", **kwargs):
+    output = os.path.join('drawings', output)
+    sfdp_pos = gt.graph_draw(graph,
+                             pos=gt.sfdp_layout(graph,
+                                                cooling_step=0.95,
+                                                epsilon=1e-3,
+                                                multilevel=True),
+                             output_size=(300,300),
+                             output=output)
+    print 'graph view saved to %s' %output
+    return sfdp_pos
+
+def pseudo3d_draw(graph, rtz, output="lattice_3d.pdf",
+                  z_angle=0.12, theta_rot=0.1,
+                  RGB=(0.8, 0.1, 0.), **kwargs):
+
+    rhos, thetas, zeds = rtz
+    thetas += theta_rot
+    output = os.path.join('drawings', output)
+
+    red, green, blue = RGB
+    
+    pseudo_x = graph.new_vertex_property('float')
+    pseudo_y = graph.new_vertex_property('float')
+
+    vertex_red = graph.new_vertex_property('float')
+    vertex_green = graph.new_vertex_property('float')
+    vertex_blue = graph.new_vertex_property('float')
+    vertex_alpha = graph.new_vertex_property('float')
+    
+    pseudo_x.a = zeds * np.cos(z_angle) - rhos * np.cos(thetas) * np.sin(z_angle)
+    pseudo_y.a = rhos * np.sin(thetas)
+    depth = rhos * np.cos(thetas)
+    normed_depth = (depth - depth.min()) / (depth.max() - depth.min())
+    
+    vertex_alpha.a = normed_depth * 0.7 + 0.3
+
+    vertex_red.a = np.ones(rhos.shape, dtype=np.float) * red
+    vertex_green.a = np.ones(rhos.shape, dtype=np.float) * green 
+    vertex_blue.a = np.ones(rhos.shape, dtype=np.float) * blue
+    
+    rgba = [vertex_red, vertex_green, vertex_blue, vertex_alpha]
+    pseudo3d_color = gt.group_vector_property(rgba, value_type='float')
+    
+    xy = [pseudo_x, pseudo_y]
+    pseudo3d_pos = gt.group_vector_property(xy, value_type='float')
+    pmap = gt.graph_draw(graph, pseudo3d_pos,
+                         vertex_fill_color=pseudo3d_color,
+                         vertex_color=pseudo3d_color,
+                         edge_pen_width=2., 
+                         output=output, **kwargs)
+    return pseudo3d_pos
+    
+def epithelium_draw(epithelium, z_angle=0.15, d_theta=0.1,
+                    output="tissue_3d.pdf", output2='tissue_sz.pdf',
+                    **kwargs):
+
+    g1 = epithelium.junctions.graph
+    g2 = epithelium.cells.graph
+
+    vertex_red1 = g1.new_vertex_property('float')
+    vertex_green1 = g1.new_vertex_property('float')
+    vertex_blue1 = g1.new_vertex_property('float') 
+    vertex_alpha1 = g1.new_vertex_property('float') 
+    vertex_size1 = g1.new_vertex_property('int') 
+
+    edge_red1 = g1.new_edge_property('float')
+    edge_green1 = g1.new_edge_property('float')
+    edge_blue1 = g1.new_edge_property('float') 
+    edge_alpha1 = g1.new_edge_property('float') 
+    edge_width1 = g1.new_edge_property('float') 
+
+    vertex_red2 = g2.new_vertex_property('float')
+    vertex_green2 = g2.new_vertex_property('float')
+    vertex_blue2 = g2.new_vertex_property('float')
+    vertex_alpha2 = g2.new_vertex_property('float') 
+    vertex_size2 = g2.new_vertex_property('int') 
+
+
+    edge_red2 = g2.new_edge_property('float')
+    edge_green2 = g2.new_edge_property('float')
+    edge_blue2 = g2.new_edge_property('float') 
+    edge_alpha2 = g2.new_edge_property('float') 
+    edge_width2 = g2.new_edge_property('float') 
+
+    vertex_red1.a[:] = 105/256.
+    vertex_green1.a[:] = 182/256.
+    vertex_blue1.a[:] = 40/256.
+    vertex_size1.a[:] = 1.
+
+    edge_red1.a[:] = 105/256.
+    edge_green1.a[:] = 201/256.
+    edge_blue1.a[:] = 40/256.
+    edge_width1.a[:] = 1.
+
+    vertex_red2.a[:] = 105/256.
+    vertex_green2.a[:] = 201/256.
+    vertex_blue2.a[:] = 237/256.
+    vertex_size2.a[:] = 5.
+
+
+    edge_red2.a[:] = 0.
+    edge_green2.a[:] = 0.
+    edge_blue2.a[:] = 0.
+    edge_width2.a[:] = 0.
+
+    props = [(epithelium.junctions.rtz_pos, epithelium.cells.rtz_pos),
+             (edge_red1, edge_red2),
+             (edge_green1, edge_green2),
+             (edge_blue1, edge_blue2),
+             (edge_alpha1, edge_alpha2),
+             (vertex_red1, vertex_red2),
+             (vertex_green1, vertex_green2),
+             (vertex_blue1, vertex_blue2),
+             (vertex_alpha1, vertex_alpha2),
+             (edge_width1, edge_width2),
+             (vertex_size1, vertex_size2)]
+
+    ug, u_props = gt.graph_union(g1, g2, props=props)
+
+    (rtz_pos, edge_red, edge_green, edge_blue, edge_alpha,
+     vertex_red, vertex_green, vertex_blue, vertex_alpha,
+     edge_width, vertex_size) = u_props
+    rhos, thetas, zeds = gt.ungroup_vector_property(rtz_pos, [0, 1, 2])
+
+    pseudo_x = ug.new_vertex_property('float')
+    pseudo_y = ug.new_vertex_property('float')
+    pseudo_x.a = zeds.a * np.cos(z_angle) - rhos.a * np.cos(
+        thetas.a + d_theta) * np.sin(z_angle)
+    pseudo_y.a = rhos.a * np.sin(thetas.a + d_theta)
+
+    depth = rhos.a * (1 - np.cos(thetas.a + d_theta))
+    normed_depth = (depth - depth.min()) / (depth.max() - depth.min())
+    vertex_alpha.a = normed_depth * 0.7 + 0.3
+    for edge in ug.edges():
+        edge_alpha[edge] = vertex_alpha[edge.source()]
+
+    vorder = ug.new_vertex_property('float') 
+    vorder.a = np.argsort(vertex_alpha.a)
+
+    eorder = ug.new_edge_property('float') 
+    eorder.a = np.argsort(edge_alpha.a)
+    
+    vertex_rgba = [vertex_red, vertex_green, vertex_blue, vertex_alpha]
+    vertex_color = gt.group_vector_property(vertex_rgba, value_type='float')
+    edge_rgba = [edge_red, edge_green, edge_blue, edge_alpha]
+    edge_color = gt.group_vector_property(edge_rgba, value_type='float')
+    
+    xy = [pseudo_x, pseudo_y]
+    pseudo3d_pos = gt.group_vector_property(xy, value_type='float')
+    
+    pmap = gt.graph_draw(ug, pseudo3d_pos,
+                         vertex_fill_color=vertex_color,
+                         vertex_color=vertex_color,
+                         edge_pen_width=edge_width, 
+                         edge_color=edge_color,
+                         vertex_size=vertex_size,
+                         vorder=vorder, eorder=eorder,
+                         output=output, **kwargs)
+
+    
+    sigma = ug.new_vertex_property('float')
+    sigma.a = rhos.a * thetas.a
+    zs = [sigma, zeds]
+    zs_pos = gt.group_vector_property(zs, value_type='float')
+
+    pmap2 = gt.graph_draw(ug, zs_pos,
+                         vertex_fill_color=vertex_color,
+                         vertex_color=vertex_color,
+                         edge_pen_width=edge_width, 
+                         edge_color=edge_color,
+                         vertex_size=vertex_size,
+                         vorder=vorder, eorder=eorder,
+                         output=output2, **kwargs)
 
 
 def cylindrical2cartesian(rtz):
