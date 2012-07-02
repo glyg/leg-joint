@@ -50,12 +50,12 @@ class AbstractRTZGraph(object):
         self.is_local = self.graph.new_vertex_property('bool')
         self.is_local.a[:] = 0
 
-
     def rtz_group(self):
         
         rtzs = [self.rhos, self.thetas, self.zeds]
         self.rtz_pos = gt.group_vector_property(rtzs, value_type='float')
         del rtzs
+        self.calc_sigmas()
         sigmazs = [self.sigmas, self.zeds]
         self.sz_pos = gt.group_vector_property(sigmazs, value_type='float')
         del sigmazs
@@ -97,9 +97,8 @@ class AbstractRTZGraph(object):
         rho = rho.clip(cutoff, rho.max())
         self.theta.a = (sigmas / rho) % (2 * np.pi)
 
-    def periodic_theta(self, vertex, ref_vertex):
-
-        dtheta = self.thetas[vertex] - self.thetas[ref_vertex]
+    def periodic_theta(self, vertex, ref_theta):
+        dtheta = self.thetas[vertex] - ref_theta
         if -np.pi <= dtheta <= np.pi:
             return self.thetas[vertex]
         if dtheta > np.pi :
@@ -121,7 +120,7 @@ class AbstractRTZGraph(object):
             zetas = []
             self.at_boundary[vertex]
             for vecino in vertex.all_neighbours():
-                theta = self.periodic_theta(vecino, vertex)
+                theta = self.periodic_theta(vecino, self.thetas[vertex])
                 if theta != self.thetas[vecino] :
                     self.at_boundary[vertex] = 1
                 zeta = np.arctan2(self.zeds[vecino] - self.zeds[vertex],
@@ -214,6 +213,8 @@ class CellGraph(AbstractRTZGraph):
             self.junctions_vertices[cell] = []
             self.junctions_edges[cell] = []
 
+
+
     def generate_graph(self, rtz):
 
         rhos, thetas, zeds = rtz
@@ -287,11 +288,9 @@ class AppicalJunctions(AbstractRTZGraph):
         line_tension0 = self.epithelium.params['line_tension']
 
         cutoff = self.epithelium.params['pos_cutoff']
-
+        
+        self.cells_vertices = self.graph.new_vertex_property('object')
         self.adjacent_cells = self.graph.new_edge_property('object')
-        # for edge in self.graph.edges():
-        #     self.adjacent_cells[edge] = []
-
         self.compute_voronoi()
         
         AbstractRTZGraph.__init__(self, self.raw_rtzs[:, 0],
@@ -334,11 +333,11 @@ class AppicalJunctions(AbstractRTZGraph):
                     continue
 
                 v0_rho = cells.rhos[vecino0]
-                v0_theta = cells.periodic_theta(vecino0, cell)
+                v0_theta = cells.periodic_theta(vecino0, cells.thetas[cell])
                 v0_zed = cells.zeds[vecino0]
                 
                 v1_rho = cells.rhos[vecino1]
-                v1_theta = cells.periodic_theta(vecino1, cell)
+                v1_theta = cells.periodic_theta(vecino1, cells.thetas[cell])
                 v1_zed = cells.zeds[vecino1]
                     
                 v0_sz = [v0_rho * v0_theta, v0_zed]
@@ -356,7 +355,7 @@ class AppicalJunctions(AbstractRTZGraph):
                 cells.junctions_vertices[cell].append(j_vertex)
                 cells.junctions_vertices[vecino0].append(j_vertex)
                 cells.junctions_vertices[vecino1].append(j_vertex)
-
+                self.cells_vertices[j_vertex] = [cell, vecino0, vecino1]
             for vecino in vecinos:
                 if vecino in visited_cells:
                     continue
@@ -370,7 +369,7 @@ class AppicalJunctions(AbstractRTZGraph):
                             cells.junctions_edges[cell].append(j_edge)
                             cells.junctions_edges[vecino].append(j_edge)
                             self.adjacent_cells[j_edge] = (cell, vecino)
-
+                            
         print n_dropped
         self.raw_rtzs = np.array(rtzs)
 

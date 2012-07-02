@@ -14,7 +14,7 @@ CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
 
-def sfdp_draw(self, output="lattice_3d.pdf", **kwargs):
+def sfdp_draw(graph, output="lattice_3d.pdf", **kwargs):
     output = os.path.join('drawings', output)
     sfdp_pos = gt.graph_draw(graph,
                              pos=gt.sfdp_layout(graph,
@@ -181,13 +181,13 @@ def epithelium_draw(epithelium, z_angle=0.15, d_theta=0.1,
     zs_pos = gt.group_vector_property(zs, value_type='float')
 
     pmap2 = gt.graph_draw(ug, zs_pos,
-                         vertex_fill_color=vertex_color,
-                         vertex_color=vertex_color,
-                         edge_pen_width=edge_width, 
-                         edge_color=edge_color,
-                         vertex_size=vertex_size,
-                         vorder=vorder, eorder=eorder,
-                         output=output2, **kwargs)
+                          vertex_fill_color=vertex_color,
+                          vertex_color=vertex_color,
+                          edge_pen_width=edge_width, 
+                          edge_color=edge_color,
+                          vertex_size=vertex_size,
+                          vorder=vorder, eorder=eorder,
+                          output=output2, **kwargs)
 
 
 def cylindrical2cartesian(rtz):

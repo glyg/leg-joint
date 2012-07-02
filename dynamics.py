@@ -16,19 +16,6 @@ PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
 ELEMENT_TYPES=('cells', 'j_vertices', 'j_edge')
 
 
-def find_energy_min(epithelium):
-
-    cells = epithelium.cells
-    junctions = epithelium.junctions
-    junctions.graph.set_vertex_filter(junctions.is_local)
-    j_vertices = [j_vert for j_vert in junctions.graph.vertices()]
-    pos0 = np.array([junctions.rtz_pos[j_vert]
-                     for j_vert in junctions.graph.vertices()]).flatten()
-    junctions.graph.set_vertex_filter(None)
-    cells.graph.set_vertex_filter(cells.is_local)
-    output = optimize.anneal(epithelium.local_energy, pos0,
-                                args=(j_vertices,))
-    return pos0, output
 
     
 class Epithelium():
@@ -42,14 +29,67 @@ class Epithelium():
         self.cells = CellGraph(self)
         self.junctions = AppicalJunctions(self)
 
-    def local_energy(self, new_rtz_pos, j_vertices):
-        
+    def find_energy_min(self):
+
+        self.junctions.graph.set_vertex_filter(self.junctions.is_local)
+        j_vertices = [j_vert for j_vert in self.junctions.graph.vertices()]
+        pos0 = np.array([self.junctions.sz_pos[j_vert]
+                         for j_vert in self.junctions.graph.vertices()])
+        self.junctions.graph.set_vertex_filter(None)
+        self.cells.graph.set_vertex_filter(self.cells.is_local)
+        output = optimize.fmin_ncg(self.local_energy, pos0.flatten(),
+                                   fprime=self.local_gradient,
+                                   args=(j_vertices,))
+        return pos0, output
+
+    def set_new_pos(self, new_sz_pos, j_vertices):
         for n, j_vert in enumerate(j_vertices):
-            self.junctions.rhos[j_vert] = new_rtz_pos[3 * n]
-            self.junctions.thetas[j_vert] = new_rtz_pos[3 * n + 1]
-            self.junctions.zeds[j_vert] = new_rtz_pos[3 * n + 2]
-            
+            self.junctions.sigmas[j_vert] = new_sz_pos[2 * n]
+            rho = self.junctions.rhos[j_vert]
+            self.junctions.thetas[j_vert] = (new_sz_pos[2 * n]
+                                             / rho) % (2 * np.pi)
+            self.junctions.zeds[j_vert] = new_sz_pos[2 * n + 1]
+        self.junctions.rtz_group()
+        
+
+    def local_energy(self, new_sz_pos, j_vertices):
+        self.set_new_pos(new_sz_pos, j_vertices)
         return self.calc_total_energy()
+
+    def local_gradient(self, new_sz_pos, j_vertices):
+        gradient = np.zeros_like(new_sz_pos)
+        
+        for n, j_vertex in enumerate(j_vertices):
+            for cell in self.junctions.cells_vertices[j_vertex]:
+                gradient[n] += self.cells.elasticities[cell] * (
+                    self.cells.areas[cell] - self.cells.prefered_area[cell])
+                gradient[n] += self.cells.contractilities[cell] * (
+                    self.cells.perimeters[cell])
+            for j_edge in j_vertex.out_edges():
+                gradient[n] += self.junctions.line_tensions[j_edge]
+        return gradient
+
+    def calc_cell_positions(self):
+
+        self.junctions.rtz_group()
+        for cell in self.cells.graph.vertices():
+
+            all_pos = np.array([self.junctions.rtz_pos[jv].a
+                                for jv in
+                                self.cells.junctions_vertices[cell]])
+            xc = all_pos[:,0] * np.cos(all_pos[:,1])
+            xc = xc.mean()
+            yc = all_pos[:,0] * np.sin(all_pos[:,1])
+            yc = yc.mean()
+            
+            rhoc = np.sqrt(xc**2 + yc**2)
+            thetac = np.arctan2(yc, xc)
+            zc = all_pos[:, 2].mean()
+
+            self.cells.rhos[cell] = rhoc
+            self.cells.thetas[cell] = thetac
+            self.cells.zeds[cell] = zc            
+        self.cells.rtz_group()
 
     def calc_apical_geometry(self):
         """
@@ -57,53 +97,31 @@ class Epithelium():
         of the areas of the triangles
         formed by the cell position and each junction
         """
-        self.cells.rtz_group()
-        self.junctions.rtz_group()
-
+        self.cells.graph.set_vertex_filter(self.cells.is_local)
         for cell in self.cells.graph.vertices():
             area = 0.
             perimeter = 0.
-            all_pos = np.array([self.junctions.rtz_pos[jv].a
-                                for jv in
-                                self.cells.junctions_vertices[cell]])
-
-            xc = all_pos[:,0] * np.cos(all_pos[:,1])
-            xc = xc.mean()
-            yc = all_pos[:,0] * np.sin(all_pos[:,1])
-            yc = yc.mean()
-            zc = all_pos[:,2].mean()
-
-            rhoc = np.sqrt(xc**2 + yc**2)
-            thetac = np.arctan2(yc, xc)
-
-            self.cells.rhos[cell] = rhoc
-            self.cells.thetas[cell] = thetac
-            self.cells.zeds[cell] = zc            
-            self.cells.rtz_pos[cell].a = [rhoc, thetac, zc]
-            rtz0 = self.cells.rtz_pos[cell]
+            sz0 = self.cells.sz_pos[cell]
             for edge in self.cells.junctions_edges[cell]:
+                t0 = self.cells.thetas[cell]
                 rtz1 = self.junctions.rtz_pos[edge.source()]
                 rtz2 = self.junctions.rtz_pos[edge.target()]
-
-                d01, d02, d12, area012 = triangle_geometry(rtz0, rtz1, rtz2)
+                t1 = self.junctions.periodic_theta(edge.source(), t0)
+                t2 = self.junctions.periodic_theta(edge.target(), t0)
+                sz1 = [rtz1[0] * t1, rtz1[2]]
+                sz2 = [rtz2[0] * t2, rtz2[2]]
+                
+                d01, d02, d12, area012 = triangle_geometry(sz0, sz1, sz2)
                 area += area012
                 self.junctions.edge_lengths[edge] = d12
                 perimeter += d12
                 self.cells.areas[cell] = area
                 self.cells.perimeters[cell] = perimeter
-    
-    def set_local_mask(self, cell):
-
-        self.cells.is_local[cell] = 1
-        for neighbour in cell.all_neighbours():
-            self.cells.is_local[neighbour] = 1
-        for j_vert in self.cells.junctions_vertices[cell]:
-            self.junctions.is_local[j_vert] = 1
-
+        self.cells.graph.set_vertex_filter(None)
+        
     def calc_total_energy(self):
         
         self.calc_apical_geometry()
-        self.cells.graph.set_vertex_filter(None)
         elastic_term = 0.5 * self.cells.elasticities.a * (
             self.cells.areas.a - self.cells.prefered_area.a)**2
         contractile_term = 0.5 * self.cells.contractilities.a * (
@@ -113,10 +131,20 @@ class Epithelium():
         return elastic_term.sum() + (
             contractile_term.sum() + tension_term.sum())
 
+    def set_local_mask(self, cell):
+
+        self.cells.is_local[cell] = 1
+        for neighbour in cell.all_neighbours():
+            self.cells.is_local[neighbour] = 1
+        for j_vert in self.cells.junctions_vertices[cell]:
+            self.junctions.is_local[j_vert] = 1
+
+
+
     def type1_transition(self, elements, element_type='cells'):
-        """Type one transition (see e.g 
+        """Type one transition (see the definition in
         Farhadifar et al. Curr Biol. 2007 Dec 18;17(24):2095-104.
-        Suppplementary figure S1
+        Suppplementary figure S1)
         
         In ASCII art (letters represent junctions and number represent cells):
 
@@ -217,25 +245,20 @@ class Epithelium():
 
         
         
-def triangle_geometry(rtz0, rtz1, rtz2):
+def triangle_geometry(sz0, sz1, sz2):
     c_code = """
-    double r0 = rtz0[0];
-    double t0 = rtz0[1];
-    double z0 = rtz0[2];
+    double s0 = sz0[0];
+    double z0 = sz0[1];
+    double s1 = sz1[0];
+    double z1 = sz1[1];
+    double s2 = sz2[0];
+    double z2 = sz2[1];
 
-    double r1 = rtz1[0];
-    double t1 = rtz1[1];
-    double z1 = rtz1[2];
 
-    double r2 = rtz2[0];
-    double t2 = rtz2[1];
-    double z2 = rtz2[2];
-
-    double d01 = sqrt(r0*r0 + r1*r1 - 2*r0*r1*cos(t1-t0) + (z1-z0)*(z1-z0));
-    double d02 = sqrt(r0*r0 + r2*r2 - 2*r0*r2*cos(t2-t0) + (z2-z0)*(z2-z0));
-    double d12 = sqrt(r1*r1 + r2*r2 - 2*r1*r2*cos(t2-t1) + (z2-z1)*(z2-z1));
-    double p = d01 + d02 + d12;
-    double area012 = sqrt(p * (p-d01) * (p-d02) * (p-d12));
+    double d01 = sqrt((s0-s1) * (s0-s1) + (z1-z0) * (z1-z0));
+    double d02 = sqrt((s0-s2) * (s0-s2) + (z2-z0) * (z2-z0));
+    double d12 = sqrt((s1-s2) * (s1-s2) + (z2-z1) * (z2-z1));
+    double area012 = fabs((s1-s0) * (z2-z0) - (s2-s0) * (z1-z0));
 
     py::tuple results(4);
     results[0] = d01;
@@ -246,6 +269,6 @@ def triangle_geometry(rtz0, rtz1, rtz2):
     
     """
     return weave.inline(c_code,
-                        arg_names=['rtz0', 'rtz1', 'rtz2'],
+                        arg_names=['sz0', 'sz1', 'sz2'],
                         headers=['<math.h>'])
 
