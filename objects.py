@@ -50,6 +50,9 @@ class AbstractRTZGraph(object):
         self.is_local = self.graph.new_vertex_property('bool')
         self.is_local.a[:] = 0
 
+        self.is_alive = self.graph.new_vertex_property('bool')
+        self.is_alive.a[:] = 1
+
     def rtz_group(self):
         
         rtzs = [self.rhos, self.thetas, self.zeds]
@@ -198,13 +201,17 @@ class CellGraph(AbstractRTZGraph):
         self.junctions_vertices = self.graph.new_vertex_property('object')
 
         self.areas = self.graph.new_vertex_property('float')
-        self.perimeters = self.graph.new_vertex_property('float')
+        self.areas.a[:] = prefered_area0
 
+        self.perimeters = self.graph.new_vertex_property('float')
+        self.perimeters.a[:] = 6 * self.epithelium.params['lambda_0']
+        
         self.contractilities = self.graph.new_vertex_property('float')
         self.contractilities.a[:] = contractility0
 
         self.elasticities = self.graph.new_vertex_property('float')
         self.elasticities.a[:] = elasticity0
+
 
         self.prefered_area =  self.graph.new_vertex_property('float')
         self.prefered_area.a[:] = prefered_area0
@@ -213,40 +220,21 @@ class CellGraph(AbstractRTZGraph):
             self.junctions_vertices[cell] = []
             self.junctions_edges[cell] = []
 
-
-
     def generate_graph(self, rtz):
-
         rhos, thetas, zeds = rtz
-        
-        num_vertices = rhos.shape[0]
         sigmas = rhos * thetas
         sigmazs = np.array([sigmas, zeds]).T
-        sigmas_shift = rhos * ((thetas + np.pi) % (2 * np.pi))
-        sigmazs_shift = np.array([sigmas_shift, zeds]).T
 
-        #Graph instanciation
-        t0 = time.time()
-        graph1, pos1 = gt.triangulation(sigmazs, type='delaunay')
-        graph2, pos2 = gt.triangulation(sigmazs_shift, type='delaunay')
-        if not hasattr(self, 'graph'):
-            self.graph = graph1.copy()
-        else:
-            self.rhos.a = rhos
-            self.thetas.a = thetas
-            self.zeds.a = zeds
-        self.graph.clear_edges()
-        for cell1, cell2 in zip(graph1.vertices(), graph2.vertices()):
-            if cell1.out_degree() >= cell2.out_degree():
-                for n1 in cell1.all_neighbours():
-                    if self.graph.edge(cell1, n1) is None:
-                        self.graph.add_edge(cell1, n1) 
-            else:
-                for n2 in cell2.all_neighbours():
-                    if self.graph.edge(cell2, n2) is None:
-                        self.graph.add_edge(cell2, n2)
-        
-
+        radius = self.epithelium.params['lambda_0'] * 1.1
+        rhoc = rhos[0]
+        # Boundary conditions
+        s_min, s_max = 0, 2 * np.pi * rhoc
+        z_min, z_max = -10 * rhoc , 10 * rhoc
+         #Graph instanciation
+        self.graph, geom_pos = gt.geometric_graph(sigmazs, radius,
+                                                  [(s_min, s_max),
+                                                   (z_min, z_max)])
+        del geom_pos 
         
     def generate_rtz(self):
         """
@@ -308,18 +296,17 @@ class AppicalJunctions(AbstractRTZGraph):
         rtzs = []
         cells = self.epithelium.cells
         cells.order_neighbours()
-
         visited_cells = []
         self.graph.clear()
         for cell in cells.graph.vertices():
             cells.junctions_vertices[cell] = []
             cells.junctions_edges[cell] = []
-        
         for cell in cells.graph.vertices():
             visited_cells.append(cell)
             vecinos = cells.all_vecinos(cell) #that's ordered
             num_vecinos = len(vecinos)
-            
+            if num_vecinos < 6:
+                cells.is_alive[cell] = 0
             cell_sigma = cells.sigmas[cell]
             cell_theta = cells.thetas[cell]
             cell_rho = cells.rhos[cell]
@@ -344,7 +331,7 @@ class AppicalJunctions(AbstractRTZGraph):
                 v1_sz = [v1_rho * v1_theta, v1_zed]
                 sigma, zed = c_circumcircle(cell_sz, v0_sz,
                                             v1_sz, cutoff)
-                if not np.isfinite(sigma):
+                if not np.isfinite(sigma) or sigma > 1e8:
                     n_dropped += 1
                     continue
                 rho = (cell_rho + v0_rho + v1_rho) / 3.
@@ -356,6 +343,7 @@ class AppicalJunctions(AbstractRTZGraph):
                 cells.junctions_vertices[vecino0].append(j_vertex)
                 cells.junctions_vertices[vecino1].append(j_vertex)
                 self.cells_vertices[j_vertex] = [cell, vecino0, vecino1]
+
             for vecino in vecinos:
                 if vecino in visited_cells:
                     continue
@@ -371,6 +359,10 @@ class AppicalJunctions(AbstractRTZGraph):
                             self.adjacent_cells[j_edge] = (cell, vecino)
                             
         print n_dropped
+
+        cells.graph.set_vertex_filter(cells.is_alive)
+        #cells.graph.purge_vertices()
+        
         self.raw_rtzs = np.array(rtzs)
 
 def c_circumcircle(sz0, sz1, sz2, cutoff):
@@ -397,35 +389,31 @@ def c_circumcircle(sz0, sz1, sz2, cutoff):
         && y2*y2 > cutoff*cutoff) 
         {
         xc = x1 / 2.;
-        yc = (x2*x2 + y2*y2 - 2*x2*xc)/(2*y2);
+        yc = (x2*x2 + y2*y2 - x2*x1)/(2*y2);
         }
     else if (y2*y2 < cutoff*cutoff
              && y1*y1 > cutoff*cutoff) 
         {
         xc = x2 / 2.;
-        yc = (x1*x1 + y1*y1 - 2*x1*xc)/(2*y1);
+        yc = (x1*x1 + y1*y1 - x1*x2)/(2*y1);
         }
     else if (y1*y1 + y2*y2 < cutoff*cutoff)
         {
-        if (x1*x1 + x2*x2 < cutoff*cutoff)
-            {
-            xc = x1 / 2.;
-            yc = y1 / 2.;
-            }
-        else
-            {
-            xc = 0.;
-            yc = 0.;
-            }
+        xc = 1e12;
+        yc = 1e12;
         }
     else
        {
        double a1 = -x1/y1;
        double a2 = -x2/y2;
-       double b1 = y1/2.;
-       double b2 = y2/2.;
-            
-       xc = (b2 - b1) / (a1 - a2);
+       double b1 = (x1*x1 + y1*y1) / (2*y1);
+       double b2 = (x2*x2 + y2*y2) / (2*y2);
+       if ((a2 - a1) * (a2 - a1) < cutoff*cutoff)
+           {
+           xc = 1e12;
+           yc = 1e12;
+           }
+       xc = (b1 - b2) / (a2 - a1);
        yc = a1 * xc + b1;
        } 
        py::tuple results(2);

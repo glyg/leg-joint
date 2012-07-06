@@ -14,6 +14,47 @@ CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
 
+
+
+def plot_gradients(epithelium):
+    epithelium.junctions.graph.set_vertex_filter(epithelium.junctions.is_local)
+    j_vertices = [j_vert for j_vert in epithelium.junctions.graph.vertices()]
+    pos0 = np.array([epithelium.junctions.sz_pos[j_vert]
+                     for j_vert in epithelium.junctions.graph.vertices()])
+    epithelium.junctions.graph.set_vertex_filter(None)
+    grad = epithelium.local_gradient(pos0.flatten(), j_vertices)
+    grad_vec = grad.reshape(pos0.shape) + pos0
+    plot_cells_sz(epithelium, local=True)
+    for g, p in zip(grad_vec, pos0):
+        plt.plot([p[0], g[0]], [p[1], g[1]], 'r-', lw=4, alpha=0.5)
+        
+
+def plot_cells_sz(epithelium, local=True, index='True'):
+    if local:
+        epithelium.cells.graph.set_vertex_filter(
+            epithelium.cells.is_local)
+    for cell in epithelium.cells.graph.vertices():
+        plt.text(epithelium.cells.sz_pos[cell][0],
+                 epithelium.cells.sz_pos[cell][1],
+                 str(cell))
+        edge_list = [edge for edge in epithelium.cells.junctions_edges[cell]]
+        plot_edges_sz(epithelium.junctions, edge_list)
+    if local:
+        epithelium.cells.graph.set_vertex_filter(None)
+
+def plot_edges_sz(junctions, edge_list, **kwargs):
+    sigmas = []
+    zeds = []
+    for edge in edge_list:
+        sigmas = (junctions.sigmas[edge.source()],
+                  junctions.sigmas[edge.target()])
+        zeds = (junctions.zeds[edge.source()],
+                junctions.zeds[edge.target()])
+        plt.plot(sigmas, zeds, 'k-', lw=2, alpha=0.5, **kwargs)
+    ax = plt.gca()
+    ax.set_aspect('equal')
+
+
 def sfdp_draw(graph, output="lattice_3d.pdf", **kwargs):
     output = os.path.join('drawings', output)
     sfdp_pos = gt.graph_draw(graph,
@@ -29,16 +70,13 @@ def sfdp_draw(graph, output="lattice_3d.pdf", **kwargs):
 def pseudo3d_draw(graph, rtz, output="lattice_3d.pdf",
                   z_angle=0.12, theta_rot=0.1,
                   RGB=(0.8, 0.1, 0.), **kwargs):
-
     rhos, thetas, zeds = rtz
     thetas += theta_rot
     output = os.path.join('drawings', output)
-
     red, green, blue = RGB
     
     pseudo_x = graph.new_vertex_property('float')
     pseudo_y = graph.new_vertex_property('float')
-
     vertex_red = graph.new_vertex_property('float')
     vertex_green = graph.new_vertex_property('float')
     vertex_blue = graph.new_vertex_property('float')
@@ -48,13 +86,10 @@ def pseudo3d_draw(graph, rtz, output="lattice_3d.pdf",
     pseudo_y.a = rhos * np.sin(thetas)
     depth = rhos * np.cos(thetas)
     normed_depth = (depth - depth.min()) / (depth.max() - depth.min())
-    
     vertex_alpha.a = normed_depth * 0.7 + 0.3
-
     vertex_red.a = np.ones(rhos.shape, dtype=np.float) * red
     vertex_green.a = np.ones(rhos.shape, dtype=np.float) * green 
     vertex_blue.a = np.ones(rhos.shape, dtype=np.float) * blue
-    
     rgba = [vertex_red, vertex_green, vertex_blue, vertex_alpha]
     pseudo3d_color = gt.group_vector_property(rgba, value_type='float')
     

@@ -14,9 +14,6 @@ CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
 ELEMENT_TYPES=('cells', 'j_vertices', 'j_edge')
-
-
-
     
 class Epithelium():
     
@@ -36,9 +33,10 @@ class Epithelium():
         pos0 = np.array([self.junctions.sz_pos[j_vert]
                          for j_vert in self.junctions.graph.vertices()])
         self.junctions.graph.set_vertex_filter(None)
-        self.cells.graph.set_vertex_filter(self.cells.is_local)
         output = optimize.fmin_ncg(self.local_energy, pos0.flatten(),
                                    fprime=self.local_gradient,
+                                   avextol=1e-02,
+                                   retall=True,
                                    args=(j_vertices,))
         return pos0, output
 
@@ -50,55 +48,57 @@ class Epithelium():
                                              / rho) % (2 * np.pi)
             self.junctions.zeds[j_vert] = new_sz_pos[2 * n + 1]
         self.junctions.rtz_group()
-        
 
     def local_energy(self, new_sz_pos, j_vertices):
         self.set_new_pos(new_sz_pos, j_vertices)
-        return self.calc_total_energy()
+        return self.calc_energy(local=True)
 
     def local_gradient(self, new_sz_pos, j_vertices):
-        gradient = np.zeros_like(new_sz_pos)
-        
+        gradient = np.zeros(new_sz_pos.shape)
+        self.set_new_pos(new_sz_pos, j_vertices)        
+        self.calc_apical_geometry()
         for n, j_vertex in enumerate(j_vertices):
+            sn, zn = new_sz_pos[2 * n],  new_sz_pos[2 * n + 1]
             for cell in self.junctions.cells_vertices[j_vertex]:
-                gradient[n] += self.cells.elasticities[cell] * (
+                s0, z0 = self.cells.sz_pos[cell]
+                d0n = np.hypot(s0 - sn, z0 - zn)
+                sg = (s0 - sn) / d0n
+                zg = (z0 - zn) / d0n
+                elastic_term = - self.cells.elasticities[cell] * (
                     self.cells.areas[cell] - self.cells.prefered_area[cell])
-                gradient[n] += self.cells.contractilities[cell] * (
+                contractile_term = - self.cells.contractilities[cell] * (
                     self.cells.perimeters[cell])
+                gradient[2 * n] += (elastic_term + contractile_term) * sg
+                gradient[2 * n + 1] += (elastic_term + contractile_term) * zg
             for j_edge in j_vertex.out_edges():
-                gradient[n] += self.junctions.line_tensions[j_edge]
+                s1, z1 = self.junctions.sz_pos[j_edge.target()]
+                d1n = np.hypot(s1 - sn, z1 - zn)
+                sg = (s1 - sn) / d1n
+                zg = (z1 - zn) / d1n
+                gradient[2*n] +=  - self.junctions.line_tensions[j_edge] * sg
+                gradient[2*n + 1] +=  - self.junctions.line_tensions[j_edge] * zg
         return gradient
-
+    
     def calc_cell_positions(self):
-
         self.junctions.rtz_group()
         for cell in self.cells.graph.vertices():
-
-            all_pos = np.array([self.junctions.rtz_pos[jv].a
+            all_pos = np.array([self.junctions.sz_pos[jv].a
                                 for jv in
                                 self.cells.junctions_vertices[cell]])
-            xc = all_pos[:,0] * np.cos(all_pos[:,1])
-            xc = xc.mean()
-            yc = all_pos[:,0] * np.sin(all_pos[:,1])
-            yc = yc.mean()
-            
-            rhoc = np.sqrt(xc**2 + yc**2)
-            thetac = np.arctan2(yc, xc)
-            zc = all_pos[:, 2].mean()
-
-            self.cells.rhos[cell] = rhoc
-            self.cells.thetas[cell] = thetac
-            self.cells.zeds[cell] = zc            
+            self.cells.sigmas[cell] = all_pos[:, 0].mean()
+            self.cells.zeds[cell] = all_pos[:, 0].mean()
         self.cells.rtz_group()
 
-    def calc_apical_geometry(self):
+    def calc_apical_geometry(self, local=False):
         """
         The area is approximated as the sum
         of the areas of the triangles
         formed by the cell position and each junction
         """
-        self.cells.graph.set_vertex_filter(self.cells.is_local)
+        if local:
+            self.cells.graph.set_vertex_filter(self.cells.is_local)
         for cell in self.cells.graph.vertices():
+            if not self.cells.is_alive[cell]: continue
             area = 0.
             perimeter = 0.
             sz0 = self.cells.sz_pos[cell]
@@ -110,18 +110,19 @@ class Epithelium():
                 t2 = self.junctions.periodic_theta(edge.target(), t0)
                 sz1 = [rtz1[0] * t1, rtz1[2]]
                 sz2 = [rtz2[0] * t2, rtz2[2]]
-                
+
                 d01, d02, d12, area012 = triangle_geometry(sz0, sz1, sz2)
                 area += area012
                 self.junctions.edge_lengths[edge] = d12
                 perimeter += d12
                 self.cells.areas[cell] = area
                 self.cells.perimeters[cell] = perimeter
-        self.cells.graph.set_vertex_filter(None)
+        if local:
+            self.cells.graph.set_vertex_filter(None)
         
-    def calc_total_energy(self):
+    def calc_energy(self, local=False):
         
-        self.calc_apical_geometry()
+        self.calc_apical_geometry(local)
         elastic_term = 0.5 * self.cells.elasticities.a * (
             self.cells.areas.a - self.cells.prefered_area.a)**2
         contractile_term = 0.5 * self.cells.contractilities.a * (
@@ -139,6 +140,13 @@ class Epithelium():
         for j_vert in self.cells.junctions_vertices[cell]:
             self.junctions.is_local[j_vert] = 1
 
+    def remove_local_mask(self, cell):
+
+        self.cells.is_local[cell] = 0
+        for neighbour in cell.all_neighbours():
+            self.cells.is_local[neighbour] = 0
+        for j_vert in self.cells.junctions_vertices[cell]:
+            self.junctions.is_local[j_vert] = 0
 
 
     def type1_transition(self, elements, element_type='cells'):
@@ -230,7 +238,9 @@ class Epithelium():
         cells.junctions_edges[cell4].append(j_edgeab)
 
         junctions.adjacent_cells[j_edgeab] = (cell2, cell4)
-
+        junctions.cells_vertices[j_verta] = [cell2, cell3, cell4]
+        junctions.cells_vertices[j_vertb] = [cell1, cell2, cell4]
+        
         edge23 = cells.graph.edge(cell1, cell3)
         cells.graph.remove_edge(edge23)
         ce24 = cells.graph.add_edge(cell2, cell4)
@@ -240,9 +250,6 @@ class Epithelium():
 
         junctions.graph.add_edge(j_verta, j_vertd)
         junctions.graph.add_edge(j_vertb, j_vertf)
-        
-    #def division(self, cell):
-
         
         
 def triangle_geometry(sz0, sz1, sz2):
