@@ -1,5 +1,31 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
+"""
+This module provides the basic elements composing the leg epithelium.
+
+The architecture of the epithelium model consists in
+two networks (aka graphs):
+
+ * The first graph is composed by the cells themselves and is obtained by
+ the Delaunay triangulation of a set of points in the ::math:(\rho, \sigma):
+ plane, representing the cell centers. An edge of this graph defines a
+ simple neighbourhood relationship. 
+
+ * The second graph represents the appical junctions, and is constructed
+ initially as the Voronoi diagramm associated with the cell centers
+ triangulation, again in the ::math:(\rho, \sigma): plane.
+ An edge of the appical junctions corresponds to the interface between
+ two neighbouring cells.
+ 
+Those two networks are implemented as classes wrapping a
+(`graph_tool`)[http://projects.skewed.de/graph-tool] object with the
+::math:(\rho, \theta, z): coordinate system. The common features
+are defined in an abstract class named ::class:`AbstractRTZGraph`:,
+from which the ::class:`CellGraph`: and ::class:`AppicalJunctions`
+are derived.
+"""
+
 import os, time
 import numpy as np
 from numpy.random import normal, random_sample
@@ -14,14 +40,42 @@ PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
         
 class AbstractRTZGraph(object):
     '''
-    For both the cells and the junctions (hence abstract)
-    Wraps `graph-tool` in the rho, theta, zed
-    coordinate system.
-
+    Wrapper of a (`graph_tool`)[http://projects.skewed.de/graph-tool]
+    object with the ::math:(\rho, \theta, z): coordinate system.
     '''
 
     def __init__(self, rhos, thetas, zeds,
                  graph, pos_cutoff=1e-3):
+        '''
+        Create an `AbstractRTZGraph` object. This is not ment as
+        a stand alone object, but should rather be sublcassed.
+
+        Parameters:
+        ===========
+        rhos, thetas, zeds : arrays
+            three 1D arrays containing the coordinates of the graph vertices.
+            They must have the as many points as there are graph vertices.
+        graph: a `graph_tool Graph` object
+            The graph should contain as many vertices as points in the
+            `rhos, thetas, zeds` arrays.
+
+        Attributes:
+        ===========
+        rhos, thetas, zeds: vertex PropertyMaps of the vertices positions 
+        sigmas: vertex PropertyMaps of the vertices ::math:\sigma = \rho\theta:
+        vecinos: vertex PropertyMap containing a list of the vertex neighbours
+            ordered counter-clockwize in the ::math:(\rho, \sigma): plane around
+            the central vertex
+        
+        Methods:
+        ===========
+        rtz_group : Creates or updates two `GroupPropertyMap`,
+            `rtz_pos` and `sz_pos` containing the ::math:(\rho, \theta, z):
+            and ::math:(\sigma, z): positions of the vertices, respectively.
+        
+        
+        
+        '''
         #Position in the rho theta zed space
         #Instanciation
         self.rhos = self.graph.new_vertex_property('float')
