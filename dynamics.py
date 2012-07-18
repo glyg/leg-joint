@@ -27,7 +27,6 @@ class Epithelium():
         self.junctions = AppicalJunctions(self)
 
     def find_energy_min(self):
-
         self.junctions.graph.set_vertex_filter(self.junctions.is_local)
         j_vertices = [j_vert for j_vert in self.junctions.graph.vertices()]
         pos0 = np.array([self.junctions.sz_pos[j_vert]
@@ -35,7 +34,7 @@ class Epithelium():
         self.junctions.graph.set_vertex_filter(None)
         output = optimize.fmin_ncg(self.local_energy, pos0.flatten(),
                                    fprime=self.local_gradient,
-                                   avextol=1e-02,
+                                   avextol=0.1,
                                    retall=True,
                                    args=(j_vertices,))
         return pos0, output
@@ -104,7 +103,6 @@ class Epithelium():
             sz0 = self.cells.sz_pos[cell]
             t0 = self.cells.thetas[cell]
             for edge in self.cells.junctions_edges[cell]:
-                print str(edge)
                 rtz1 = self.junctions.rtz_pos[edge.source()]
                 rtz2 = self.junctions.rtz_pos[edge.target()]
                 t1 = self.junctions.periodic_theta(edge.source(), t0)
@@ -167,18 +165,8 @@ class Epithelium():
         if not element_type in ELEMENT_TYPES:
             raise AttributeError( "element_type should be in:"
                                   "{'cells', 'j_vertices', 'j_edge'} ")
-        
-        cells = self.cells
-        junctions = self.junctions
-        if element_type == 'j_vertices':
-            j_verta, j_vertb = elements
-            j_edgeab = self.junctions.graph.edge(elements)
-            cell1, cell3 = self.junctions.adjacent_cells[j_edgeab]
-        elif element_type == 'j_edge':
-            j_edgeab = elements
-            j_verta, j_vertb = j_edgeab.source(), j_edgeab.target()
-            cell1, cell3 = self.junctions.adjacent_cells[j_edgeab]
-        elif element_type == 'cells':
+
+        if element_type == 'cells':
             cell1 = elements[0]
             cell3 = elements[1]
             for je in self.cells.junctions_edges[cell1]:
@@ -186,81 +174,155 @@ class Epithelium():
                     j_edgeab = je
             j_verta = j_edgeab.source()
             j_vertb = j_edgeab.target()
+        elif element_type == 'j_vertices':
+            j_verta, j_vertb = elements
+            j_edgeab = self.junctions.graph.edge(elements)
+            cell1, cell3 = self.junctions.adjacent_cells[j_edgeab]
+        elif element_type == 'j_edge':
+            j_edgeab = elements
+            j_verta, j_vertb = j_edgeab.source(), j_edgeab.target()
+            cell1, cell3 = self.junctions.adjacent_cells[j_edgeab]
         try:
             vecinos_a = self.junctions.all_vecinos(j_verta)
             vecinos_b = self.junctions.all_vecinos(j_vertb)
             j_vertc, j_vertf = vecinos_a[vecinos_a != j_vertb]
             j_vertd, j_verte = vecinos_b[vecinos_b != j_verta]
         except ValueError:
-            print "Valid only for 3-way junctions"
-            return
+            raise ValueError("Valid only for 3-way junctions")
 
         j_edgeac = self.junctions.graph.edge(j_verta, j_vertc)
-        j_edgeaf = self.junctions.graph.edge(j_verta, j_vertf)
-
-        j_edgebd = self.junctions.graph.edge(j_vertb, j_vertd)
         j_edgebe = self.junctions.graph.edge(j_vertb, j_verte)
+        if j_edgebe is None or j_edgeac is None:
+            raise ValueError
 
-        cell2 = self.junctions.adjacent_cells[j_edgebd][1]
-        if cell2 == cell1:
-            cell2 = self.junctions.adjacent_cells[j_edgebd][0]
-        cell4 = self.junctions.adjacent_cells[j_edgeaf][1]
-        if cell4 == cell3:
+        if not cell1 in self.junctions.adjacent_cells[j_edgeac]:
+            j_vertc, j_vertf = j_vertf, j_vertc
+        if not cell3 in self.junctions.adjacent_cells[j_edgebe]:
+            j_verte, j_vertd = j_verte, j_vertd
+        cell2 = self.junctions.adjacent_cells[j_edgebe][1]
+        if cell2 == cell3:
+            cell2 = self.junctions.adjacent_cells[j_edgebe][0]
+        cell4 = self.junctions.adjacent_cells[j_edgeac][1]
+        if cell4 == cell1:
             cell4 = self.junctions.adjacent_cells[j_edgeac][0]
-            
+
+        self.remove_junction(cell1, cell3, j_verta, j_vertb)
+        self.remove_junction(cell1, cell4, j_verta, j_vertc)
+        self.remove_junction(cell2, cell3, j_vertb, j_verte)
+        self.add_junction(cell2, cell4, j_verta, j_vertb)
+        self.add_junction(cell2, cell3, j_verta, j_verte)
+        self.add_junction(cell1, cell4, j_vertb, j_vertc)
+
         # pi/2 rotation of junction vertices a and b around their center
+        self.junctions.rtz_group()
         center = (self.junctions.sz_pos[j_verta].a +
                   self.junctions.sz_pos[j_vertb].a)/2.
         j_verta_sz = self.junctions.sz_pos[j_verta].a - center
         j_vertb_sz = self.junctions.sz_pos[j_vertb].a - center
+
+        self.junctions.sigmas[j_verta] = j_verta_sz[1] + center[0]
+        self.junctions.zeds[j_verta] = - j_verta_sz[0]  + center[1]
+        self.junctions.thetas[j_verta] = (
+            self.junctions.sigmas[j_verta]
+            / self.junctions.rhos[j_verta]
+            ) % (2 * np.pi)
+        self.junctions.sigmas[j_vertb] = j_vertb_sz[1] + center[0]
+        self.junctions.zeds[j_vertb] = - j_vertb_sz[0]  + center[1]
+        self.junctions.thetas[j_vertb] = (
+            self.junctions.sigmas[j_vertb]
+            / self.junctions.rhos[j_vertb]
+            ) % (2 * np.pi)
+        self.junctions.rtz_group()
+        self.calc_apical_geometry(local=True)
+
+        modified_cells = [cell1, cell2, cell3, cell4]
+        modified_jverts = [j_verta, j_vertb, j_vertc,
+                           j_vertd, j_verte, j_vertf]
+        return modified_cells, modified_jverts
+
+    def cell_division(self, mother_cell):
+        zeta_division = np.random.random_sample(
+            ) * 2 * np.pi - np.pi
+        sigmas = [self.junctions.sigmas[j] for j in
+                  self.cells.junctions_vertices[mother_cell]]
+        zeds = [self.junctions.zeds[j] for j in
+                  self.cells.junctions_vertices[mother_cell]]
+        zetas = np.arctan2(sigmas, zeds)
+        zetas_rel = zetas - zeta_division
+        right_of = [zetas_rel <= 0]
+        left_of = [zetas_rel > 0]
         
-        self.junctions.sigmas[j_verta] = j_verta_sz[1] + center[0]
-        self.junctions.zeds[j_verta] = - j_verta_sz[0]  + center[1]
-        self.junctions.thetas[j_verta] = (self.junctions.sigmas[j_verta]
-                                     / self.junctions.rhos[j_verta]) % (2 * np.pi)
+        
+        
+    def add_junction(self, cell0, cell1, j_verta, j_vertb):
+        ##### This block should go in a decorator
+        valid = np.array([obj.is_valid() for obj in
+                          (cell0, cell1, j_verta, j_vertb)])
+        if not valid.all():
+            raise ValueError("invalid elements in the argument list"
+                             "with cell0 => %s"
+                             "     cell1 => %s"
+                             "     vertex a => %s "
+                             "     vertex b => %s " % (str(v) for v in valid)
+                             )
+        ####
+        ce01 = self.cells.graph.edge(cell0, cell1)
+        if ce01 is not None:
+            print "Warning: previous cell0 to cell1 edge is re-created."
+            self.cells.graph.remove_edge(ce01)
+        ce01 = self.cells.graph.add_edge(cell0, cell1)
 
-        self.junctions.sigmas[j_verta] = j_verta_sz[1] + center[0]
-        self.junctions.zeds[j_verta] = - j_verta_sz[0]  + center[1]
-        self.junctions.thetas[j_verta] = (self.junctions.sigmas[j_verta]
-                                     / self.junctions.rhos[j_verta]) % (2 * np.pi)
+        j_edgeab = self.junctions.graph.edge(j_verta, j_vertb)
+        if j_edgeab is not None:
+            print "Warning: previous j_verta to j_vertb edge is re-created."
+            self.junctions.graph.remove_edge(j_verta, j_vertb)
+        j_edgeab = self.junctions.graph.add_edge(j_verta, j_vertb)
 
-        self.cells.graph.remove_edge(
-            self.cells.graph.edge(cell1, cell3))
-        celledge24 = self.cells.graph.add_edge(cell2, cell4)
+        self.cells.junctions_edges[cell0].append(j_edgeab)
+        self.cells.junctions_vertices[cell0].extend((j_verta, j_vertb))
+        self.cells.junctions_edges[cell1].append(j_edgeab)
+        self.cells.junctions_vertices[cell1].extend((j_verta, j_vertb))
+        
+        self.junctions.adjacent_cells[j_edgeab] = (cell0, cell1)
+        self.junctions.cells_vertices[j_verta].extend((cell0, cell1))
+        self.junctions.cells_vertices[j_vertb].extend((cell0, cell1))
+        line_tension0 = self.params['line_tension']
+        self.junctions.line_tensions[j_edgeab] = line_tension0
 
-        self.cells.junctions_vertices[cell1].remove(j_verta)
-        self.cells.junctions_edges[cell1].remove(j_edgeab)
-        self.cells.junctions_edges[cell1].remove(j_edgeac)
-
-        self.cells.junctions_vertices[cell3].remove(j_vertb)
-        self.cells.junctions_edges[cell3].remove(j_edgeab)
-        self.cells.junctions_edges[cell3].remove(j_edgebe)
-
-        self.junctions.graph.remove_edge(j_edgebe)
-        self.junctions.graph.remove_edge(j_edgeac)
-
-        self.cells.junctions_vertices[cell2].append(j_verta)
-        self.cells.junctions_vertices[cell2].append(j_vertb)
-        self.cells.junctions_edges[cell2].append(j_edgeab)
-
-        self.cells.junctions_vertices[cell4].append(j_verta)
-        self.cells.junctions_vertices[cell4].append(j_vertb)        
-        self.cells.junctions_edges[cell4].append(j_edgeab)
-
-        j_edgeae = self.junctions.graph.add_edge(j_verta, j_verte)
-        self.junctions.adjacent_cells[j_edgeae] = (cell2, cell3)
-        self.junctions.cells_vertices[j_verta
-                                      ] = [cell2, cell3, cell4]
-        self.cells.junction_edges[cell2].append(j_edgeae)
-        self.cells.junction_edges[cell3].append(j_edgeae)
-
-
-        j_edgebc = self.junctions.graph.add_edge(j_vertb, j_vertc)
-        self.junctions.adjacent_cells[j_edgebc] = (cell1, cell4)
-        self.junctions.cells_vertices[j_vertb
-                                      ] = [cell1, cell2, cell4]
-        self.cells.junction_edges[cell1].append(j_edgebc)
-        self.cells.junction_edges[cell4].append(j_edgebc)
+    def remove_junction(self, cell0, cell1, j_verta, j_vertb):
+        #This block should go in a decorator
+        valid = np.array([element.is_valid() for element in
+                          (cell0, cell1, j_verta, j_vertb)])
+        if not valid.all():
+            raise ValueError("invalid elements in the argument list"
+                             "with cell0 => %s"
+                             "     cell1 => %s"
+                             "     vertex a => %s "
+                             "     vertex b => %s " % (str(v) for v in valid))
+        ####
+        j_edgeab = self.junctions.graph.edge(j_verta, j_vertb)
+        if j_edgeab is None:
+            print "Warning: junction %s doesn't exist" % str(j_edgeab)
+            return
+        try:
+            self.cells.junctions_edges[cell0].remove(j_edgeab)
+            self.cells.junctions_edges[cell1].remove(j_edgeab)
+            self.junctions.cells_vertices[j_verta].remove(cell0)
+            self.junctions.cells_vertices[j_verta].remove(cell1)
+            self.junctions.cells_vertices[j_vertb].remove(cell0)
+            self.junctions.cells_vertices[j_vertb].remove(cell1)
+            self.cells.junctions_vertices[cell0].remove(j_verta)
+            self.cells.junctions_vertices[cell1].remove(j_verta)
+            self.cells.junctions_vertices[cell0].remove(j_vertb)
+            self.cells.junctions_vertices[cell1].remove(j_vertb)
+        except ValueError:
+            print("redundant call for cells %s, %s "
+                  "and vertices %s, %s " 
+                  % (cell0, cell1, j_verta, j_vertb))
+            pass
+        ce01 = self.cells.graph.edge(cell0, cell1)
+        self.cells.graph.remove_edge(ce01)
+        self.junctions.graph.remove_edge(j_edgeab)
 
 
 def triangle_geometry(sz0, sz1, sz2):

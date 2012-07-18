@@ -342,6 +342,7 @@ class AppicalJunctions(AbstractRTZGraph):
         self.edge_lengths = self.graph.new_edge_property('float')
         self.line_tensions = self.graph.new_edge_property('float')
         self.line_tensions.a[:] = line_tension0
+        # WTF?
         epithelium.junctions = self
 
     def compute_voronoi(self):
@@ -476,43 +477,6 @@ def c_circumcircle(sz0, sz1, sz2, cutoff):
     return weave.inline(c_code,
                         arg_names=['sz0', 'sz1', 'sz2', 'cutoff'],
                         headers=['<math.h>'])
-
-
-
-def circumcircle(u0, u1, u2, cutoff):
-    u1_loc = u1 - u0
-    u2_loc = u2 - u0
-    centers = med_intersect(u1_loc[0], u1_loc[1],
-                            u2_loc[0], u2_loc[1], cutoff)
-    uc = centers + u0
-    return uc
-
-def med_intersect(x1, y1, x2, y2, cutoff):
-    if y1**2 < cutoff**2 and y2**2 > cutoff**2:
-        xc = x1 / 2.
-        yc = (x2**2 + y2**2 - 2 * x2 * xc) / (2 * y2)  
-        return xc, yc
-    if y2**2 < cutoff**2 and y1**2 > cutoff**2:
-        xc = x2 / 2.
-        yc = (x1**2 + y1**2 - 2 * x1 * xc) / (2 * y1)  
-        return xc, yc
-    if y1**2 + y2**2 < cutoff**2:
-        if x1**2 + x2**2 < cutoff**2:
-            print 'points are superimposed'
-            return x1 / 2., y1 / 2.
-        else:
-            return np.inf, np.inf
-    #Equation des mediatrices
-    a1,  a2 = - x1/y1, - x2/y2
-    if (a1 - a2)**2 < cutoff**2:
-        print 'points are aligned'
-        return np.inf, np.inf
-    b1 = y1 / 2. - a1 * x1 / 2.
-    b2 = y2 / 2. - a2 * x2 / 2.
-    xc = (b2 - b1) / (a1 - a2)
-    yc = a1 * xc + b1
-    
-    return xc, yc
 
 def dist_rtz(rtz0, rtz1):
     

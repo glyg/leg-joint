@@ -46,11 +46,20 @@ def plot_edges_sz(junctions, edge_list, **kwargs):
     sigmas = []
     zeds = []
     for edge in edge_list:
+        if not edge.is_valid():
+            print edge
+            continue
         sigmas = (junctions.sigmas[edge.source()],
                   junctions.sigmas[edge.target()])
         zeds = (junctions.zeds[edge.source()],
                 junctions.zeds[edge.target()])
         plt.plot(sigmas, zeds, 'k-', lw=2, alpha=0.5, **kwargs)
+        plt.text(junctions.sigmas[edge.source()],
+                 junctions.zeds[edge.source()],
+                 str(edge.source()))
+        plt.text(junctions.sigmas[edge.target()],
+                 junctions.zeds[edge.target()],
+                 str(edge.target()))
     ax = plt.gca()
     ax.set_aspect('equal')
 
@@ -214,7 +223,6 @@ def epithelium_draw(epithelium, z_angle=0.15, d_theta=0.1,
     sigma.a = rhos.a * thetas.a
     zs = [sigma, zeds]
     zs_pos = gt.group_vector_property(zs, value_type='float')
-
     pmap2 = gt.graph_draw(ug, zs_pos,
                           vertex_fill_color=vertex_color,
                           vertex_color=vertex_color,
@@ -246,10 +254,11 @@ def cylindrical2cartesian(rtz):
     xyz['zed'] = zeds   
     return xyz
 
-def vertices_projections(rtz, figure, axes, **kwards):
+def vertices_projections(rtz, **kwards):
     """
     Plots a figure with the various 2D projections
     """
+    figure, axes = plt.subplots(2, 2)
     basalapical_ax = axes[1,1]
     basalapical_ax.plot(rtz['zed'], rtz['rho'],
                         'o', alpha=0.3)
