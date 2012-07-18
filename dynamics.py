@@ -56,7 +56,7 @@ class Epithelium():
     def local_gradient(self, new_sz_pos, j_vertices):
         gradient = np.zeros(new_sz_pos.shape)
         self.set_new_pos(new_sz_pos, j_vertices)        
-        self.calc_apical_geometry()
+        self.calc_apical_geometry(local=True)
         for n, j_vertex in enumerate(j_vertices):
             sn, zn = new_sz_pos[2 * n],  new_sz_pos[2 * n + 1]
             for cell in self.junctions.cells_vertices[j_vertex]:
@@ -75,8 +75,8 @@ class Epithelium():
                 d1n = np.hypot(s1 - sn, z1 - zn)
                 sg = (s1 - sn) / d1n
                 zg = (z1 - zn) / d1n
-                gradient[2*n] +=  - self.junctions.line_tensions[j_edge] * sg
-                gradient[2*n + 1] +=  - self.junctions.line_tensions[j_edge] * zg
+                gradient[2*n] +=  -self.junctions.line_tensions[j_edge] * sg
+                gradient[2*n + 1] +=  -self.junctions.line_tensions[j_edge] * zg
         return gradient
     
     def calc_cell_positions(self):
@@ -102,8 +102,9 @@ class Epithelium():
             area = 0.
             perimeter = 0.
             sz0 = self.cells.sz_pos[cell]
+            t0 = self.cells.thetas[cell]
             for edge in self.cells.junctions_edges[cell]:
-                t0 = self.cells.thetas[cell]
+                print str(edge)
                 rtz1 = self.junctions.rtz_pos[edge.source()]
                 rtz2 = self.junctions.rtz_pos[edge.target()]
                 t1 = self.junctions.periodic_theta(edge.source(), t0)
@@ -148,7 +149,6 @@ class Epithelium():
         for j_vert in self.cells.junctions_vertices[cell]:
             self.junctions.is_local[j_vert] = 0
 
-
     def type1_transition(self, elements, element_type='cells'):
         """Type one transition (see the definition in
         Farhadifar et al. Curr Biol. 2007 Dec 18;17(24):2095-104.
@@ -172,86 +172,97 @@ class Epithelium():
         junctions = self.junctions
         if element_type == 'j_vertices':
             j_verta, j_vertb = elements
-            j_edgeab = junctions.graph.edge(elements)
-            cell1, cell3 = junctions.adjacent_cells[j_edgeab]
+            j_edgeab = self.junctions.graph.edge(elements)
+            cell1, cell3 = self.junctions.adjacent_cells[j_edgeab]
         elif element_type == 'j_edge':
             j_edgeab = elements
             j_verta, j_vertb = j_edgeab.source(), j_edgeab.target()
-            cell1, cell3 = junctions.adjacent_cells[j_edgeab]
+            cell1, cell3 = self.junctions.adjacent_cells[j_edgeab]
         elif element_type == 'cells':
             cell1 = elements[0]
             cell3 = elements[1]
-            for je in cells.junctions_edges[cell1]:
-                if je in cells.junctions_edges[cell3]:
+            for je in self.cells.junctions_edges[cell1]:
+                if je in self.cells.junctions_edges[cell3]:
                     j_edgeab = je
             j_verta = j_edgeab.source()
             j_vertb = j_edgeab.target()
         try:
-            vecinos_a = junctions.all_vecinos(j_verta)
-            vecinos_b = junctions.all_vecinos(j_vertb)
+            vecinos_a = self.junctions.all_vecinos(j_verta)
+            vecinos_b = self.junctions.all_vecinos(j_vertb)
             j_vertc, j_vertf = vecinos_a[vecinos_a != j_vertb]
             j_vertd, j_verte = vecinos_b[vecinos_b != j_verta]
         except ValueError:
             print "Valid only for 3-way junctions"
             return
 
-        j_edgeac = junctions.graph.edge(j_verta, j_vertc)
-        j_edgeaf = junctions.graph.edge(j_verta, j_vertf)
-        j_edgebd = junctions.graph.edge(j_vertb, j_vertd)
-        j_edgeeb = junctions.graph.edge(j_verte, j_vertb)
+        j_edgeac = self.junctions.graph.edge(j_verta, j_vertc)
+        j_edgeaf = self.junctions.graph.edge(j_verta, j_vertf)
 
-        cell2 = junctions.adjacent_cells[j_edgebd][1]
+        j_edgebd = self.junctions.graph.edge(j_vertb, j_vertd)
+        j_edgebe = self.junctions.graph.edge(j_vertb, j_verte)
+
+        cell2 = self.junctions.adjacent_cells[j_edgebd][1]
         if cell2 == cell1:
-            cell2 = junctions.adjacent_cells[j_edgebd][0]
-        cell4 = junctions.adjacent_cells[j_edgeaf][1]
+            cell2 = self.junctions.adjacent_cells[j_edgebd][0]
+        cell4 = self.junctions.adjacent_cells[j_edgeaf][1]
         if cell4 == cell3:
-            cell4 = junctions.adjacent_cells[j_edgeac][0]
+            cell4 = self.junctions.adjacent_cells[j_edgeac][0]
             
-        # pi/2 rotation of junctions a and b around their center
-        center = (junctions.sz_pos[j_verta].a +
-                  junctions.sz_pos[j_vertb].a)/2.
-        j_verta_sz = junctions.sz_pos[j_verta].a - center
-        j_vertb_sz = junctions.sz_pos[j_vertb].a - center
+        # pi/2 rotation of junction vertices a and b around their center
+        center = (self.junctions.sz_pos[j_verta].a +
+                  self.junctions.sz_pos[j_vertb].a)/2.
+        j_verta_sz = self.junctions.sz_pos[j_verta].a - center
+        j_vertb_sz = self.junctions.sz_pos[j_vertb].a - center
         
-        junctions.sigmas[j_verta] = j_verta_sz[1] + center[0]
-        junctions.zeds[j_verta] = - j_verta_sz[0]  + center[1]
-        junctions.thetas[j_verta] = (junctions.sigmas[j_verta]
-                                     / junctions.rhos[j_verta]) % (2 * np.pi)
+        self.junctions.sigmas[j_verta] = j_verta_sz[1] + center[0]
+        self.junctions.zeds[j_verta] = - j_verta_sz[0]  + center[1]
+        self.junctions.thetas[j_verta] = (self.junctions.sigmas[j_verta]
+                                     / self.junctions.rhos[j_verta]) % (2 * np.pi)
 
-        junctions.sigmas[j_verta] = j_verta_sz[1] + center[0]
-        junctions.zeds[j_verta] = - j_verta_sz[0]  + center[1]
-        junctions.thetas[j_verta] = (junctions.sigmas[j_verta]
-                                     / junctions.rhos[j_verta]) % (2 * np.pi)
+        self.junctions.sigmas[j_verta] = j_verta_sz[1] + center[0]
+        self.junctions.zeds[j_verta] = - j_verta_sz[0]  + center[1]
+        self.junctions.thetas[j_verta] = (self.junctions.sigmas[j_verta]
+                                     / self.junctions.rhos[j_verta]) % (2 * np.pi)
 
-        # redistributing junctions
-        cells.junctions_vertices[cell1].remove(j_vertb)
-        cells.junctions_vertices[cell3].remove(j_verta)
-        cells.junctions_vertices[cell2].append(j_verta)
-        cells.junctions_vertices[cell2].append(j_vertb)
-        cells.junctions_vertices[cell4].append(j_verta)
-        cells.junctions_vertices[cell4].append(j_vertb)        
+        self.cells.graph.remove_edge(
+            self.cells.graph.edge(cell1, cell3))
+        celledge24 = self.cells.graph.add_edge(cell2, cell4)
 
-        cells.junctions_edges[cell1].remove(j_edgeab)
-        cells.junctions_edges[cell3].remove(j_edgeab)
+        self.cells.junctions_vertices[cell1].remove(j_verta)
+        self.cells.junctions_edges[cell1].remove(j_edgeab)
+        self.cells.junctions_edges[cell1].remove(j_edgeac)
 
-        cells.junctions_edges[cell2].append(j_edgeab)
-        cells.junctions_edges[cell4].append(j_edgeab)
+        self.cells.junctions_vertices[cell3].remove(j_vertb)
+        self.cells.junctions_edges[cell3].remove(j_edgeab)
+        self.cells.junctions_edges[cell3].remove(j_edgebe)
 
-        junctions.adjacent_cells[j_edgeab] = (cell2, cell4)
-        junctions.cells_vertices[j_verta] = [cell2, cell3, cell4]
-        junctions.cells_vertices[j_vertb] = [cell1, cell2, cell4]
-        
-        edge23 = cells.graph.edge(cell1, cell3)
-        cells.graph.remove_edge(edge23)
-        ce24 = cells.graph.add_edge(cell2, cell4)
+        self.junctions.graph.remove_edge(j_edgebe)
+        self.junctions.graph.remove_edge(j_edgeac)
 
-        junctions.graph.remove_edge(j_edgeaf)
-        junctions.graph.remove_edge(j_edgebd)
+        self.cells.junctions_vertices[cell2].append(j_verta)
+        self.cells.junctions_vertices[cell2].append(j_vertb)
+        self.cells.junctions_edges[cell2].append(j_edgeab)
 
-        junctions.graph.add_edge(j_verta, j_vertd)
-        junctions.graph.add_edge(j_vertb, j_vertf)
-        
-        
+        self.cells.junctions_vertices[cell4].append(j_verta)
+        self.cells.junctions_vertices[cell4].append(j_vertb)        
+        self.cells.junctions_edges[cell4].append(j_edgeab)
+
+        j_edgeae = self.junctions.graph.add_edge(j_verta, j_verte)
+        self.junctions.adjacent_cells[j_edgeae] = (cell2, cell3)
+        self.junctions.cells_vertices[j_verta
+                                      ] = [cell2, cell3, cell4]
+        self.cells.junction_edges[cell2].append(j_edgeae)
+        self.cells.junction_edges[cell3].append(j_edgeae)
+
+
+        j_edgebc = self.junctions.graph.add_edge(j_vertb, j_vertc)
+        self.junctions.adjacent_cells[j_edgebc] = (cell1, cell4)
+        self.junctions.cells_vertices[j_vertb
+                                      ] = [cell1, cell2, cell4]
+        self.cells.junction_edges[cell1].append(j_edgebc)
+        self.cells.junction_edges[cell4].append(j_edgebc)
+
+
 def triangle_geometry(sz0, sz1, sz2):
     c_code = """
     double s0 = sz0[0];

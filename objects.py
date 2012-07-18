@@ -411,9 +411,6 @@ class AppicalJunctions(AbstractRTZGraph):
                             cells.junctions_edges[cell].append(j_edge)
                             cells.junctions_edges[vecino].append(j_edge)
                             self.adjacent_cells[j_edge] = (cell, vecino)
-                            
-        print n_dropped
-
         cells.graph.set_vertex_filter(cells.is_alive)
         #cells.graph.purge_vertices()
         
