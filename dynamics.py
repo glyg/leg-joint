@@ -8,30 +8,84 @@ import graph_tool.all as gt
 from xml_handler import ParamTree
 from scipy import weave
 
-from objects import CellGraph, AppicalJunctions
+from objects import  AbstractRTZGraph, Cells, AppicalJunctions
 
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
 ELEMENT_TYPES=('cells', 'j_vertices', 'j_edge')
     
-class Epithelium():
+class Epithelium(AbstractRTZGraph):
     
     def __init__(self, paramtree=None, paramfile=PARAMFILE):
+        # Parametrisation
         if paramtree == None:
             self.paramtree = ParamTree(paramfile)
         else:
             self.paramtree = paramtree
         self.params = self.paramtree.absolute_dic
-        self.cells = CellGraph(self)
-        self.junctions = AppicalJunctions(self)
 
+        #Cell graph initialisation
+        cells = Cells(self, subgraph=None)
+        
+        # Adding the cells to the (stil empty) epithelium graph
+        subgraph = cells.subgraph.copy()
+
+
+        rhos = subgraph.vertex_properties['rhos'].a
+        thetas = subgraph.vertex_properties['thetas'].a
+        zeds = subgraph.vertex_properties['zeds'].a
+        AbstractRTZGraph.__init__(self, rhos,
+                                  thetas,
+                                  zeds,
+                                  subgraph)
+
+        self.junctions = AppicalJunctions(self, cells=cells, subgraph=None)        # Note that from next line on we only work on filtered views
+        # and the AbstractRTZGraph methods are only valid applied directly
+        # to `eptm.graph`. i.e. `eptm.cells.rhos` is not guaranteed to
+        # be up to date.
+        
+
+    @property
+    def is_cell_vert(self):
+        return self.subgraph.vertex_properties["is_cell_vert"]
+    @property
+    def is_junction_edge(self):
+        return self.subgraph.edge_properties["is_junction_edge"]
+ 
+    @property
+    def is_ctoj_edge(self):
+        return self.subgraph.edge_properties["is_ctoj_edge"]
+
+    @property
+    def cells_subgraph(self):
+        return gt.GraphView(self.subgraph,
+                            vfilt=self.is_cell_vert)
+    @property
+    def junctions_subgraph(self):
+        return gt.GraphView(self.subgraph,
+                            efilt=self.is_junction_edge)
+    def init_cells(self):
+        return Cells(self, subgraph=self.cells_subgraph)
+
+    def init_junctions(self):
+        return AppicalJunctions(self, subgraph=self.junctions_subgraph)
+
+    @property
+    def is_local(self):
+        return self.subgraph.edge_properties["is_local"]
+    
     def find_energy_min(self):
-        self.junctions.graph.set_vertex_filter(self.junctions.is_local)
-        j_vertices = [j_vert for j_vert in self.junctions.graph.vertices()]
-        pos0 = np.array([self.junctions.sz_pos[j_vert]
-                         for j_vert in self.junctions.graph.vertices()])
-        self.junctions.graph.set_vertex_filter(None)
+        
+        #vfilt = 
+        self.junctions_subgraph.set_vertex_filter(self.is_local)
+        j_vertices = [j_vert for j_vert in
+                      self.junctions_subgraph.vertices()]
+        pos0 = self.sz_pos
+
+        np.array([self.sz_pos[j_vert]
+                  for j_vert in self.junctions_subgraph.vertices()])
+        self.junctions_subgraph.set_vertex_filter(None)
         output = optimize.fmin_ncg(self.local_energy, pos0.flatten(),
                                    fprime=self.local_gradient,
                                    avextol=0.1,
@@ -39,7 +93,7 @@ class Epithelium():
                                    args=(j_vertices,))
         return pos0, output
 
-    def set_new_pos(self, new_sz_pos, j_vertices):
+    def set_new_pos(self, new_sz_pos, vertices, filter):
         for n, j_vert in enumerate(j_vertices):
             self.junctions.sigmas[j_vert] = new_sz_pos[2 * n]
             rho = self.junctions.rhos[j_vert]
@@ -80,7 +134,7 @@ class Epithelium():
     
     def calc_cell_positions(self):
         self.junctions.rtz_group()
-        for cell in self.cells.graph.vertices():
+        for cell in self.cells.subgraph.vertices():
             all_pos = np.array([self.junctions.sz_pos[jv].a
                                 for jv in
                                 self.cells.junctions_vertices[cell]])
@@ -95,8 +149,8 @@ class Epithelium():
         formed by the cell position and each junction
         """
         if local:
-            self.cells.graph.set_vertex_filter(self.cells.is_local)
-        for cell in self.cells.graph.vertices():
+            self.cells.subgraph.set_vertex_filter(self.cells.is_local)
+        for cell in self.cells.subgraph.vertices():
             if not self.cells.is_alive[cell]: continue
             area = 0.
             perimeter = 0.
@@ -117,7 +171,7 @@ class Epithelium():
                 self.cells.areas[cell] = area
                 self.cells.perimeters[cell] = perimeter
         if local:
-            self.cells.graph.set_vertex_filter(None)
+            self.cells.subgraph.set_vertex_filter(None)
         
     def calc_energy(self, local=False):
         
@@ -176,7 +230,7 @@ class Epithelium():
             j_vertb = j_edgeab.target()
         elif element_type == 'j_vertices':
             j_verta, j_vertb = elements
-            j_edgeab = self.junctions.graph.edge(elements)
+            j_edgeab = self.junctions_subgraph.edge(elements)
             cell1, cell3 = self.junctions.adjacent_cells[j_edgeab]
         elif element_type == 'j_edge':
             j_edgeab = elements
@@ -190,8 +244,8 @@ class Epithelium():
         except ValueError:
             raise ValueError("Valid only for 3-way junctions")
 
-        j_edgeac = self.junctions.graph.edge(j_verta, j_vertc)
-        j_edgebe = self.junctions.graph.edge(j_vertb, j_verte)
+        j_edgeac = self.junctions_subgraph.edge(j_verta, j_vertc)
+        j_edgebe = self.junctions_subgraph.edge(j_vertb, j_verte)
         if j_edgebe is None or j_edgeac is None:
             raise ValueError
 
@@ -240,21 +294,33 @@ class Epithelium():
                            j_vertd, j_verte, j_vertf]
         return modified_cells, modified_jverts
 
-    def cell_division(self, mother_cell):
-        zeta_division = np.random.random_sample(
-            ) * 2 * np.pi - np.pi
-        sigmas = [self.junctions.sigmas[j] for j in
-                  self.cells.junctions_vertices[mother_cell]]
-        zeds = [self.junctions.zeds[j] for j in
-                  self.cells.junctions_vertices[mother_cell]]
-        zetas = np.arctan2(sigmas, zeds)
-        zetas_rel = zetas - zeta_division
-        right_of = [zetas_rel <= 0]
-        left_of = [zetas_rel > 0]
+    # def cell_division(self, mother_cell):
+
+    #     j_verts = self.cells.junctions_vertices[mother_cell]
+
+    #     zeta_division = np.random.random_sample() * 2 * np.pi
+    #     sigmas = [self.junctions.sigmas[j] - self.cells.sigmas[mother_cell]
+    #               for j in j_verts]
+    #     zeds = [self.junctions.zeds[j] - self.cells.zeds[mother_cell] 
+    #             for j in j_verts]
+    #     zetas = np.arctan2(sigmas, zeds) + np.pi
+    #     zetas_rel = (zetas - zeta_division) % (2 * np.pi)
+    #     right_of = [zetas_rel <= np.pi]
+    #     right_verts = [jv for jv, right in zip(j_verts, right_of)
+    #                    if right]
+    #     left_verts =  [jv for jv, right in zip(j_verts, right_of)
+    #                    if not right]
         
-        
+    #     daughter_cell = self.cells.subgraph.add_vertex()
+    #     for j_edge in  self.cells.junction_edges[mother_cell]:
+    #         if (j_edge.source() in right_verts
+    #             ) and (j_edge.target() in right_verts):
+
+    #             self.cells.junction_edges[mother_cell]
+                
         
     def add_junction(self, cell0, cell1, j_verta, j_vertb):
+
         ##### This block should go in a decorator
         valid = np.array([obj.is_valid() for obj in
                           (cell0, cell1, j_verta, j_vertb)])
@@ -266,17 +332,17 @@ class Epithelium():
                              "     vertex b => %s " % (str(v) for v in valid)
                              )
         ####
-        ce01 = self.cells.graph.edge(cell0, cell1)
+        ce01 = self.cells.subgraph.edge(cell0, cell1)
         if ce01 is not None:
             print "Warning: previous cell0 to cell1 edge is re-created."
-            self.cells.graph.remove_edge(ce01)
-        ce01 = self.cells.graph.add_edge(cell0, cell1)
+            self.cells.subgraph.remove_edge(ce01)
+        ce01 = self.cells.subgraph.add_edge(cell0, cell1)
 
-        j_edgeab = self.junctions.graph.edge(j_verta, j_vertb)
+        j_edgeab = self.junctions_subgraph.edge(j_verta, j_vertb)
         if j_edgeab is not None:
             print "Warning: previous j_verta to j_vertb edge is re-created."
-            self.junctions.graph.remove_edge(j_verta, j_vertb)
-        j_edgeab = self.junctions.graph.add_edge(j_verta, j_vertb)
+            self.junctions_subgraph.remove_edge(j_verta, j_vertb)
+        j_edgeab = self.junctions_subgraph.add_edge(j_verta, j_vertb)
 
         self.cells.junctions_edges[cell0].append(j_edgeab)
         self.cells.junctions_vertices[cell0].extend((j_verta, j_vertb))
@@ -300,7 +366,7 @@ class Epithelium():
                              "     vertex a => %s "
                              "     vertex b => %s " % (str(v) for v in valid))
         ####
-        j_edgeab = self.junctions.graph.edge(j_verta, j_vertb)
+        j_edgeab = self.junctions_subgraph.edge(j_verta, j_vertb)
         if j_edgeab is None:
             print "Warning: junction %s doesn't exist" % str(j_edgeab)
             return
@@ -320,9 +386,9 @@ class Epithelium():
                   "and vertices %s, %s " 
                   % (cell0, cell1, j_verta, j_vertb))
             pass
-        ce01 = self.cells.graph.edge(cell0, cell1)
-        self.cells.graph.remove_edge(ce01)
-        self.junctions.graph.remove_edge(j_edgeab)
+        ce01 = self.cells.subgraph.edge(cell0, cell1)
+        self.cells.subgraph.remove_edge(ce01)
+        self.junctions_subgraph.remove_edge(j_edgeab)
 
 
 def triangle_geometry(sz0, sz1, sz2):
