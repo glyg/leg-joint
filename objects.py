@@ -3,26 +3,27 @@
 """
 This module provides the basic elements composing the leg epithelium.
 
-The architecture of the epithelium model consists in
+The architecture of the epithelium model consists in a graph devided
+in two graphviews
 two networks (aka graphs):
 
- * The first graph is composed by the cells themselves and is obtained by
+ * The first graphview is composed by the cells themselves and is obtained by
  the Delaunay triangulation of a set of points in the ::math:(\rho, \sigma):
  plane, representing the cell centers. An edge of this graph defines a
  simple neighbourhood relationship. 
 
- * The second graph represents the appical junctions, and is constructed
+ * The second graphview represents the appical junctions, and is constructed
  initially as the Voronoi diagramm associated with the cell centers
  triangulation, again in the ::math:(\rho, \sigma): plane.
  An edge of the appical junctions corresponds to the interface between
  two neighbouring cells.
  
-Those two networks are implemented as classes wrapping a
+This graph implemented as a class wrapping a
 (`graph_tool`)[http://projects.skewed.de/graph-tool] object with the
-::math:(\rho, \theta, z): coordinate system. The common features
+::math:(\rho, \theta, z): coordinate system. The geometrical features
 are defined in an abstract class named ::class:`AbstractRTZGraph`:,
-from which the ::class:`Cells`: and ::class:`AppicalJunctions`
-are derived.
+from which ::class:`Epithelium`: and for commodity
+the ::class:`Cells`: and ::class:`AppicalJunctions` are derived.
 """
 
 import os, time
@@ -45,7 +46,7 @@ class AbstractRTZGraph(object):
     '''
 
     def __init__(self, rhos, thetas, zeds,
-                 subgraph):
+                 graph):
         '''
         Create an `AbstractRTZGraph` object. This is not ment as
         a stand alone object, but should rather be sublcassed.
@@ -55,7 +56,7 @@ class AbstractRTZGraph(object):
         rhos, thetas, zeds : arrays
             three 1D arrays containing the coordinates of the graph vertices.
             They must have the as many points as there are graph vertices.
-        subgraph: a `graph_tool Graph` object
+        graph: a `graph_tool Graph` object
             The graph should contain as many vertices as points in the
             `rhos, thetas, zeds` arrays.
 
@@ -76,60 +77,67 @@ class AbstractRTZGraph(object):
         
         
         '''
-        self.subgraph = subgraph
-        self.subgraph.set_directed(True) #So each edge is a defined vector
+        self.graph = graph
+        self.graph.set_directed(True) #So each edge is a defined vector
 
-        if len(subgraph.properties) == 0 :
-            print 'resetting graph'
-            at_boundary = self.subgraph.new_vertex_property('bool')
+        if len(graph.properties) == 0 :
+            print '(re)setting graph'
+            at_boundary = self.graph.new_vertex_property('bool')
             at_boundary.a[:] = 0
-            is_local = self.subgraph.new_vertex_property('bool')
+            is_local = self.graph.new_vertex_property('bool')
             is_local.a[:] = 0
-            is_alive = self.subgraph.new_vertex_property('bool')
+            is_alive = self.graph.new_vertex_property('bool')
             is_alive.a[:] = 1
-            is_cell_vert = self.subgraph.new_vertex_property('bool')
-            is_junction_edge = self.subgraph.new_edge_property('bool')
+            is_cell_vert = self.graph.new_vertex_property('bool')
+            is_junction_edge = self.graph.new_edge_property('bool')
             # self.is_ctoj_edge will be true for cell to junctions
             # edges in the epithelium
-            is_ctoj_edge = subgraph.new_edge_property('bool')
-            subgraph.edge_properties["is_ctoj_edge"] = is_ctoj_edge
+            is_ctoj_edge = graph.new_edge_property('bool')
+            graph.edge_properties["is_ctoj_edge"] = is_ctoj_edge
 
             #Position in the rho theta zed space
-            rhos_p = self.subgraph.new_vertex_property('float')
-            zeds_p = self.subgraph.new_vertex_property('float')
-            thetas_p = self.subgraph.new_vertex_property('float')
+            rhos_p = self.graph.new_vertex_property('float')
+            zeds_p = self.graph.new_vertex_property('float')
+            thetas_p = self.graph.new_vertex_property('float')
             rhos_p.a[:] = rhos
             thetas_p.a[:] = thetas
             zeds_p.a[:] = zeds
             #sigmas = rhos * thetas [2pi]
-            sigmas_p = self.subgraph.new_vertex_property('float')
+            sigmas_p = self.graph.new_vertex_property('float')
             sigmas_p.a[:] = rhos * (thetas % (2 * np.pi))
-            vecinos_indexes = self.subgraph.new_vertex_property('vector<int>')
-            edge_lengths = self.subgraph.new_edge_property('float')
-            dthetas = self.subgraph.new_edge_property('float')
-            dsigmas = self.subgraph.new_edge_property('float')
-            dzeds = self.subgraph.new_edge_property('float')
-            drhos = self.subgraph.new_edge_property('float')
-            ordered_neighbours = self.subgraph.new_vertex_property('object')
+            vecinos_indexes = self.graph.new_vertex_property('vector<int>')
+            ordered_neighbours = self.graph.new_vertex_property('object')
             
             #Internalisation
-            self.subgraph.vertex_properties["is_local"] = is_local
-            self.subgraph.vertex_properties["is_alive"] = is_alive
-            self.subgraph.vertex_properties["is_cell_vert"] = is_cell_vert
-            self.subgraph.vertex_properties["rhos"] = rhos_p
-            self.subgraph.vertex_properties["thetas"] = thetas_p
-            self.subgraph.vertex_properties["zeds"] = zeds_p
-            self.subgraph.vertex_properties["sigmas"] = sigmas_p
-            self.subgraph.vertex_properties["at_boundary"] = at_boundary
-            self.subgraph.vertex_properties["ordered_neighbours"
+            self.graph.vertex_properties["is_local"] = is_local
+            self.graph.vertex_properties["is_alive"] = is_alive
+            self.graph.vertex_properties["is_cell_vert"] = is_cell_vert
+            self.graph.vertex_properties["rhos"] = rhos_p
+            self.graph.vertex_properties["thetas"] = thetas_p
+            self.graph.vertex_properties["zeds"] = zeds_p
+            self.graph.vertex_properties["sigmas"] = sigmas_p
+            self.graph.vertex_properties["at_boundary"] = at_boundary
+            self.graph.vertex_properties["ordered_neighbours"
                                             ] = ordered_neighbours
-            self.subgraph.edge_properties["is_junction_edge"] = is_junction_edge
-            self.subgraph.edge_properties["edge_lengths"] = edge_lengths
-            self.subgraph.edge_properties["dthetas"] = dthetas
-            self.subgraph.edge_properties["dsigmas"] = dsigmas
-            self.subgraph.edge_properties["dzeds"] = dzeds
-            self.subgraph.edge_properties["drhos"] = drhos
 
+            edge_lengths = self.graph.new_edge_property('float')
+            dthetas = self.graph.new_edge_property('float')
+            dsigmas = self.graph.new_edge_property('float')
+            dzeds = self.graph.new_edge_property('float')
+            drhos = self.graph.new_edge_property('float')
+            u_dsigmas = self.graph.new_edge_property('float')
+            u_dzeds = self.graph.new_edge_property('float')
+            u_drhos = self.graph.new_edge_property('float')
+            self.graph.edge_properties["is_junction_edge"
+                                       ] = is_junction_edge
+            self.graph.edge_properties["edge_lengths"] = edge_lengths
+            self.graph.edge_properties["dthetas"] = dthetas
+            self.graph.edge_properties["dsigmas"] = dsigmas
+            self.graph.edge_properties["dzeds"] = dzeds
+            self.graph.edge_properties["drhos"] = drhos
+            self.graph.edge_properties["u_dsigmas"] = u_dsigmas
+            self.graph.edge_properties["u_dzeds"] = u_dzeds
+            self.graph.edge_properties["u_drhos"] = u_drhos
 
         #self.relax_rhos()
         self.update_thetas()
@@ -139,35 +147,38 @@ class AbstractRTZGraph(object):
 
     @property
     def zeds(self):
-        return self.subgraph.vertex_properties["zeds"]
+        return self.graph.vertex_properties["zeds"]
     @property
     def sigmas(self):
-        return self.subgraph.vertex_properties["sigmas"]
+        return self.graph.vertex_properties["sigmas"]
     @property
     def rhos(self):
-        return self.subgraph.vertex_properties["rhos"]
+        return self.graph.vertex_properties["rhos"]
     @property
     def thetas(self):
-        return self.subgraph.vertex_properties["thetas"]
+        return self.graph.vertex_properties["thetas"]
     @property
     def dthetas(self):
-        return self.subgraph.edge_properties["dthetas"]
+        return self.graph.edge_properties["dthetas"]
     @property
     def dzeds(self):
-        return self.subgraph.edge_properties["dzeds"]
+        return self.graph.edge_properties["dzeds"]
     @property
     def drhos(self):
-        return self.subgraph.edge_properties["drhos"]
+        return self.graph.edge_properties["drhos"]
     @property
     def dsigmas(self):
-        return self.subgraph.edge_properties["dsigmas"]
+        return self.graph.edge_properties["dsigmas"]
     @property
-    def dsigmas(self):
-        return self.subgraph.edge_properties["dsigmas"]
-
+    def u_dsigmas(self):
+        return self.graph.edge_properties["u_dsigmas"]
+    @property
+    def u_dzeds(self):
+        return self.graph.edge_properties["u_dzeds"]
+        
     @property
     def edge_lengths(self):
-        return self.subgraph.edge_properties["edge_lengths"]
+        return self.graph.edge_properties["edge_lengths"]
     @property
     def rtz_pos(self):
         rtzs = [self.rhos, self.thetas, self.zeds]
@@ -178,13 +189,13 @@ class AbstractRTZGraph(object):
         return gt.group_vector_property(sigmazs, value_type='float')
     @property
     def at_boundary(self):
-        return self.subgraph.vertex_properties["at_boundary"]
+        return self.graph.vertex_properties["at_boundary"]
     @property
     def ordered_neighbours(self):
-        return self.subgraph.vertex_properties["ordered_neighbours"]
+        return self.graph.vertex_properties["ordered_neighbours"]
     @property
     def vecinos_indexes(self):
-        return self.subgraph.vertex_properties["vecinos_indexes"]
+        return self.graph.vertex_properties["vecinos_indexes"]
 
     def relax_rhos(self):
         sigmas = self.sigmas.a.copy()
@@ -201,7 +212,7 @@ class AbstractRTZGraph(object):
                                  zeds[z_bin_width / 2 :: z_bin_width],
                                  s=0, k=3)
         rhos = splev(self.zeds.a, rho_vs_zeds_tck)
-        self.subgraph.vertex_properties["rhos"].a = rhos
+        self.graph.vertex_properties["rhos"].a = rhos
 
     def update_thetas(self):
         cut_off = self.params['pos_cutoff']
@@ -209,38 +220,45 @@ class AbstractRTZGraph(object):
         sigmas = self.sigmas.a
         rhos = rhos.clip(cut_off, rhos.max())
         thetas = (sigmas / rhos) % (2 * np.pi)
-        self.subgraph.vertex_properties["thetas"].a = thetas
+        self.graph.vertex_properties["thetas"].a = thetas
 
     def update_deltas(self):
-        for edge in self.subgraph.edges():
+        for edge in self.graph.edges():
             v0, v1 = edge.source(), edge.target()
             dtheta = self.thetas[v1] - self.thetas[v0]
             if dtheta > np.pi:
                 dtheta -= 2 * np.pi
             elif dtheta < -np.pi:
                 dtheta += 2 * np.pi
-            self.subgraph.edge_properties["dthetas"][edge] = dtheta
+            self.graph.edge_properties["dthetas"][edge] = dtheta
             dzed = self.zeds[v1] - self.zeds[v0]
-            self.subgraph.edge_properties["dzeds"][edge] = dzed
+            self.graph.edge_properties["dzeds"][edge] = dzed
             drho = self.rhos[v1] - self.rhos[v0]
-            self.subgraph.edge_properties["drhos"][edge] = drho
+            self.graph.edge_properties["drhos"][edge] = drho
             dsigma = self.rhos[v0] * dtheta
-            self.subgraph.edge_properties["dsigmas"][edge] = dsigma
+            self.graph.edge_properties["dsigmas"][edge] = dsigma
 
     def out_delta_sz(self, vertex0, vertex1 ):
-            edge01 = self.subgraph.edge(vertex0, vertex1)
-            if edge01 is not None:
-                return [self.dsigmas[edge01], self.dzeds[edge01]]
-            edge10 = self.subgraph.edge(vertex1, vertex0)
-            if edge10 is not None:
-                return [-self.dsigmas[edge10], -self.dzeds[edge10]]
-            return
+        edge01 = self.graph.edge(vertex0, vertex1)
+        if edge01 is not None:
+            return [self.dsigmas[edge01], self.dzeds[edge01]]
+        edge10 = self.graph.edge(vertex1, vertex0)
+        if edge10 is not None:
+            return [-self.dsigmas[edge10], -self.dzeds[edge10]]
+        return
 
     def update_edge_lengths(self):
         edge_length = np.sqrt(self.dzeds.a**2
                               + self.drhos.a**2
                               + self.dsigmas.a**2)
-        self.subgraph.edge_properties["edge_lengths"].a = edge_length
+        
+        self.graph.edge_properties["u_drhos"
+                                   ].a = self.drhos.a / edge_length
+        self.graph.edge_properties["u_dsigmas"
+                                   ].a = self.dsigmas.a / edge_length
+        self.graph.edge_properties["u_dzeds"
+                                   ].a = self.dzeds.a / edge_length
+        self.graph.edge_properties["edge_lengths"].a = edge_length
 
     def rtz_record_array(self):
         rtz_dtype = [('rho', np.float32),
@@ -275,13 +293,16 @@ class AbstractRTZGraph(object):
         at the vertex position, sort the neighbours counter-clockwise
         and sets the  ordered_neighbours PropertyMap
         """
-        for vertex in self.subgraph.vertices():
-            zetas_out = np.array([np.arctan2(self.dzeds[edge], self.dthetas[edge])
+        for vertex in self.graph.vertices():
+            zetas_out = np.array([np.arctan2(self.dzeds[edge],
+                                             self.dthetas[edge])
                                   for edge in vertex.out_edges()])
-            zetas_in = np.array([np.arctan2(-self.dzeds[edge], -self.dthetas[edge])
+            zetas_in = np.array([np.arctan2(-self.dzeds[edge],
+                                            -self.dthetas[edge])
                                  for edge in vertex.in_edges()])
             zetas = np.append(zetas_out, zetas_in)
-            vecinos = np.array([vecino for vecino in vertex.all_neighbours()])
+            vecinos = np.array([vecino for vecino
+                                in vertex.all_neighbours()])
             indexes = np.argsort(zetas)
             self.ordered_neighbours[vertex] = vecinos.take(indexes)
     
@@ -294,14 +315,14 @@ class AbstractRTZGraph(object):
         """
         output = os.path.join('drawings', output)
         pos = self.sz_pos
-        pmap = gt.graph_draw(self.subgraph, self.sz_pos,
+        pmap = gt.graph_draw(self.graph, self.sz_pos,
                              output=output, **kwargs)
         print 'graph view saved to %s' %output
     
     def sfdp_draw(self, output="lattice_3d.pdf", **kwargs):
         output = os.path.join('drawings', output)
-        sfdp_pos = gt.graph_draw(self.subgraph,
-                                 pos=gt.sfdp_layout(self.subgraph,
+        sfdp_pos = gt.graph_draw(self.graph,
+                                 pos=gt.sfdp_layout(self.graph,
                                                     cooling_step=0.95,
                                                     epsilon=1e-3,
                                                     multilevel=True),
@@ -320,48 +341,78 @@ class Cells(AbstractRTZGraph):
     '''
     
     '''
-    def __init__(self, epithelium, subgraph=None):
+    def __init__(self, epithelium, graph=None):
         self.epithelium = epithelium
         self.params = epithelium.params
-        if subgraph is None:
+        if graph is None:
             rtz = self.generate_rtz()
             rhos, thetas, zeds = rtz
             self.generate_graph(rtz)
             AbstractRTZGraph.__init__(self, rhos, thetas, zeds,
-                                 self.subgraph)
+                                 self.graph)
             contractility0 = self.params['contractility']        
             prefered_area0 =  self.params['prefered_area']
             elasticity0 = self.params['elasticity']        
 
-            areas =self.subgraph.new_vertex_property('float')
+            areas =self.graph.new_vertex_property('float')
             areas.a[:] = prefered_area0
-            self.subgraph.vertex_properties["areas"] = areas
+            self.graph.vertex_properties["areas"] = areas
             
-            perimeters =self.subgraph.new_vertex_property('float')
-            perimeters.a[:] = 6 * self.params['lambda_0']
-            self.subgraph.vertex_properties["perimeters"] = perimeters
-            
-            contractilities =self.subgraph.new_vertex_property('float')
+            contractilities =self.graph.new_vertex_property('float')
             contractilities.a[:] = contractility0
-            self.subgraph.vertex_properties["contractilities"
+            self.graph.vertex_properties["contractilities"
                                             ] = contractilities
-            elasticities =self.subgraph.new_vertex_property('float')
+            elasticities =self.graph.new_vertex_property('float')
             elasticities.a[:] = elasticity0
-            self.subgraph.vertex_properties["elasticities"] = elasticities
+            self.graph.vertex_properties["elasticities"] = elasticities
 
-            prefered_area = self.subgraph.new_vertex_property('float')
+            perimeters =self.graph.new_vertex_property('float')
+            perimeters.a[:] = 6 * self.params['lambda_0']
+            self.graph.vertex_properties["perimeters"] = perimeters
+
+            prefered_area = self.graph.new_vertex_property('float')
             prefered_area.a[:] = prefered_area0
-            self.subgraph.vertex_properties["prefered_area"
+            self.graph.vertex_properties["prefered_area"
                                             ] = prefered_area
-            self.subgraph.vertex_properties["is_cell_vert"].a[:] = 1
+            self.graph.vertex_properties["is_cell_vert"].a[:] = 1
+
+            energy_grad = self.graph.new_vertex_property('float')
+            self.graph.vertex_properties["energy_grad"
+                                            ] = energy_grad
         else :
-            self.subgraph = subgraph
-            rhos = self.subgraph.vertex_properties['rhos']
-            thetas = self.subgraph.vertex_properties['thetas']
-            zeds = self.subgraph.vertex_properties['zeds']
-            self.subgraph.vertex_properties["is_cell_vert"].a[:] = 1
+            self.graph = graph
+            rhos = self.graph.vertex_properties['rhos']
+            thetas = self.graph.vertex_properties['thetas']
+            zeds = self.graph.vertex_properties['zeds']
+            #self.graph.vertex_properties["is_cell_vert"].a[:] = 1
             AbstractRTZGraph.__init__(self, rhos, thetas, zeds,
-                                      self.subgraph)
+                                      self.graph)
+
+    @property
+    def areas(self):
+        return self.graph.vertex_properties["areas"]
+    @property
+    def contractilities(self):
+        return self.graph.vertex_properties["contractilities"]
+    @property
+    def elasticities(self):
+        return self.graph.vertex_properties["elasticities"]
+    @property
+    def perimeter(self):
+        return self.graph.vertex_properties["perimeter"]
+    @property
+    def prefered_area(self):
+        return self.graph.vertex_properties["prefered_area"]
+    @property
+    def energy_grad(self):
+        return self.graph.vertex_properties["energy_grad"]
+
+    def update_energy_grad(self):
+        elastic_term =  self.elasticities.a * (
+            self.areas.a - self.prefered_area.a )
+        contractile_term =  self.contractilities.a * self.perimeters.a
+        grad = elastic_term + contractile_term
+        self.graph.vertex_properties["energy_grad"].a = grad
 
     def generate_graph(self, rtz):
         rhos, thetas, zeds = rtz
@@ -374,7 +425,7 @@ class Cells(AbstractRTZGraph):
         s_min, s_max = 0, 2 * np.pi * rhoc
         z_min, z_max = -10 * rhoc , 10 * rhoc
         #Graph instanciation
-        self.subgraph, geom_pos = gt.geometric_graph(sigmazs, radius,
+        self.graph, geom_pos = gt.geometric_graph(sigmazs, radius,
                                                      [(s_min, s_max),
                                                       (z_min, z_max)])
         del geom_pos 
@@ -412,37 +463,39 @@ class Cells(AbstractRTZGraph):
 
 class AppicalJunctions(AbstractRTZGraph):
 
-    def __init__(self, epithelium,
-                 cells, subgraph=None):
+    def __init__(self, epithelium, graph=None):
 
         self.epithelium = epithelium
         self.params = epithelium.params
-        if subgraph is None:
+        if graph is None:
             rtzs = self.compute_voronoi()
-            # rhos = rtzs[:, 0]
-            # thetas = rtzs[:, 1]
-            # zeds = rtzs[:, 2]
-            # AbstractRTZGraph.__init__(self, rhos,
-            #                           thetas,
-            #                           zeds,
-            #                           self.subgraph)
-            line_tension0 = epithelium.params['line_tension']
-            line_tensions = self.subgraph.new_edge_property('float')
-            line_tensions.a[:] = line_tension0
-            self.subgraph.edge_properties["line_tensions"] = line_tensions
-        else :
-            print subgraph
-            self.subgraph = subgraph
-            rhos = self.subgraph.properties['rhos'].a
-            thetas = self.subgraph.properties['thetas'].a
-            zeds = self.subgraph.properties['zeds'].a
+            rhos = rtzs[:, 0]
+            thetas = rtzs[:, 1]
+            zeds = rtzs[:, 2]
+            self.graph = self.epithelium.junctions_graph
             AbstractRTZGraph.__init__(self, rhos,
                                       thetas,
                                       zeds,
-                                      self.subgraph)
+                                      self.graph)
+            line_tension0 = epithelium.params['line_tension']
+            line_tensions = self.graph.new_edge_property('float')
+            line_tensions.a[:] = line_tension0
+            self.graph.edge_properties["line_tensions"] = line_tensions
+        else :
+            print graph
+            self.graph = graph
+            rhos = self.graph.properties['rhos'].a
+            thetas = self.graph.properties['thetas'].a
+            zeds = self.graph.properties['zeds'].a
+            AbstractRTZGraph.__init__(self, rhos,
+                                      thetas,
+                                      zeds,
+                                      self.graph)
+    @property
+    def line_tensions(self):
+        return self.graph.edge_properties["line_tensions"]
 
     def compute_voronoi(self):
-
         n_dropped = 0
         n_visited = 0
         rtzs = []
@@ -453,9 +506,9 @@ class AppicalJunctions(AbstractRTZGraph):
         eptm.update_neighbours()
 
         # Cell to cell graph to compute the junction vertices positions
-        cells_subgraph = gt.GraphView(eptm.subgraph,
+        cells_graph = gt.GraphView(eptm.graph,
                                       vfilt=eptm.is_cell_vert)
-        for cell in cells_subgraph.vertices():
+        for cell in cells_graph.vertices():
             visited_cells.append(cell)
             vecinos = eptm.ordered_neighbours[cell] #that's ordered
             num_vecinos = len(vecinos)
@@ -468,84 +521,76 @@ class AppicalJunctions(AbstractRTZGraph):
                 if vecino0 in visited_cells or vecino1 in visited_cells:
                     n_visited += 1
                     continue
-
                 v0_sz = eptm.out_delta_sz(cell, vecino0)
                 v1_sz = eptm.out_delta_sz(cell, vecino1)
                 sigma, zed = c_circumcircle([0,0], v0_sz,
                                             v1_sz, cutoff)
+                sigma += eptm.sigmas[cell]
+                zed += eptm.zeds[cell]
                 if not np.isfinite(sigma) or sigma > 1e8:
                     print "#####"
-                    print 'defective cell %s' % str(cell), v0_sz
-                    print cell, v1_sz
-                    print cell, sigma, zed
+                    print 'defective triangle %s, %s, %s' % (str(cell),
+                                                             str(vecino0),
+                                                             str(vecino1))
                     print "#####"
                     n_dropped += 1
                     continue
                 rho = (eptm.rhos[cell]
                        + eptm.rhos[vecino0] + eptm.rhos[vecino1]) / 3.
-
                 theta = (sigma / rho) % (2 * np.pi)
                 
-                # new junction vertex here *directly in the epithelium* subgraph
-                j_vertex = eptm.subgraph.add_vertex()
+                # new junction vertex here *directly in the epithelium* graph
+                j_vertex = eptm.graph.add_vertex()
                 eptm.is_cell_vert[j_vertex] = 0
                 eptm.rhos[j_vertex] = rho
                 eptm.thetas[j_vertex] = theta
                 eptm.zeds[j_vertex] = zed
+                eptm.sigmas[j_vertex] = sigma
                 rtzs.append([rho, theta, zed])
-
                 # new cell to junction edges here
-                cj = eptm.subgraph.add_edge(cell, j_vertex)
+                cj = eptm.graph.add_edge(cell, j_vertex)
                 eptm.is_ctoj_edge[cj] = 1
-                v0j = eptm.subgraph.add_edge(vecino0, j_vertex)
+                eptm.is_junction_edge[cj] = 0
+                v0j = eptm.graph.add_edge(vecino0, j_vertex)
                 eptm.is_ctoj_edge[v0j] = 1
-                v1j = eptm.subgraph.add_edge(vecino1, j_vertex)
+                eptm.is_junction_edge[v0j] = 0
+                v1j = eptm.graph.add_edge(vecino1, j_vertex)
                 eptm.is_ctoj_edge[v1j] = 1
-            
-        # Cell to junction subgraph
+                eptm.is_junction_edge[v1j] = 0
+        # Cell to junction graph
         n_jdropped = 0
-        c2jsubgraph = gt.GraphView(eptm.subgraph,
+        c2jgraph = gt.GraphView(eptm.graph,
                                    efilt=eptm.is_ctoj_edge)
 
-        print "%i cells where dropped" % n_dropped
+        print "%i cells were dropped" % n_dropped
         visited_cells = []
-        for link in c2jsubgraph.edges():
+        for link in c2jgraph.edges():
             cell0_link = link.source()
             j_verts0 = [jv for jv in cell0_link.out_neighbours()]
             assert link.target() in j_verts0
-            j_vert0 = None
-            cell0 = cells_subgraph.vertex(cell0_link)
+            cell0 = cells_graph.vertex(cell0_link)
             visited_cells.append(cell0)
-            for cell1 in cell0.out_neighbours():
+            for cell1 in cell0.all_neighbours():
                 if cell1 in visited_cells:
                     continue
-                cell1_link = c2jsubgraph.vertex(cell1)
+                cell1_link = c2jgraph.vertex(cell1)
                 j_verts1 = [jv for jv in cell1_link.out_neighbours()]
                 common_jvs = [jv for jv in j_verts0 if jv in j_verts1]
                 if len(common_jvs) == 2:
                     j_v0, j_v1 = common_jvs[0], common_jvs[1]
-                    j_edge = eptm.subgraph.add_edge(j_v0, j_v1)
+                    j_edge_out = eptm.graph.edge(j_v0, j_v1)
+                    j_edge_in = eptm.graph.edge(j_v1, j_v0)
+                    if j_edge_in is None and j_edge_out is None:
+                        j_edge = eptm.graph.add_edge(j_v0, j_v1)
                     eptm.is_junction_edge[j_edge] = 1
                 else:
                     n_jdropped += 1
-        self.subgraph = gt.GraphView(eptm.subgraph,
-                                     efilt=eptm.is_junction_edge)
-        print " %i Junctions edges where droped" % n_dropped
+        print "%i junction edges were dropped" % n_dropped
         return np.array(rtzs)
 
+    
 
-    def adjacent_cells(self, j_edge):
-        
-        c2jsubgraph = gt.GraphView(self.epithelium.subgraph,
-                                   efilt=self.epithelium.is_ctoj_edge)
-        cell0 = None
-        for cella in c2jsubgraph.vertex(j_edge.source()).out_neighbours():
-            for cellb in c2jsubgraph.vertex(j_edge.target()).out_neighbours():
-                if cellb == cella:
-                    if cell0 is None:
-                        cell0 = cella
-                    else:
-                        return cell0, cellb
+
 
 
 def c_circumcircle(sz0, sz1, sz2, cutoff):
