@@ -14,51 +14,51 @@ CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
 
-
-
 def plot_gradients(epithelium):
-    epithelium.junctions.graph.set_vertex_filter(epithelium.junctions.is_local)
-    j_vertices = [j_vert for j_vert in epithelium.junctions.graph.vertices()]
-    pos0 = np.array([epithelium.junctions.sz_pos[j_vert]
-                     for j_vert in epithelium.junctions.graph.vertices()])
-    epithelium.junctions.graph.set_vertex_filter(None)
+    epithelium.graph.set_vertex_filter(epithelium.is_local_junction)
+    j_vertices = [j_vert for j_vert in epithelium.graph.vertices()]
+    epithelium.graph.set_vertex_filter(None)
+    pos0 = np.array([epithelium.sz_pos[j_vert]
+                     for j_vert in j_vertices])
+    epithelium.graph.set_vertex_filter(None)
     grad = epithelium.local_gradient(pos0.flatten(), j_vertices)
-    grad_vec = grad.reshape(pos0.shape) + pos0
+
+    grad_vecs = grad.reshape(pos0.shape) + pos0
     plot_cells_sz(epithelium, local=True)
-    for g, p in zip(grad_vec, pos0):
-        plt.plot([p[0], g[0]], [p[1], g[1]], 'r-', lw=4, alpha=0.5)
+    for g, p in zip(grad_vecs, pos0):
+        plt.plot([p[0], g[0]], [p[1], g[1]], 'ro-', lw=4, alpha=0.5)
         
 
 def plot_cells_sz(epithelium, local=True, index='True'):
     if local:
-        epithelium.cells.graph.set_vertex_filter(
-            epithelium.cells.is_local)
-    for cell in epithelium.cells.graph.vertices():
-        plt.text(epithelium.cells.sz_pos[cell][0],
-                 epithelium.cells.sz_pos[cell][1],
+        epithelium.graph.set_vertex_filter(
+            epithelium.is_local_cell)
+    for cell in epithelium.graph.vertices():
+        plt.text(epithelium.sz_pos[cell][0],
+                 epithelium.sz_pos[cell][1],
                  str(cell))
-        edge_list = [edge for edge in epithelium.cells.junctions_edges[cell]]
-        plot_edges_sz(epithelium.junctions, edge_list)
+        edge_list = [edge for edge in epithelium.cell_junctions(cell)]
+        plot_edges_sz(epithelium, edge_list)
     if local:
-        epithelium.cells.graph.set_vertex_filter(None)
+        epithelium.graph.set_vertex_filter(None)
 
-def plot_edges_sz(junctions, edge_list, **kwargs):
+def plot_edges_sz(epithelium, edge_list, **kwargs):
     sigmas = []
     zeds = []
     for edge in edge_list:
         if not edge.is_valid():
-            print edge
+            print "invalid edge %s" %str(edge)
             continue
-        sigmas = (junctions.sigmas[edge.source()],
-                  junctions.sigmas[edge.target()])
-        zeds = (junctions.zeds[edge.source()],
-                junctions.zeds[edge.target()])
+        sigmas = (epithelium.sigmas[edge.source()],
+                  epithelium.sigmas[edge.target()])
+        zeds = (epithelium.zeds[edge.source()],
+                epithelium.zeds[edge.target()])
         plt.plot(sigmas, zeds, 'k-', lw=2, alpha=0.5, **kwargs)
-        plt.text(junctions.sigmas[edge.source()],
-                 junctions.zeds[edge.source()],
+        plt.text(epithelium.sigmas[edge.source()],
+                 epithelium.zeds[edge.source()],
                  str(edge.source()))
-        plt.text(junctions.sigmas[edge.target()],
-                 junctions.zeds[edge.target()],
+        plt.text(epithelium.sigmas[edge.target()],
+                 epithelium.zeds[edge.target()],
                  str(edge.target()))
     ax = plt.gca()
     ax.set_aspect('equal')
