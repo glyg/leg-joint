@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <parameters>
-  <param max="10." min="0.1" name="lambda_0" step="0.1" value="8.">
+  <param max="10." min="0.1" name="lambda_0" step="0.1" value="4.">
     <unit>um</unit>
     <description>Average cell to cell distance</description>
   </param>
@@ -24,7 +24,7 @@
     <unit>pN/um2</unit>
     <description>Area elasticity</description>
   </param>
-  <param max="10." min="0.1" name="prefered_area" step="0.01" value="25.">
+  <param max="10." min="0.1" name="prefered_area" step="0.01" value="12.">
     <unit>um2</unit>
     <description>Prefered area</description>
   </param>

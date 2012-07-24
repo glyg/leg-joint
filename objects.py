@@ -83,8 +83,10 @@ class AbstractRTZGraph(object):
             at_boundary.a[:] = 0
             is_local_cell = self.graph.new_vertex_property('bool')
             is_local_cell.a[:] = 0
-            is_local_junction = self.graph.new_vertex_property('bool')
-            is_local_junction.a[:] = 0
+            is_local_j_vert = self.graph.new_vertex_property('bool')
+            is_local_j_vert.a[:] = 0
+            is_local_j_edge = self.graph.new_edge_property('bool')
+            is_local_j_edge.a[:] = 0
             is_local_both = self.graph.new_vertex_property('bool')
             is_local_both.a[:] = 0
 
@@ -106,8 +108,9 @@ class AbstractRTZGraph(object):
             vecinos_indexes = self.graph.new_vertex_property('vector<int>')
             #Internalisation
             self.graph.vertex_properties["is_local_cell"] = is_local_cell
-            self.graph.vertex_properties[
-                "is_local_junction"] = is_local_junction
+            self.graph.vertex_properties["is_local_j_vert"] = is_local_j_vert
+            self.graph.edge_properties["is_local_j_edge"] = is_local_j_edge
+
             self.graph.vertex_properties["is_local_both"] = is_local_both
             self.graph.vertex_properties["is_alive"] = is_alive
             self.graph.vertex_properties["is_cell_vert"] = is_cell_vert
@@ -225,6 +228,7 @@ class AbstractRTZGraph(object):
         self.graph.vertex_properties["thetas"].a = thetas
 
     def update_deltas(self):
+        
         for edge in self.graph.edges():
             v0, v1 = edge.source(), edge.target()
             dtheta = self.thetas[v1] - self.thetas[v0]
