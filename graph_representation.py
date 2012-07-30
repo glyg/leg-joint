@@ -34,24 +34,25 @@ def plot_cells_sz(epithelium, ax=None, local=True):
         fig, ax = plt.subplots(1,1)
     if local:
         epithelium.graph.set_vertex_filter(
-            epithelium.is_local_cell)
+            epithelium.is_local_vert)
+        epithelium.graph.set_edge_filter(
+            epithelium.is_local_edge)
+    sz_pos = epithelium.sz_pos()
     for cell in epithelium.graph.vertices():
-        ax.text(epithelium.sz_pos[cell][0],
-                epithelium.sz_pos[cell][1],
+        ax.text(sz_pos[cell][0],
+                sz_pos[cell][1],
                 str(cell))
         edge_list = [edge for edge in epithelium.cell_junctions(cell)]
         plot_edges_sz(epithelium, edge_list, ax)
     if local:
         epithelium.graph.set_vertex_filter(None)
     plt.draw()
-    
-
 
 def plot_edges_sz(epithelium, edge_list, ax, **kwargs):
     sigmas = []
     zeds = []
     for edge in edge_list:
-        if not edge.is_valid():
+        if edge is None:
             print "invalid edge %s" %str(edge)
             continue
         sigmas = (epithelium.sigmas[edge.source()],
@@ -112,6 +113,7 @@ def pseudo3d_draw(graph, rtz, output="lattice_3d.pdf",
                          vertex_color=pseudo3d_color,
                          edge_pen_width=2., 
                          output=output, **kwargs)
+    del pmap
     return pseudo3d_pos
     
 def epithelium_draw(epithelium, z_angle=0.15, d_theta=0.1,
@@ -234,7 +236,7 @@ def epithelium_draw(epithelium, z_angle=0.15, d_theta=0.1,
                           vertex_size=vertex_size,
                           vorder=vorder, eorder=eorder,
                           output=output2, **kwargs)
-
+    del pmap, pmap2
 
 def cylindrical2cartesian(rtz):
     """
