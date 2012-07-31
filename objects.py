@@ -87,42 +87,43 @@ class AbstractRTZGraph(object):
             is_local_vert.a[:] = 0
             is_local_j_vert = self.graph.new_vertex_property('bool')
             is_local_j_vert.a[:] = 0
+            is_local_both = self.graph.new_vertex_property('bool')
+            is_local_both.a[:] = 0
+            is_alive = self.graph.new_vertex_property('bool')
+            is_alive.a[:] = 1
+            is_cell_vert = self.graph.new_vertex_property('bool')
+            # Internalisation
+            self.graph.vertex_properties["is_local_cell"] = is_local_cell
+            self.graph.vertex_properties["is_local_j_vert"] = is_local_j_vert
+            self.graph.vertex_properties["is_local_vert"] = is_local_vert
+            self.graph.vertex_properties["is_local_both"] = is_local_both
+            self.graph.vertex_properties["is_alive"] = is_alive
+            self.graph.vertex_properties["is_cell_vert"] = is_cell_vert
+            self.graph.vertex_properties["at_boundary"] = at_boundary
+
             is_local_edge = self.graph.new_edge_property('bool')
             is_local_edge.a[:] = 0
             is_local_j_edge = self.graph.new_edge_property('bool')
             is_local_j_edge.a[:] = 0
-            is_local_both = self.graph.new_vertex_property('bool')
-            is_local_both.a[:] = 0
+            is_junction_edge = self.graph.new_edge_property('bool')
+            is_ctoj_edge = self.graph.new_edge_property('bool')
+            self.graph.edge_properties["is_junction_edge"
+                                       ] = is_junction_edge
+            self.graph.edge_properties["is_ctoj_edge"] = is_ctoj_edge
+            self.graph.edge_properties["is_local_edge"] = is_local_edge
+            self.graph.edge_properties["is_local_j_edge"] = is_local_j_edge
 
-            is_alive = self.graph.new_vertex_property('bool')
-            is_alive.a[:] = 1
-            is_cell_vert = self.graph.new_vertex_property('bool')
-
-            #Position in the rho theta zed space
+            # Position in the rho theta zed space
             rhos_p = self.graph.new_vertex_property('float')
             zeds_p = self.graph.new_vertex_property('float')
             thetas_p = self.graph.new_vertex_property('float')
             sigmas_p = self.graph.new_vertex_property('float')
-            #vecinos_indexes = self.graph.new_vertex_property('vector<int>')
-            #Internalisation
-            self.graph.vertex_properties["is_local_cell"] = is_local_cell
-            self.graph.vertex_properties["is_local_j_vert"] = is_local_j_vert
-            self.graph.vertex_properties["is_local_vert"] = is_local_vert
-            self.graph.edge_properties["is_local_edge"] = is_local_edge
-            self.graph.edge_properties["is_local_j_edge"] = is_local_j_edge
-            self.graph.vertex_properties["is_local_both"] = is_local_both
-
-            self.graph.vertex_properties["is_alive"] = is_alive
-            self.graph.vertex_properties["is_cell_vert"] = is_cell_vert
-            self.graph.vertex_properties["at_boundary"] = at_boundary
             self.graph.vertex_properties["rhos"] = rhos_p
             self.graph.vertex_properties["thetas"] = thetas_p
             self.graph.vertex_properties["zeds"] = zeds_p
             self.graph.vertex_properties["sigmas"] = sigmas_p
 
-            is_junction_edge = self.graph.new_edge_property('bool')
-            is_ctoj_edge = self.graph.new_edge_property('bool')
-
+            # distances and unitary vectors
             edge_lengths = self.graph.new_edge_property('float')
             dthetas = self.graph.new_edge_property('float')
             dsigmas = self.graph.new_edge_property('float')
@@ -131,10 +132,7 @@ class AbstractRTZGraph(object):
             u_dsigmas = self.graph.new_edge_property('float')
             u_dzeds = self.graph.new_edge_property('float')
             u_drhos = self.graph.new_edge_property('float')
-            #Internalisation
-            self.graph.edge_properties["is_junction_edge"
-                                       ] = is_junction_edge
-            self.graph.edge_properties["is_ctoj_edge"] = is_ctoj_edge
+            # Internalisation
             self.graph.edge_properties["edge_lengths"] = edge_lengths
             self.graph.edge_properties["dthetas"] = dthetas
             self.graph.edge_properties["dsigmas"] = dsigmas
@@ -143,6 +141,15 @@ class AbstractRTZGraph(object):
             self.graph.edge_properties["u_dsigmas"] = u_dsigmas
             self.graph.edge_properties["u_dzeds"] = u_dzeds
             self.graph.edge_properties["u_drhos"] = u_drhos
+            # Gradients and energy
+            grad_sigma = self.graph.new_vertex_property('float')
+            grad_zed = self.graph.new_vertex_property('float')
+            energy_grad = self.graph.new_vertex_property('float')
+            self.graph.vertex_properties["grad_sigma"] = grad_sigma
+            self.graph.vertex_properties["grad_zed"] = grad_zed
+            self.graph.vertex_properties["energy_grad"] = energy_grad
+
+
 
 
     @property
@@ -179,6 +186,12 @@ class AbstractRTZGraph(object):
     def edge_lengths(self):
         return self.graph.edge_properties["edge_lengths"]
     @property
+    def grad_sigma(self):
+        return self.graph.vertex_properties["grad_sigma"]
+    @property
+    def grad_zed(self):
+        return self.graph.vertex_properties["grad_zed"]
+    @property
     def at_boundary(self):
         return self.graph.vertex_properties["at_boundary"]
     @property
@@ -189,9 +202,12 @@ class AbstractRTZGraph(object):
         return self.graph.vertex_properties["vecinos_indexes"]
 
     def any_edge(self, v0, v1):
+        efilt = self.graph.get_edge_filter()
+        self.graph.set_edge_filter(None)
         e = self.graph.edge(v0, v1)
         if e is None:
             e = self.graph.edge(v1, v0)
+        self.graph.set_edge_filter(efilt[0], efilt[1])
         return e
 
     @property
@@ -202,17 +218,18 @@ class AbstractRTZGraph(object):
     def rtz_pos(self, vfilt=None, inversed=False):
         """
         Returns a **copy** of the rho theta zed values
-        Note that no updates are ran.
+        Note that no update is run.
         """
         rhos = self.graph.vertex_properties["rhos"].copy()
         thetas = self.graph.vertex_properties["thetas"].copy()
         zeds = self.graph.vertex_properties["zeds"].copy()
         rtzs = [rhos, thetas, zeds]
         return gt.group_vector_property(rtzs, value_type='float')
+
     def sz_pos(self, vfilt=None, inversed=False):
         """
         Returns a **copy** of the sigma zed values
-        Note that no updates are ran.
+        Note that no update is run.
         """
         sigmas = self.graph.vertex_properties["sigmas"].copy()
         zeds = self.graph.vertex_properties["zeds"].copy()
@@ -238,15 +255,6 @@ class AbstractRTZGraph(object):
         self.graph.vertex_properties["rhos"].fa = rhos
         self.graph.set_vertex_filter(None)
         
-    def update_thetas(self, vfilt=None, inverted=False):
-        self.graph.set_vertex_filter(vfilt, inverted)
-        cut_off = self.params['pos_cutoff']
-        rhos = self.rhos.fa
-        sigmas = self.sigmas.fa
-        rhos = rhos.clip(cut_off, rhos.max())
-        thetas = (sigmas / rhos) % (2 * np.pi)
-        self.graph.vertex_properties["thetas"].fa = thetas
-
     def update_deltas(self, efilt=None, inverted=False):
         self.graph.set_edge_filter(efilt, inverted)
         for edge in self.graph.edges():
@@ -263,8 +271,7 @@ class AbstractRTZGraph(object):
             self.graph.edge_properties["drhos"][edge] = drho
             dsigma = self.rhos[v0] * dtheta
             self.graph.edge_properties["dsigmas"][edge] = dsigma
-        self.graph.set_edge_filter(None)
-
+            
     def update_edge_lengths(self, efilt=None, inverted=False):
         edge_lengths = np.sqrt(self.dzeds.fa**2
                                + self.drhos.fa**2
@@ -384,7 +391,7 @@ class Cells(AbstractRTZGraph):
     
     '''
     def __init__(self, epithelium):
-
+        
         self.epithelium = epithelium
         self.params = epithelium.params
         rtz = self.generate_rtz()
@@ -519,9 +526,6 @@ class AppicalJunctions(AbstractRTZGraph):
         for edge in self.epithelium.graph.edges():
             if self.epithelium.is_junction_edge[edge]:
                 yield edge
-
-
-
     @property
     def line_tensions(self):
         return self.graph.edge_properties["line_tensions"]
@@ -547,8 +551,6 @@ class AppicalJunctions(AbstractRTZGraph):
             visited_cells.append(cell)
             vecinos = eptm.ordered_neighbours(cell) #that's ordered
             num_vecinos = len(vecinos)
-            cell_sz = [eptm.sigmas[cell],
-                       eptm.zeds[cell]]
             for n0 in range(num_vecinos):
                 n1 = (n0 + 1) % num_vecinos
                 vecino0 = vecinos[n0]
@@ -563,10 +565,9 @@ class AppicalJunctions(AbstractRTZGraph):
                 sigma += eptm.sigmas[cell]
                 zed += eptm.zeds[cell]
                 if not np.isfinite(sigma) or sigma > 1e8:
-                    print 'defective triangle %s, %s, %s' % (str(cell),
-                                                             str(vecino0),
-                                                             str(vecino1))
-                    print "#####"
+                    # print 'defective triangle %s, %s, %s' % (str(cell),
+                    #                                          str(vecino0),
+                    #                                          str(vecino1))
                     n_dropped += 1
                     continue
                 rho = (eptm.rhos[cell]

@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<parameters>
+  <param max="10." min="0.1" name="lambda_0" step="0.1" value="8.3">
+    <unit>um</unit>
+    <description>Average cell to cell distance</description>
+  </param>
+  <param max="100." min="0.1" name="rho_0" step="0.1" value="16.">
+    <unit>um</unit>
+    <description>epithelium radius</description>
+  </param>
+  <param max="10." min="0." name="pos_noise" step="0.01" value="0.01">
+    <unit>um</unit>
+    <description>vertex position noise</description>
+  </param>
+  <param max="10." min="0.001" name="pos_cutoff" step="0.0001" value="1e-35">
+    <unit>um</unit>
+    <description>Distance cut-off </description>
+  </param>
+  <param max="10." min="0.1" name="theta_cutoff" step="0.01" value="0.01">
+    <unit>um</unit>
+    <description>Angular cut-off </description>
+  </param>
+  <param max="10." min="0.1" name="elasticity" step="0.01" value="1.">
+    <unit>pN/um2</unit>
+    <description>Area elasticity</description>
+  </param>
+  <param max="10." min="0.1" name="prefered_area" step="0.01" value="12.">
+    <unit>um2</unit>
+    <description>Prefered area</description>
+  </param>
+  <param max="10." min="0.1" name="contractility" step="0.01" value="0.02">
+    <unit>pN/um</unit>
+    <description>Cell contractility</description>
+  </param>
+  <param max="10." min="-10." name="line_tension" step="0.01" value="-0.03">
+    <unit>pN</unit>
+    <description>Line tension</description>
+  </param>
+  <param max="100" min="2" name="z_bin_width" step="1" value="4">
+    <unit></unit>
+    <description>Line tension</description>
+  </param>
+</parameters>

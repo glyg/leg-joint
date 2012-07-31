@@ -15,43 +15,55 @@ ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
 
 def plot_gradients(epithelium, ax=None, scale=0.1):
-    epithelium.graph.set_vertex_filter(epithelium.is_local_j_vert)
-    j_vertices = [j_vert for j_vert in epithelium.graph.vertices()]
+    grad = epithelium.calc_gradient(vfilt=epithelium.is_local_vert)
+    print grad
+    vfilt = epithelium.is_local_vert.copy()
+    vfilt.a *= (1 - epithelium.is_cell_vert.a)
+    epithelium.graph.set_vertex_filter(vfilt)
+    sigmas = epithelium.sigmas.fa
+    zeds = epithelium.zeds.fa
+    pos0 = np.vstack((sigmas, zeds))
+    print pos0.shape
     epithelium.graph.set_vertex_filter(None)
-    pos0 = np.array([epithelium.sz_pos[j_vert]
-                     for j_vert in j_vertices])
-    epithelium.graph.set_vertex_filter(None)
-    grad = epithelium.local_gradient(pos0.flatten(), j_vertices)
-
     grad_vecs = grad.reshape(pos0.shape) * scale + pos0
-    plot_cells_sz(epithelium, ax, local=True)
-    for g, p in zip(grad_vecs, pos0):
-        plt.plot([p[0], g[0]], [p[1], g[1]], 'r-', lw=2, alpha=0.5)
-        
+    plot_cells_sz(epithelium, ax,
+                  vfilt=epithelium.is_local_vert,
+                  efilt=epithelium.is_local_edge)
 
-def plot_cells_sz(epithelium, ax=None, local=True):
+    
+    for g, p in zip(grad_vecs, pos0):
+        plt.plot([p[0], g[0]], [p[1], g[1]], 'ro-', lw=2, alpha=0.5)
+    epithelium.graph.set_vertex_filter(None)    
+
+def plot_cells_sz(epithelium, ax=None,
+                  vfilt=None, efilt=None):
     if ax is None:
         fig, ax = plt.subplots(1,1)
-    if local:
-        epithelium.graph.set_vertex_filter(
-            epithelium.is_local_vert)
-        epithelium.graph.set_edge_filter(
-            epithelium.is_local_edge)
-    sz_pos = epithelium.sz_pos()
-    for cell in epithelium.graph.vertices():
-        ax.text(sz_pos[cell][0],
-                sz_pos[cell][1],
+    epithelium.graph.set_vertex_filter(vfilt)
+    sigmas = epithelium.sigmas.copy()
+    zeds = epithelium.zeds.copy()
+    for cell in epithelium.cells :
+        ax.text(sigmas[cell],
+                zeds[cell],
                 str(cell))
-        edge_list = [edge for edge in epithelium.cell_junctions(cell)]
-        plot_edges_sz(epithelium, edge_list, ax)
-    if local:
-        epithelium.graph.set_vertex_filter(None)
+        ax.plot(sigmas[cell],
+                zeds[cell], 'bo', alpha=0.3)
+    epithelium.graph.set_vertex_filter(None)
+    epithelium.graph.set_edge_filter(efilt)
+    plot_edges_sz(epithelium, efilt, ax=ax)
+    epithelium.graph.set_vertex_filter(None)
+    epithelium.graph.set_edge_filter(None)
     plt.draw()
 
-def plot_edges_sz(epithelium, edge_list, ax, **kwargs):
+def plot_edges_sz(epithelium, efilt=None,
+                  text=True, ax=None, **kwargs):
     sigmas = []
     zeds = []
-    for edge in edge_list:
+    if ax is None:
+        fig, ax = plt.subplots(1,1)
+    epithelium.graph.set_edge_filter(efilt)
+    epithelium.graph.set_vertex_filter(None)
+    for edge in epithelium.junctions:
         if edge is None:
             print "invalid edge %s" %str(edge)
             continue
@@ -59,14 +71,16 @@ def plot_edges_sz(epithelium, edge_list, ax, **kwargs):
                   epithelium.sigmas[edge.target()])
         zeds = (epithelium.zeds[edge.source()],
                 epithelium.zeds[edge.target()])
-        ax.plot(sigmas, zeds, 'k-', lw=2, alpha=0.5, **kwargs)
-        ax.text(epithelium.sigmas[edge.source()],
-                 epithelium.zeds[edge.source()],
-                 str(edge.source()))
-        ax.text(epithelium.sigmas[edge.target()],
-                 epithelium.zeds[edge.target()],
-                 str(edge.target()))
+        ax.plot(sigmas, zeds, 'go-', lw=2, alpha=0.4, **kwargs)
+        if text:
+            ax.text(epithelium.sigmas[edge.source()],
+                    epithelium.zeds[edge.source()],
+                    str(edge.source()))
+            ax.text(epithelium.sigmas[edge.target()],
+                    epithelium.zeds[edge.target()],
+                    str(edge.target()))
     ax.set_aspect('equal')
+    epithelium.graph.set_edge_filter(None)
 
 def sfdp_draw(graph, output="lattice_3d.pdf", **kwargs):
     output = os.path.join('drawings', output)
@@ -95,7 +109,8 @@ def pseudo3d_draw(graph, rtz, output="lattice_3d.pdf",
     vertex_blue = graph.new_vertex_property('float')
     vertex_alpha = graph.new_vertex_property('float')
     
-    pseudo_x.a = zeds * np.cos(z_angle) - rhos * np.cos(thetas) * np.sin(z_angle)
+    pseudo_x.a = zeds * np.cos(z_angle)\
+                 - rhos * np.cos(thetas) * np.sin(z_angle)
     pseudo_y.a = rhos * np.sin(thetas)
     depth = rhos * np.cos(thetas)
     normed_depth = (depth - depth.min()) / (depth.max() - depth.min())
