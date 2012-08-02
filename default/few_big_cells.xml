@@ -4,7 +4,7 @@
     <unit>um</unit>
     <description>Average cell to cell distance</description>
   </param>
-  <param max="100." min="0.1" name="rho_0" step="0.1" value="16.">
+  <param max="100." min="0.1" name="rho_0" step="0.1" value="13.">
     <unit>um</unit>
     <description>epithelium radius</description>
   </param>
@@ -24,15 +24,15 @@
     <unit>pN/um2</unit>
     <description>Area elasticity</description>
   </param>
-  <param max="10." min="0.1" name="prefered_area" step="0.01" value="12.">
+  <param max="10." min="0.1" name="prefered_area" step="0.01" value="50.">
     <unit>um2</unit>
     <description>Prefered area</description>
   </param>
-  <param max="10." min="0.1" name="contractility" step="0.01" value="0.02">
+  <param max="10." min="0.1" name="contractility" step="0.01" value="0.01">
     <unit>pN/um</unit>
     <description>Cell contractility</description>
   </param>
-  <param max="10." min="-10." name="line_tension" step="0.01" value="-0.03">
+  <param max="10." min="-10." name="line_tension" step="0.01" value="-0.01">
     <unit>pN</unit>
     <description>Line tension</description>
   </param>

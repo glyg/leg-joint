@@ -15,27 +15,30 @@ ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
 
 def plot_gradients(epithelium, ax=None, scale=0.1):
+    vfilt = epithelium.is_local_vert
     grad = epithelium.calc_gradient(vfilt=epithelium.is_local_vert)
-    print grad
+
     vfilt = epithelium.is_local_vert.copy()
     vfilt.a *= (1 - epithelium.is_cell_vert.a)
     epithelium.graph.set_vertex_filter(vfilt)
     sigmas = epithelium.sigmas.fa
     zeds = epithelium.zeds.fa
-    pos0 = np.vstack((sigmas, zeds))
-    print pos0.shape
-    epithelium.graph.set_vertex_filter(None)
-    grad_vecs = grad.reshape(pos0.shape) * scale + pos0
-    plot_cells_sz(epithelium, ax,
-                  vfilt=epithelium.is_local_vert,
-                  efilt=epithelium.is_local_edge)
-
-    
-    for g, p in zip(grad_vecs, pos0):
-        plt.plot([p[0], g[0]], [p[1], g[1]], 'ro-', lw=2, alpha=0.5)
     epithelium.graph.set_vertex_filter(None)    
 
-def plot_cells_sz(epithelium, ax=None,
+    grad_sigmas = grad[::2] * scale + sigmas
+    grad_zeds = grad[1::2] * scale + zeds
+    v_sigmas = np.array([sigmas, grad_sigmas]).T
+    v_zeds = np.array([zeds, grad_zeds]).T
+    if ax is None:
+        ax =  plot_cells_sz(epithelium, ax=None,
+                            vfilt=epithelium.is_local_vert,
+                            efilt=epithelium.is_local_edge)
+    for s, z in zip(v_sigmas, v_zeds):
+        ax.plot(s, z, 'ro-', lw=2, alpha=0.5)
+    plt.draw()
+    return ax
+
+def plot_cells_sz(epithelium, ax=None, text=True,
                   vfilt=None, efilt=None):
     if ax is None:
         fig, ax = plt.subplots(1,1)
@@ -43,20 +46,21 @@ def plot_cells_sz(epithelium, ax=None,
     sigmas = epithelium.sigmas.copy()
     zeds = epithelium.zeds.copy()
     for cell in epithelium.cells :
-        ax.text(sigmas[cell],
-                zeds[cell],
-                str(cell))
+        if text:
+            ax.text(sigmas[cell],
+                    zeds[cell],
+                    str(cell))
         ax.plot(sigmas[cell],
                 zeds[cell], 'bo', alpha=0.3)
     epithelium.graph.set_vertex_filter(None)
     epithelium.graph.set_edge_filter(efilt)
-    plot_edges_sz(epithelium, efilt, ax=ax)
-    epithelium.graph.set_vertex_filter(None)
+    plot_edges_sz(epithelium, efilt, ax=ax, text=text)
     epithelium.graph.set_edge_filter(None)
     plt.draw()
+    return ax
 
 def plot_edges_sz(epithelium, efilt=None,
-                  text=True, ax=None, **kwargs):
+                  text=False, ax=None, **kwargs):
     sigmas = []
     zeds = []
     if ax is None:
