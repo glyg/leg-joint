@@ -46,7 +46,7 @@ class ParamTree(object):
     whereas the value in the dictionnary is changed.
     """
 
-    def __init__(self, filename=None, root=None, adimentionalized=False):
+    def __init__(self, filename=None, root=None, adimentionalized=True):
 
         if filename is not None:
             self.filename = filename
@@ -72,7 +72,7 @@ class ParamTree(object):
         self.absolute_dic = dict(list)
         self.relative_dic = dict(list)
         if adimentionalized :
-            self.adimentionalize()
+            self.dimentionalize()
             
     def has_unit(self, param, UNIT):
 
@@ -82,30 +82,23 @@ class ParamTree(object):
         else :
             return False
 
-    def adimentionalize(self):
+    def dimentionalize(self):
 
         '''
-        This function scales everything taking dt as unit time, Vk as
-        unit speed, and Fk as unit force. It relies on a correct
-        definition of the units of the elements of the param tree,
-        thus a correct spelling in the xml file, so please beware
-
         Note that the "value" attribute of the ElementTree instance are
-        NOT modified. Also, applying this function on an already
-        adimentionalized  dictionnary won"t change any thing
+        **not** modified. Also, applying this function on an already
+        dimentionalized  dictionnary won"t change any thing
         '''
 
         prefered_area = self.absolute_dic["prefered_area"]
         elasticity = self.absolute_dic["elasticity"]
-        contractility = self.absolute_dic["contractility"]
-        line_tension = self.absolute_dic["line_tension"]
-        params = self.root.findall("param")
+        contractility = self.relative_dic["contractility"]
+        line_tension = self.relative_dic["line_tension"]
 
-        self.relative_dic["line_tension"] = line_tension / (
-            elasticity * prefered_area**(3 / 2))
-        self.relative_dic["contractility"] = contractility /(
-            elasticity * prefered_area)
-
+        self.absolute_dic["line_tension"] = line_tension *\
+                                            elasticity * prefered_area**(3 / 2)
+        self.absolute_dic["contractility"] = contractility *\
+                                             elasticity * prefered_area
 
     def change_dic(self, key, new_value, write=False,
                    back_up=False, verbose=False):

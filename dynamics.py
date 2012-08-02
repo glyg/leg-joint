@@ -39,8 +39,9 @@ class Epithelium(AbstractRTZGraph):
         self.update_deltas()
         self.update_edge_lengths()
         self.junctions = AppicalJunctions(self)
-
+        
         self.update_apical_geom()
+        self.relax_total_area()
         # self.relax_rhos()
         # self.update_energy()
 
@@ -197,12 +198,25 @@ class Epithelium(AbstractRTZGraph):
             vfilt.a *= (1 - self.is_cell_vert.a)
             self.graph.set_vertex_filter(vfilt)
         gradient = np.zeros(self.graph.num_vertices() * 2)
-        gradient[::2] = - self.grad_sigma.fa
-        gradient[1::2] = - self.grad_zed.fa
+        gradient[::2] = self.grad_sigma.fa
+        gradient[1::2] = self.grad_zed.fa
         # print 'calc_grad : '+str(self.zeds.fa)
         self.graph.set_vertex_filter(None)
         return gradient
 
+
+    def relax_total_area(self):
+        
+        prefered_area = self.params["prefered_area"]
+        self.graph.set_vertex_filter(self.is_cell_vert)
+        avg_area = self.cells.areas.fa.mean()
+        self.graph.set_vertex_filter(None)
+        surface_stress = prefered_area/avg_area
+        dilation_factor = np.sqrt(surface_stress)
+        print "dilation factor: "+str(dilation_factor)
+        self.rhos.a *= dilation_factor
+        self.sigmas.a *= dilation_factor
+        self.zeds.a *= dilation_factor
     
     def update_apical_geom(self, vfilt=None, efilt=None):
         """
@@ -275,7 +289,7 @@ class Epithelium(AbstractRTZGraph):
         self.graph.set_vertex_filter(None)
         self.graph.set_edge_filter(None)
 
-    def update_gradient(self, vfilt=None, efilt=None, inverted=False):
+    def update_gradient(self, vfilt=None, efilt=None):
         # Cell vertices
         if vfilt == None:
             vfilt = self.is_cell_vert.copy()

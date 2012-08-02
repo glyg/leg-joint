@@ -28,16 +28,16 @@
     <unit>um2</unit>
     <description>Prefered area</description>
   </param>
-  <param max="10." min="0.1" name="contractility" step="0.01" value="0.01">
-    <unit>pN/um</unit>
+  <param max="10." min="0.1" name="contractility" step="0.01" value="0.04">
+    <unit>adim</unit>
     <description>Cell contractility</description>
   </param>
-  <param max="10." min="-10." name="line_tension" step="0.01" value="-0.01">
-    <unit>pN</unit>
+  <param max="10." min="-10." name="line_tension" step="0.01" value="0.12">
+    <unit>adim</unit>
     <description>Line tension</description>
   </param>
   <param max="100" min="2" name="z_bin_width" step="1" value="4">
     <unit></unit>
-    <description>Line tension</description>
+    <description>Z bin width</description>
   </param>
 </parameters>
