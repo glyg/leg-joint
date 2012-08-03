@@ -99,7 +99,6 @@ class Epithelium(AbstractRTZGraph):
         # print "bounds :"+str(bounds)
         self.graph.set_vertex_filter(None)
 
-
         # output = optimize.fmin(self.opt_energy,
         #                        pos0.flatten(),
         #                        ftol=tol, xtol=0.01,
@@ -203,7 +202,6 @@ class Epithelium(AbstractRTZGraph):
         # print 'calc_grad : '+str(self.zeds.fa)
         self.graph.set_vertex_filter(None)
         return gradient
-
 
     def relax_total_area(self):
         
@@ -698,8 +696,6 @@ class Epithelium(AbstractRTZGraph):
             self.is_new_edge[ctoj_1b] = 1
 
         return j_verta, j_vertb, cell0, cell1
-
-
 
     def remove_junction(self, j_verta, j_vertb, cell0, cell1):
         #This block should go in a decorator
