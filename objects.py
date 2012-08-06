@@ -146,10 +146,13 @@ class AbstractRTZGraph(object):
             # Gradients and energy
             grad_sigma = self.graph.new_vertex_property('float')
             grad_zed = self.graph.new_vertex_property('float')
-            energy_grad = self.graph.new_vertex_property('float')
+            elastic_grad = self.graph.new_vertex_property('float')
+            contractile_grad = self.graph.new_vertex_property('float')
+
             self.graph.vertex_properties["grad_sigma"] = grad_sigma
             self.graph.vertex_properties["grad_zed"] = grad_zed
-            self.graph.vertex_properties["energy_grad"] = energy_grad
+            self.graph.vertex_properties["elastic_grad"] = elastic_grad
+            self.graph.vertex_properties["contractile_grad"] = contractile_grad
 
     @property
     def zeds(self):
@@ -191,6 +194,12 @@ class AbstractRTZGraph(object):
     def grad_zed(self):
         return self.graph.vertex_properties["grad_zed"]
     @property
+    def elastic_grad(self):
+        return self.graph.vertex_properties["elastic_grad"]
+    @property
+    def contractile_grad(self):
+        return self.graph.vertex_properties["contractile_grad"]
+    @property
     def at_boundary(self):
         return self.graph.edge_properties["at_boundary"]
     @property
@@ -204,6 +213,8 @@ class AbstractRTZGraph(object):
     def vecinos_indexes(self):
         return self.graph.vertex_properties["vecinos_indexes"]
 
+
+        
     def any_edge(self, v0, v1):
         efilt = self.graph.get_edge_filter()
         self.graph.set_edge_filter(None)
@@ -212,10 +223,6 @@ class AbstractRTZGraph(object):
             e = self.graph.edge(v1, v0)
         self.graph.set_edge_filter(efilt[0], efilt[1])
         return e
-
-    @property
-    def energy_grad(self):
-        return self.graph.vertex_properties["energy_grad"]
 
     # For clarity reason, those are not properties and return copies
     def rtz_pos(self, vfilt=None, inversed=False):
@@ -553,13 +560,6 @@ class AppicalJunctions(AbstractRTZGraph):
     @property
     def line_tensions(self):
         return self.epithelium.graph.edge_properties["line_tensions"]
-
-    def graphview(self):
-        not_cell_vert = self.epithelium.is_cell_vert.copy()
-        not_cell_vert.a = 1 - self.epithelium.is_cell_vert.a
-        return gt.GraphView(self.epithelium.graph,
-                            vfilt=not_cell_vert,
-                            efilt=self.epithelium.is_junction_edge)
 
     def compute_voronoi(self):
         n_dropped = 0

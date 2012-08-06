@@ -41,7 +41,7 @@ class Epithelium(AbstractRTZGraph):
         self.junctions = AppicalJunctions(self)
         
         self.update_apical_geom()
-        self.relax_total_area()
+        # self.relax_total_area()
         # self.relax_rhos()
         # self.update_energy()
 
@@ -105,20 +105,20 @@ class Epithelium(AbstractRTZGraph):
         #                        args=(self.is_local_vert,),
         #                        callback=self.opt_callback)
 
-        # try:
-        #     output = optimize.fmin_ncg(self.opt_energy,
-        #                                pos0.flatten(),
-        #                                fprime=self.opt_gradient,
-        #                                avextol=tol,
-        #                                retall=True,
-        #                                args=(self.is_local_vert,),
-        #                                callback=self.opt_callback)
-        # except:
-        #     self.graph.set_vertex_filter(vfilt)            
-        #     self.set_new_pos(pos0, vfilt)
-        #     self.graph.set_vertex_filter(None)            
-        #     print "unable to find local min"
-        #     output = 0
+        try:
+            output = optimize.fmin_ncg(self.opt_energy,
+                                       pos0.flatten(),
+                                       fprime=self.opt_gradient,
+                                       avextol=tol,
+                                       retall=True,
+                                       args=(self.is_local_vert,),
+                                       callback=self.opt_callback)
+        except:
+            self.graph.set_vertex_filter(vfilt)            
+            self.set_new_pos(pos0, vfilt)
+            self.graph.set_vertex_filter(None)            
+            print "unable to find local min"
+            output = 0
 
         # output = optimize.fmin_bfgs(self.opt_energy,
         #                             pos0.flatten(),
@@ -129,19 +129,19 @@ class Epithelium(AbstractRTZGraph):
         #                             retall=1,
         #                             callback=self.opt_callback)
 
-        output = optimize.fmin_l_bfgs_b(self.opt_energy,
-                                        pos0.flatten(),
-                                        fprime=None, #self.opt_gradient,
-                                        args=(self.is_local_vert,),
-                                        approx_grad=1,
-                                        bounds=bounds.flatten(),
-                                        m=10,
-                                        factr=1e12,
-                                        pgtol=tol,
-                                        epsilon=1e-08,
-                                        iprint=1,
-                                        maxfun=150,
-                                        disp=None)
+        # output = optimize.fmin_l_bfgs_b(self.opt_energy,
+        #                                 pos0.flatten(),
+        #                                 fprime=None, #self.opt_gradient,
+        #                                 args=(self.is_local_vert,),
+        #                                 approx_grad=1,
+        #                                 bounds=bounds.flatten(),
+        #                                 m=10,
+        #                                 factr=1e12,
+        #                                 pgtol=tol,
+        #                                 epsilon=1e-08,
+        #                                 iprint=1,
+        #                                 maxfun=150,
+        #                                 disp=None)
         return pos0, output
 
     def opt_energy(self, sz_pos, vfilt):
@@ -203,19 +203,35 @@ class Epithelium(AbstractRTZGraph):
         self.graph.set_vertex_filter(None)
         return gradient
 
-    def relax_total_area(self):
-        
+    def find_global_min(self, xtol=1e-5, ftol=1e-6):
         prefered_area = self.params["prefered_area"]
         self.graph.set_vertex_filter(self.is_cell_vert)
         avg_area = self.cells.areas.fa.mean()
         self.graph.set_vertex_filter(None)
         surface_stress = prefered_area/avg_area
         dilation_factor = np.sqrt(surface_stress)
-        print "dilation factor: "+str(dilation_factor)
+        optimal_output = optimize.fmin(self.relax_isotropic,
+                                       dilation_factor,
+                                       xtol=xtol, ftol=ftol, retall=1)
+        return optimal_output
+        
+    def relax_isotropic(self, dilation_factor):
+        self.dilation(dilation_factor)
+        self.update_apical_geom()
+        self.graph.set_vertex_filter(self.is_cell_vert)
+        elastic_term = 0.5 * self.cells.elasticities.a * (
+            self.cells.areas.a - self.cells.prefered_area.a)**2
+        contractile_term = 0.5 * self.cells.contractilities.a * \
+                           self.cells.perimeters.a**2
+        total_cell_energy = elastic_term.sum() + contractile_term.sum()
+        return total_cell_energy
+        
+    def dilation(self, dilation_factor):
+        self.graph.set_vertex_filter(None)
         self.rhos.a *= dilation_factor
         self.sigmas.a *= dilation_factor
         self.zeds.a *= dilation_factor
-    
+        
     def update_apical_geom(self, vfilt=None, efilt=None):
         """
         The area is approximated as the sum
@@ -295,12 +311,11 @@ class Epithelium(AbstractRTZGraph):
             vfilt = vfilt.copy()
             vfilt.a *= self.is_cell_vert.a
         self.graph.set_vertex_filter(vfilt)
-        elastic_term =  self.cells.elasticities.fa \
-                       * (self.cells.areas.fa - self.cells.prefered_area.fa )
-        contractile_term =  self.cells.contractilities.fa \
-                           * self.cells.perimeters.fa
-        cell_grad = elastic_term + contractile_term
-        self.graph.vertex_properties["energy_grad"].fa = cell_grad
+        self.elastic_grad.fa =  self.cells.elasticities.fa \
+                                 * (self.cells.areas.fa -
+                                    self.cells.prefered_area.fa )
+        self.contractile_grad.fa =  self.cells.contractilities.fa \
+                                    * self.cells.perimeters.fa
         self.graph.set_vertex_filter(None)
         # Junction edges
         tension = self.junctions.line_tensions
@@ -310,14 +325,22 @@ class Epithelium(AbstractRTZGraph):
 
         for edge in self.junctions:
             j_src, j_trgt = edge.source(), edge.target()
-            for cell in self.adjacent_cells(edge):
-                perp_sigma, perp_zed =  self.outward_uvect(cell, edge)
-                self.grad_sigma[j_src] += self.energy_grad[cell] * perp_sigma
-                self.grad_zed[j_src] += self.energy_grad[cell] * perp_zed
-                self.grad_sigma[j_trgt] += self.energy_grad[cell] * perp_sigma
-                self.grad_zed[j_trgt] += self.energy_grad[cell] * perp_zed
             u_sg = self.u_dsigmas[edge]
             u_zg = self.u_dzeds[edge]
+            for cell in self.adjacent_cells(edge):
+                perp_sigma, perp_zed =  self.outward_uvect(cell, edge)
+                self.grad_sigma[j_src] += self.elastic_grad[cell] * perp_sigma
+                self.grad_zed[j_src] += self.elastic_grad[cell] * perp_zed
+                self.grad_sigma[j_trgt] += self.elastic_grad[cell] * perp_sigma
+                self.grad_zed[j_trgt] += self.elastic_grad[cell] * perp_zed
+                self.grad_sigma[j_src] += self.contractile_grad[
+                    cell] * u_sg
+                self.grad_zed[j_src] += self.contractile_grad[
+                    cell] * u_zg
+                self.grad_sigma[j_trgt] -= self.contractile_grad[
+                    cell] * u_sg
+                self.grad_zed[j_trgt] -= self.contractile_grad[
+                    cell] * u_zg
             self.grad_sigma[j_src] += tension[edge] * u_sg
             self.grad_zed[j_src] += tension[edge] * u_zg
             self.grad_sigma[j_trgt] += - tension[edge] * u_sg
@@ -326,16 +349,17 @@ class Epithelium(AbstractRTZGraph):
     def outward_uvect(self, cell, j_edge):
         """
         Returns the (sigma, zed) coordinates of the unitary vector
-        perpendicular to the junction edge `j_edge` and the cell `cell`
+        perpendicular to the junction edge `j_edge` and pointing
+        outward the cell `cell`
         """
         if not cell in self.adjacent_cells(j_edge):
             raise AttributeError("Cell not adjacent to junction")
-        perp_zed = self.u_dsigmas[j_edge]
         perp_sigma = - self.u_dzeds[j_edge]
+        perp_zed = self.u_dsigmas[j_edge]
         ctoj1 = self.graph.edge(cell, j_edge.source())
         ctoj2 = self.graph.edge(cell, j_edge.target())
-        median_dzed = (self.dzeds[ctoj1] + self.dzeds[ctoj2])
         median_dsigma = (self.dsigmas[ctoj1] + self.dsigmas[ctoj2])
+        median_dzed = (self.dzeds[ctoj1] + self.dzeds[ctoj2])
         if perp_sigma * median_dsigma < 0:
             perp_sigma *= -1
         if perp_zed * median_dzed < 0:
@@ -694,7 +718,6 @@ class Epithelium(AbstractRTZGraph):
             self.is_junction_edge[ctoj_1b] = 0
             self.is_ctoj_edge[ctoj_1b] = 1
             self.is_new_edge[ctoj_1b] = 1
-
         return j_verta, j_vertb, cell0, cell1
 
     def remove_junction(self, j_verta, j_vertb, cell0, cell1):
