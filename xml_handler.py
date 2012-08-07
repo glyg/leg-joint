@@ -96,7 +96,7 @@ class ParamTree(object):
         line_tension = self.relative_dic["line_tension"]
 
         self.absolute_dic["line_tension"] = line_tension *\
-                                            elasticity * prefered_area**(3 / 2)
+                                            elasticity * prefered_area**(3 / 2.)
         self.absolute_dic["contractility"] = contractility *\
                                              elasticity * prefered_area
 

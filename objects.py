@@ -208,7 +208,7 @@ class AbstractRTZGraph(object):
 
     @property
     def is_alive(self):
-        return self.graph.edge_properties["is_alive"]
+        return self.graph.vertex_properties["is_alive"]
     @property
     def vecinos_indexes(self):
         return self.graph.vertex_properties["vecinos_indexes"]
@@ -462,13 +462,13 @@ class Cells(AbstractRTZGraph):
         self.epithelium.graph.vertex_properties["prefered_area"
                                      ] = prefered_area
         self.epithelium.graph.vertex_properties["is_cell_vert"].a[:] = 1
-
         
         AbstractRTZGraph.__init__(self)
 
     def __iter__(self):
         for vertex in self.epithelium.graph.vertices():
-            if self.epithelium.is_cell_vert[vertex]:
+            if self.epithelium.is_cell_vert[vertex] and\
+               self.epithelium.is_alive[vertex]:
                 yield vertex
 
     @property
@@ -518,14 +518,12 @@ class Cells(AbstractRTZGraph):
         rho_0 = self.epithelium.params['rho_0']
         lambda_0 = self.epithelium.params['lambda_0']
 
-        delta_z = lambda_0 * np.sqrt(3) / 2.
-        n_zeds = np.int(4 * rho_0 / delta_z)
-        delta_theta = 2 * np.arcsin(lambda_0 / (2 * rho_0))
-
-        n_thetas = np.int(2 * np.pi / delta_theta)
+        n_thetas = np.int(2 * np.pi * rho_0 / lambda_0)
         rho_c = (n_thetas - 1) * lambda_0 / (2 * np.pi)
-        delta_theta_c = 2 * np.pi / n_thetas
-
+        delta_theta = 2 * np.pi / n_thetas
+        delta_z = delta_theta * rho_c * np.sqrt(3)/2.
+        n_zeds = np.int(5 * rho_0 / delta_z)
+        
         self.n_zeds = int(n_zeds)
         self.n_thetas = int(n_thetas)
 
@@ -533,7 +531,7 @@ class Cells(AbstractRTZGraph):
         zt_grid = np.mgrid[:n_zeds, :n_thetas]
         thetas = zt_grid[1].astype('float')
         thetas[::2, ...] += 0.5
-        thetas *= delta_theta_c
+        thetas *= delta_theta
         zeds = zt_grid[0].astype('float')
         zeds *= delta_z
         zeds -= zeds.max() / 2
