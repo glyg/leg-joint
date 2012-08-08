@@ -209,13 +209,17 @@ class Epithelium(AbstractRTZGraph):
             vfilt = vfilt.copy()
             vfilt.a *= (1 - self.is_cell_vert.a)
             self.graph.set_vertex_filter(vfilt)
+        prefered_area0 =  self.params['prefered_area']
+        elasticity0 = self.params['elasticity']        
+        norm_factor = prefered_area0 * elasticity0
+
         gradient = np.zeros(self.graph.num_vertices() * 2)
-        gradient[::2] = self.grad_sigma.fa
-        gradient[1::2] = self.grad_zed.fa
+        gradient[::2] = self.grad_sigma.fa / norm_factor
+        gradient[1::2] = self.grad_zed.fa / norm_factor
         # print 'calc_grad : '+str(self.zeds.fa)
         self.graph.set_vertex_filter(None)
         return gradient
-
+        
     def isotropic_relax(self):
         gamma = self.paramtree.relative_dic['contractility']
         lbda = self.paramtree.relative_dic['line_tension']
@@ -366,10 +370,6 @@ class Epithelium(AbstractRTZGraph):
                                     * self.cells.perimeters.fa
         self.graph.set_vertex_filter(None)
 
-        num_cells = vfilt.a.sum()
-        prefered_area0 =  self.params['prefered_area']
-        elasticity0 = self.params['elasticity']        
-        
         # Junction edges
         tension = self.junctions.line_tensions
         self.graph.set_edge_filter(efilt)

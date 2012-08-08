@@ -25,8 +25,8 @@ def plot_gradients(epithelium, ax=None, scale=0.1):
     zeds = epithelium.zeds.fa
     epithelium.graph.set_vertex_filter(None)    
 
-    grad_sigmas = grad[::2] * scale + sigmas
-    grad_zeds = grad[1::2] * scale + zeds
+    grad_sigmas = grad[::2] * scale
+    grad_zeds = grad[1::2] * scale
     v_sigmas = np.array([sigmas, grad_sigmas]).T
     v_zeds = np.array([zeds, grad_zeds]).T
     if ax is None:
@@ -34,7 +34,8 @@ def plot_gradients(epithelium, ax=None, scale=0.1):
                             vfilt=epithelium.is_local_vert,
                             efilt=epithelium.is_local_edge)
     for s, z in zip(v_sigmas, v_zeds):
-        ax.plot(s, z, 'ro-', lw=2, alpha=0.5)
+        ax.arrow(s[0], z[0], s[1], z[1], width=0.1,
+                 ec='red', fc='red', alpha=0.5)
     plt.draw()
     return ax
 
