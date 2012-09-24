@@ -5,8 +5,8 @@ import os
 import numpy as np
 from numpy.random import normal, random_sample
 import graph_tool.all as gt
-import pylab as plt
 
+import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 FLOAT = np.dtype('float32')
@@ -136,80 +136,70 @@ def pseudo3d_draw(graph, rtz, output="lattice_3d.pdf",
     del pmap
     return pseudo3d_pos
     
-def epithelium_draw(epithelium, z_angle=0.15, d_theta=0.1,
+def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
                     output="tissue_3d.pdf", output2='tissue_sz.pdf',
                     **kwargs):
 
-    g1 = epithelium.junctions.graph
-    g2 = epithelium.cells.graph
+    graph = eptm.graph
+    
+    vertex_red = eptm.graph.new_vertex_property('float')
+    vertex_green = eptm.graph.new_vertex_property('float')
+    vertex_blue = eptm.graph.new_vertex_property('float') 
+    vertex_alpha = eptm.graph.new_vertex_property('float') 
+    vertex_size = eptm.graph.new_vertex_property('int') 
 
-    vertex_red1 = g1.new_vertex_property('float')
-    vertex_green1 = g1.new_vertex_property('float')
-    vertex_blue1 = g1.new_vertex_property('float') 
-    vertex_alpha1 = g1.new_vertex_property('float') 
-    vertex_size1 = g1.new_vertex_property('int') 
+    edge_red = eptm.graph.new_edge_property('float')
+    edge_green = eptm.graph.new_edge_property('float')
+    edge_blue = eptm.graph.new_edge_property('float') 
+    edge_alpha = eptm.graph.new_edge_property('float') 
+    edge_width = eptm.graph.new_edge_property('float') 
 
-    edge_red1 = g1.new_edge_property('float')
-    edge_green1 = g1.new_edge_property('float')
-    edge_blue1 = g1.new_edge_property('float') 
-    edge_alpha1 = g1.new_edge_property('float') 
-    edge_width1 = g1.new_edge_property('float') 
+    j_filt = eptm.is_cell_vert.copy()
+    j_filt.a *= (1 - eptm.is_alive.a)
+    eptm.graph.set_vertex_filter(j_filt,
+                                 inverted=True)
+    print eptm.graph.num_vertices()
+    vertex_red.fa = 105/256.
+    vertex_green.fa = 182/256.
+    vertex_blue.fa = 40/256.
+    vertex_size.fa = 1.
+    print vertex_size.fa.sum()
+    eptm.graph.set_vertex_filter(None)
 
-    vertex_red2 = g2.new_vertex_property('float')
-    vertex_green2 = g2.new_vertex_property('float')
-    vertex_blue2 = g2.new_vertex_property('float')
-    vertex_alpha2 = g2.new_vertex_property('float') 
-    vertex_size2 = g2.new_vertex_property('int') 
+    eptm.graph.set_edge_filter(eptm.is_junction_edge,
+                               inverted=False)
+    edge_red.fa = 105/256.
+    edge_green.fa = 201/256.
+    edge_blue.fa = 40/256.
+    edge_width.fa = 1.
+    print edge_width.fa.size
+    eptm.graph.set_edge_filter(None)
 
+    cell_filt = eptm.is_cell_vert.copy()
+    cell_filt.a *= eptm.is_alive.a
+    eptm.graph.set_vertex_filter(cell_filt,
+                                 inverted=False)
+    vertex_red.fa = 105/256.
+    vertex_green.fa = 201/256.
+    vertex_blue.fa = 237/256.
+    vertex_size.fa = 5.
+    eptm.graph.set_vertex_filter(None)
 
-    edge_red2 = g2.new_edge_property('float')
-    edge_green2 = g2.new_edge_property('float')
-    edge_blue2 = g2.new_edge_property('float') 
-    edge_alpha2 = g2.new_edge_property('float') 
-    edge_width2 = g2.new_edge_property('float') 
+    eptm.graph.set_edge_filter(eptm.is_ctoj_edge,
+                               inverted=False)
+    print eptm.graph.num_edges()
+    edge_red.fa = 0.9
+    edge_green.fa = 0.9
+    edge_blue.fa = 0.9
+    edge_width.fa = 0.1
+    eptm.graph.set_edge_filter(None)
 
-    vertex_red1.a[:] = 105/256.
-    vertex_green1.a[:] = 182/256.
-    vertex_blue1.a[:] = 40/256.
-    vertex_size1.a[:] = 1.
-
-    edge_red1.a[:] = 105/256.
-    edge_green1.a[:] = 201/256.
-    edge_blue1.a[:] = 40/256.
-    edge_width1.a[:] = 1.
-
-    vertex_red2.a[:] = 105/256.
-    vertex_green2.a[:] = 201/256.
-    vertex_blue2.a[:] = 237/256.
-    vertex_size2.a[:] = 5.
-
-
-    edge_red2.a[:] = 0.
-    edge_green2.a[:] = 0.
-    edge_blue2.a[:] = 0.
-    edge_width2.a[:] = 0.
-
-    props = [(epithelium.junctions.rtz_pos, epithelium.cells.rtz_pos),
-             (edge_red1, edge_red2),
-             (edge_green1, edge_green2),
-             (edge_blue1, edge_blue2),
-             (edge_alpha1, edge_alpha2),
-             (vertex_red1, vertex_red2),
-             (vertex_green1, vertex_green2),
-             (vertex_blue1, vertex_blue2),
-             (vertex_alpha1, vertex_alpha2),
-             (edge_width1, edge_width2),
-             (vertex_size1, vertex_size2)]
-
-    ug, u_props = gt.graph_union(g1, g2, props=props)
-
-    (rtz_pos, edge_red, edge_green, edge_blue, edge_alpha,
-     vertex_red, vertex_green, vertex_blue, vertex_alpha,
-     edge_width, vertex_size) = u_props
-    rhos, thetas, zeds = gt.ungroup_vector_property(rtz_pos, [0, 1, 2])
-
-    pseudo_x = ug.new_vertex_property('float')
-    pseudo_y = ug.new_vertex_property('float')
+    rhos, sigmas, zeds = eptm.rhos, eptm.sigmas, eptm.zeds
+    thetas = sigmas.copy()
+    thetas.a = sigmas.a / rhos.a
+    
+    pseudo_x = eptm.graph.new_vertex_property('float')
+    pseudo_y = eptm.graph.new_vertex_property('float')
     pseudo_x.a = zeds.a * np.cos(z_angle) - rhos.a * np.cos(
         thetas.a + d_theta) * np.sin(z_angle)
     pseudo_y.a = rhos.a * np.sin(thetas.a + d_theta)
@@ -217,13 +207,13 @@ def epithelium_draw(epithelium, z_angle=0.15, d_theta=0.1,
     depth = rhos.a * (1 - np.cos(thetas.a + d_theta))
     normed_depth = (depth - depth.min()) / (depth.max() - depth.min())
     vertex_alpha.a = normed_depth * 0.7 + 0.3
-    for edge in ug.edges():
+    for edge in eptm.graph.edges():
         edge_alpha[edge] = vertex_alpha[edge.source()]
 
-    vorder = ug.new_vertex_property('float') 
+    vorder = eptm.graph.new_vertex_property('float') 
     vorder.a = np.argsort(vertex_alpha.a)
 
-    eorder = ug.new_edge_property('float') 
+    eorder = eptm.graph.new_edge_property('float') 
     eorder.a = np.argsort(edge_alpha.a)
     
     vertex_rgba = [vertex_red, vertex_green, vertex_blue, vertex_alpha]
@@ -234,7 +224,7 @@ def epithelium_draw(epithelium, z_angle=0.15, d_theta=0.1,
     xy = [pseudo_x, pseudo_y]
     pseudo3d_pos = gt.group_vector_property(xy, value_type='float')
     
-    pmap = gt.graph_draw(ug, pseudo3d_pos,
+    pmap = gt.graph_draw(eptm.graph, pseudo3d_pos,
                          vertex_fill_color=vertex_color,
                          vertex_color=vertex_color,
                          edge_pen_width=edge_width, 
@@ -244,11 +234,10 @@ def epithelium_draw(epithelium, z_angle=0.15, d_theta=0.1,
                          output=output, **kwargs)
 
     
-    sigma = ug.new_vertex_property('float')
-    sigma.a = rhos.a * thetas.a
+    sigma = eptm.sigmas
     zs = [sigma, zeds]
     zs_pos = gt.group_vector_property(zs, value_type='float')
-    pmap2 = gt.graph_draw(ug, zs_pos,
+    pmap2 = gt.graph_draw(eptm.graph, zs_pos,
                           vertex_fill_color=vertex_color,
                           vertex_color=vertex_color,
                           edge_pen_width=edge_width, 

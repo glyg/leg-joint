@@ -26,11 +26,10 @@ from which ::class:`Epithelium`: and for commodity
 the ::class:`Cells`: and ::class:`AppicalJunctions` are derived.
 """
 
-import os, time
+import os
 import numpy as np
-from numpy.random import normal, random_sample
+from numpy.random import normal
 import graph_tool.all as gt
-from xml_handler import ParamTree
 from scipy import weave
 from scipy.interpolate import splrep, splev
 
@@ -79,81 +78,74 @@ class AbstractRTZGraph(object):
 
         if len(self.graph.properties) == 0 :
             at_boundary = self.graph.new_edge_property('bool')
-            at_boundary.a[:] = 1
+            at_boundary.a[:] = 0
+            self.graph.edge_properties["at_boundary"] = at_boundary
             is_new_edge = self.graph.new_edge_property('bool')
             is_new_edge.a[:] = 1
+            self.graph.edge_properties["is_new_edge"] = is_new_edge
             is_local_cell = self.graph.new_vertex_property('bool')
             is_local_cell.a[:] = 0
+            self.graph.vertex_properties["is_local_cell"] = is_local_cell
             is_local_vert = self.graph.new_vertex_property('bool')
             is_local_vert.a[:] = 0
-            is_local_j_vert = self.graph.new_vertex_property('bool')
-            is_local_j_vert.a[:] = 0
-            is_local_both = self.graph.new_vertex_property('bool')
-            is_local_both.a[:] = 0
+            self.graph.vertex_properties["is_local_vert"] = is_local_vert
             is_alive = self.graph.new_vertex_property('bool')
             is_alive.a[:] = 1
-            is_cell_vert = self.graph.new_vertex_property('bool')
-            # Internalisation
-            self.graph.vertex_properties["is_local_cell"] = is_local_cell
-            self.graph.vertex_properties["is_local_j_vert"] = is_local_j_vert
-            self.graph.vertex_properties["is_local_vert"] = is_local_vert
-            self.graph.vertex_properties["is_local_both"] = is_local_both
             self.graph.vertex_properties["is_alive"] = is_alive
+            is_cell_vert = self.graph.new_vertex_property('bool')
             self.graph.vertex_properties["is_cell_vert"] = is_cell_vert
-            self.graph.edge_properties["at_boundary"] = at_boundary
-            self.graph.edge_properties["is_new_edge"] = is_new_edge
 
             is_local_edge = self.graph.new_edge_property('bool')
             is_local_edge.a[:] = 0
-            is_local_j_edge = self.graph.new_edge_property('bool')
-            is_local_j_edge.a[:] = 0
+            self.graph.edge_properties["is_local_edge"] = is_local_edge
             is_junction_edge = self.graph.new_edge_property('bool')
-            is_ctoj_edge = self.graph.new_edge_property('bool')
             self.graph.edge_properties["is_junction_edge"
                                        ] = is_junction_edge
+            is_ctoj_edge = self.graph.new_edge_property('bool')
             self.graph.edge_properties["is_ctoj_edge"] = is_ctoj_edge
-            self.graph.edge_properties["is_local_edge"] = is_local_edge
-            self.graph.edge_properties["is_local_j_edge"] = is_local_j_edge
 
             # Position in the rho theta zed space
             rhos_p = self.graph.new_vertex_property('float')
-            zeds_p = self.graph.new_vertex_property('float')
-            thetas_p = self.graph.new_vertex_property('float')
-            sigmas_p = self.graph.new_vertex_property('float')
             self.graph.vertex_properties["rhos"] = rhos_p
-            self.graph.vertex_properties["thetas"] = thetas_p
+            zeds_p = self.graph.new_vertex_property('float')
             self.graph.vertex_properties["zeds"] = zeds_p
+            thetas_p = self.graph.new_vertex_property('float')
+            self.graph.vertex_properties["thetas"] = thetas_p
+            sigmas_p = self.graph.new_vertex_property('float')
             self.graph.vertex_properties["sigmas"] = sigmas_p
 
-            # distances and unitary vectors
+            # distances 
             edge_lengths = self.graph.new_edge_property('float')
-            dthetas = self.graph.new_edge_property('float')
-            dsigmas = self.graph.new_edge_property('float')
-            dzeds = self.graph.new_edge_property('float')
-            drhos = self.graph.new_edge_property('float')
-            u_dsigmas = self.graph.new_edge_property('float')
-            u_dzeds = self.graph.new_edge_property('float')
-            u_drhos = self.graph.new_edge_property('float')
-            # Internalisation
             self.graph.edge_properties["edge_lengths"] = edge_lengths
+            dthetas = self.graph.new_edge_property('float')
             self.graph.edge_properties["dthetas"] = dthetas
+            dsigmas = self.graph.new_edge_property('float')
             self.graph.edge_properties["dsigmas"] = dsigmas
+            dzeds = self.graph.new_edge_property('float')
             self.graph.edge_properties["dzeds"] = dzeds
+            drhos = self.graph.new_edge_property('float')
             self.graph.edge_properties["drhos"] = drhos
+
+            # unitary vectors
+            u_dsigmas = self.graph.new_edge_property('float')
             self.graph.edge_properties["u_dsigmas"] = u_dsigmas
+            u_dzeds = self.graph.new_edge_property('float')
             self.graph.edge_properties["u_dzeds"] = u_dzeds
+            u_drhos = self.graph.new_edge_property('float')
             self.graph.edge_properties["u_drhos"] = u_drhos
+
             # Gradients and energy
             grad_sigma = self.graph.new_vertex_property('float')
-            grad_zed = self.graph.new_vertex_property('float')
-            elastic_grad = self.graph.new_vertex_property('float')
-            contractile_grad = self.graph.new_vertex_property('float')
-
             self.graph.vertex_properties["grad_sigma"] = grad_sigma
+            grad_zed = self.graph.new_vertex_property('float')
             self.graph.vertex_properties["grad_zed"] = grad_zed
+            elastic_grad = self.graph.new_vertex_property('float')
             self.graph.vertex_properties["elastic_grad"] = elastic_grad
+            contractile_grad = self.graph.new_vertex_property('float')
             self.graph.vertex_properties["contractile_grad"] = contractile_grad
-
+            radial_grad = self.graph.new_vertex_property('float')
+            self.graph.vertex_properties["radial_grad"] = radial_grad
+            
     @property
     def zeds(self):
         return self.graph.vertex_properties["zeds"]
@@ -200,6 +192,10 @@ class AbstractRTZGraph(object):
     def contractile_grad(self):
         return self.graph.vertex_properties["contractile_grad"]
     @property
+    def radial_grad(self):
+        return self.graph.vertex_properties["radial_grad"]
+
+    @property
     def at_boundary(self):
         return self.graph.edge_properties["at_boundary"]
     @property
@@ -213,6 +209,8 @@ class AbstractRTZGraph(object):
     def vecinos_indexes(self):
         return self.graph.vertex_properties["vecinos_indexes"]
 
+    
+        
 
         
     def any_edge(self, v0, v1):
@@ -271,10 +269,10 @@ class AbstractRTZGraph(object):
         for edge in self.graph.edges():
             v0, v1 = edge.source(), edge.target()
             dzed = self.zeds[v1] - self.zeds[v0]
-            self.graph.edge_properties["dzeds"][edge] = dzed
+            self.dzeds[edge] = dzed
             drho = self.rhos[v1] - self.rhos[v0]
-            self.graph.edge_properties["drhos"][edge] = drho
-            if self.is_new_edge[edge] or self.at_boundary[edge] :
+            self.drhos[edge] = drho
+            if self.is_new_edge[edge]:
                 dtheta = self.thetas[v1] - self.thetas[v0]
                 # dtheta lies between -tau and tau
                 if dtheta > 0.5 * tau :
@@ -287,12 +285,20 @@ class AbstractRTZGraph(object):
                     self.at_boundary[edge] = 1
                 else :
                     dsigma = self.sigmas[v1] - self.sigmas[v0]
-                    if abs(dsigma) > 20. :
+                    if abs(dsigma) > tau * self.rhos.a.max() :
                         print dtheta
                         print str(v0), str(v1)
-                    if self.is_new_edge[edge]:
-                        self.at_boundary[edge] = 0
+                    self.at_boundary[edge] = 0
                     dtheta = dsigma / self.rhos[v0]
+            if self.at_boundary[edge]:
+                rho0 = self.rhos[v0]
+                dsigma = self.sigmas[v1] - self.sigmas[v0]
+                if dsigma > tau * rho0 / 2.:
+                    dsigma -= tau * rho0
+                elif dsigma < - tau * rho0 / 2.:
+                    dsigma += tau * rho0
+                dtheta = dsigma / self.rhos[v0]
+
             else:
                 dsigma = self.sigmas[v1] - self.sigmas[v0]
                 dtheta = dsigma / self.rhos[v0]
@@ -405,15 +411,21 @@ class AbstractRTZGraph(object):
         return sfdp_pos
 
     def set_new_pos(self, new_sz_pos, vfilt=None):
+        
+        tau = 2*np.pi
         new_sz_pos = new_sz_pos.flatten()
         if vfilt == None:
             self.graph.set_vertex_filter(self.is_cell_vert, inverted=True)
         else:
             vfilt = vfilt.copy()
-            vfilt.a *= (1 - self.is_cell_vert.a)
+            vfilt.a *= (1 - self.is_cell_vert.a) * self.is_alive.a
             self.graph.set_vertex_filter(vfilt)
         assert len(new_sz_pos) / 2 == self.graph.num_vertices()
-        self.sigmas.fa = new_sz_pos[::2]
+        rhos = self.rhos.fa
+        raw_sigma = new_sz_pos[::2]
+        raw_sigma[raw_sigma > tau * rhos] -= tau * rhos[raw_sigma > tau * rhos]
+        raw_sigma[raw_sigma < 0] += tau * rhos[raw_sigma < 0]
+        self.sigmas.fa = raw_sigma
         self.zeds.fa = new_sz_pos[1::2]
         self.graph.set_vertex_filter(None)
 
@@ -610,19 +622,19 @@ class AppicalJunctions(AbstractRTZGraph):
                 cj = eptm.graph.add_edge(cell, j_vertex)
                 eptm.is_ctoj_edge[cj] = 1
                 eptm.is_junction_edge[cj] = 0
-                eptm.at_boundary[cj] = 1
+                eptm.at_boundary[cj] = 0
                 eptm.is_new_edge[cj] = 1
 
                 v0j = eptm.graph.add_edge(vecino0, j_vertex)
                 eptm.is_ctoj_edge[v0j] = 1
                 eptm.is_junction_edge[v0j] = 0
-                eptm.at_boundary[v0j] = 1
+                eptm.at_boundary[v0j] = 0
                 eptm.is_new_edge[v0j] = 1
 
                 v1j = eptm.graph.add_edge(vecino1, j_vertex)
                 eptm.is_ctoj_edge[v1j] = 1
                 eptm.is_junction_edge[v1j] = 0
-                eptm.at_boundary[v1j] = 1
+                eptm.at_boundary[v1j] = 0
                 eptm.is_new_edge[v1j] = 1
 
         # Cell to junction graph
@@ -653,7 +665,7 @@ class AppicalJunctions(AbstractRTZGraph):
                         j_edge = eptm.graph.add_edge(j_v0, j_v1)
                         eptm.is_ctoj_edge[j_edge] = 0
                         eptm.is_junction_edge[j_edge] = 1
-                        eptm.at_boundary[j_edge] = 1
+                        eptm.at_boundary[j_edge] = 0
                         eptm.is_new_edge[j_edge] = 1
                 else:
                     n_jdropped += 1

@@ -2,13 +2,14 @@
 # -*- coding: utf-8 -*-
 
 import os
-import numpy as np
-from scipy import optimize
+
 import graph_tool.all as gt
-from xml_handler import ParamTree
-from scipy import weave
+import numpy as np
+from scipy import optimize, weave
 
 from objects import  AbstractRTZGraph, Cells, AppicalJunctions
+from xml_handler import ParamTree
+
 
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
@@ -20,6 +21,8 @@ tau = 2. * np.pi
 
 class Epithelium(AbstractRTZGraph):
     """
+    The ::class::`Epithelium` is the container for all the simulation.
+    
     """
     def __init__(self, paramtree=None, paramfile=PARAMFILE):
         """
@@ -43,9 +46,10 @@ class Epithelium(AbstractRTZGraph):
         
         self.update_apical_geom()
         self.isotropic_relax()
+        self.compute_bending()
+
         # self.relax_rhos()
         # self.update_energy()
-
 
     @property
     def is_cell_vert(self):
@@ -78,9 +82,12 @@ class Epithelium(AbstractRTZGraph):
     def is_local_both(self):
         return self.graph.vertex_properties["is_local_both"]
 
+    def compute_bending(self):
+        pass
+        
     def find_energy_min(self, tol=1e-8):
         vfilt = self.is_local_vert.copy()
-        vfilt.a *= (1 - self.is_cell_vert.a)
+        vfilt.a *= (1 - self.is_cell_vert.a) * self.is_alive.a
         self.graph.set_vertex_filter(vfilt)
         pos0 = np.array([(s, z) for s, z in zip(self.sigmas.fa,
                                                 self.zeds.fa)])
@@ -106,67 +113,84 @@ class Epithelium(AbstractRTZGraph):
         #                        args=(self.is_local_vert,),
         #                        callback=self.opt_callback)
 
-        try:
-            output = optimize.fmin_ncg(self.opt_energy,
-                                       pos0.flatten(),
-                                       fprime=self.opt_gradient,
-                                       avextol=tol,
-                                       retall=True,
-                                       args=(self.is_local_vert,
-                                             self.is_local_edge),
-                                       callback=self.opt_callback)
-        except:
-            self.graph.set_vertex_filter(vfilt)            
-            self.set_new_pos(pos0, vfilt)
-            self.graph.set_vertex_filter(None)            
-            output = 0
-            raise 
+        # try:
+        #     output = optimize.fmin_ncg(self.opt_energy,
+        #                                pos0.flatten(),
+        #                                fprime=self.opt_gradient,
+        #                                avextol=tol,
+        #                                retall=True,
+        #                                args=(self.is_local_vert,
+        #                                      self.is_local_edge),
+        #                                callback=self.opt_callback)
+        # except:
+        #     self.graph.set_vertex_filter(vfilt)
+        #     self.set_new_pos(pos0, vfilt)
+        #     self.graph.set_vertex_filter(None)
+        #     output = 0
 
         # output = optimize.fmin_bfgs(self.opt_energy,
         #                             pos0.flatten(),
         #                             fprime=self.opt_gradient,
-        #                             args=(self.is_local_vert,),
+        #                             args=(self.is_local_vert,
+        #                                   self.is_local_edge),
         #                             gtol=tol,
         #                             norm=np.inf,
         #                             retall=1,
         #                             callback=self.opt_callback)
 
-        # output = optimize.fmin_l_bfgs_b(self.opt_energy,
-        #                                 pos0.flatten(),
-        #                                 fprime=None, #self.opt_gradient,
-        #                                 args=(self.is_local_vert,),
-        #                                 approx_grad=1,
-        #                                 bounds=bounds.flatten(),
-        #                                 m=10,
-        #                                 factr=1e12,
-        #                                 pgtol=tol,
-        #                                 epsilon=1e-08,
-        #                                 iprint=1,
-        #                                 maxfun=150,
-        #                                 disp=None)
+        output = optimize.fmin_l_bfgs_b(self.opt_energy,
+                                        pos0.flatten(),
+                                        fprime=self.opt_gradient,
+                                        args=(self.is_local_vert,
+                                              self.is_local_edge),
+                                        approx_grad=1,
+                                        bounds=bounds.flatten(),
+                                        m=10,
+                                        factr=1e12,
+                                        pgtol=tol,
+                                        epsilon=1e-08,
+                                        iprint=1,
+                                        maxfun=150,
+                                        disp=None)
         return pos0, output
 
     def opt_energy(self, sz_pos, vfilt, efilt):
+        """
+        After setting the sigma, zed position to sz_pos,
+        computes the energy over the graph as filtered
+        by vfilt and efilt vertex and edge filters (respectively)
+        """
         # Position setting
-        # print 'opt_energy : '+str(sz_pos[1::2])
         self.set_new_pos(sz_pos, vfilt)
         self.update_apical_geom(vfilt, efilt)
         energy = self.calc_energy(vfilt, efilt)
         return energy
 
     def opt_gradient(self, sz_pos, vfilt, efilt):
+        """
+        After setting the sigma, zed position to sz_pos,
+        computes the gradient over the graph as filtered
+        by vfilt and efilt vertex and edge filters (respectively)
+        """
         # # position setting
         self.set_new_pos(sz_pos, vfilt)
-        self.update_apical_geom(vfilt)
+        self.update_apical_geom(vfilt, efilt)
         self.update_gradient(vfilt)
         gradient = self.calc_gradient(vfilt)
         return gradient
 
     def opt_callback(self, sz_pos):
-        self.update_apical_geom(self.is_local_vert)
-        self.update_gradient(self.is_local_vert)
+        """ Call back for the optimization """
+
+        self.resolve_small_edges(self.is_local_vert,
+                                 self.is_local_edge)
+        self.update_apical_geom(self.is_local_vert,
+                                self.is_local_edge)
+        self.update_gradient(self.is_local_vert,
+                             self.is_local_edge)
 
     def calc_energy(self, vfilt=None, efilt=None):
+        """ Computes the apical energy on the filtered epithelium """
         # Cell vertices (filtered by the vertex filter `vfilt`)
         if vfilt is None:
             vfilt = self.is_cell_vert.copy()
@@ -182,7 +206,7 @@ class Epithelium(AbstractRTZGraph):
         num_cells = vfilt.a.sum()
         # print 'Computing energy for %i cells' % num_cells
         prefered_area0 =  self.params['prefered_area']
-        elasticity0 = self.params['elasticity']        
+        elasticity0 = self.params['elasticity']
         self.graph.set_vertex_filter(None)
         # Appical junction related terms (filtered over by `efilt`)
         if efilt is None:
@@ -201,7 +225,7 @@ class Epithelium(AbstractRTZGraph):
                        + tension_term.sum()
         denominator = num_cells * elasticity0 * prefered_area0**2
         return total_energy / denominator
-
+        
     def calc_gradient(self, vfilt=None):
         if vfilt == None:
             self.graph.set_vertex_filter(self.is_cell_vert, inverted=True)
@@ -210,7 +234,7 @@ class Epithelium(AbstractRTZGraph):
             vfilt.a *= (1 - self.is_cell_vert.a)
             self.graph.set_vertex_filter(vfilt)
         prefered_area0 =  self.params['prefered_area']
-        elasticity0 = self.params['elasticity']        
+        elasticity0 = self.params['elasticity']
         norm_factor = prefered_area0 * elasticity0
 
         gradient = np.zeros(self.graph.num_vertices() * 2)
@@ -242,24 +266,6 @@ class Epithelium(AbstractRTZGraph):
         self.scale(correction)
         self.update_apical_geom()
 
-    def check_phase_space(self, gamma, lbda):
-        # See the energies.pynb notebook for the derivation of this:
-        mu = 6 * np.sqrt(2. / (3 * np.sqrt(3)))
-        if (gamma < - lbda / (2 * mu)):
-            report= ("Contractility is too low,"
-                     "Soft network not supported")
-            return False, report
-        if 2 * gamma * mu**2 > 4:
-            lambda_max = 0.
-        else:
-            lambda_max = ((4 - 2 * gamma * mu**2) / 3.)**(3./2.) / mu
-        if lbda > lambda_max:
-            report = ("Invalid value for the line tension: "
-                      "it should be lower than %.2f "
-                      "for a contractility of %.2f "
-                    % (lambda_max, gamma))
-            return False, report
-        return True, 'ok!'
         
     def isotropic_grad(self, delta, gamma, lbda):
         mu = 6 * np.sqrt(2. / (3 * np.sqrt(3)))
@@ -273,7 +279,6 @@ class Epithelium(AbstractRTZGraph):
         tension = lbda * mu * delta / 2.
         energy = elasticity + contractility + tension
         return energy
-    
         
     def scale(self, scaling_factor):
         self.graph.set_vertex_filter(None)
@@ -281,7 +286,7 @@ class Epithelium(AbstractRTZGraph):
         self.sigmas.a *= scaling_factor
         self.zeds.a *= scaling_factor
         
-    def update_apical_geom(self, vfilt=None, efilt=None):
+    def update_apical_geom(self, vfilt=None, efilt=None, cutoff=1e-1):
         """
         The area is approximated as the sum
         of the areas of the triangles
@@ -292,11 +297,11 @@ class Epithelium(AbstractRTZGraph):
         self.update_cell_positions(vfilt)
         # cell to junctions edges only
         if efilt == None:
-            efilt = self.is_ctoj_edge.copy()
+            efilt_ctoj = self.is_ctoj_edge.copy()
         else:
-            efilt = efilt.copy()
-            efilt.a *= self.is_ctoj_edge.a
-        self.graph.set_edge_filter(efilt)
+            efilt_ctoj = efilt.copy()
+            efilt_ctoj.a *= self.is_ctoj_edge.a
+        self.graph.set_edge_filter(efilt_ctoj)
         self.graph.set_vertex_filter(vfilt)
         for cell in self.cells:
             if cell.out_degree() < 3:
@@ -325,21 +330,20 @@ class Epithelium(AbstractRTZGraph):
         self.graph.set_edge_filter(None)
         
     def update_cell_positions(self, vfilt=None):
+
         if vfilt == None:
-            self.graph.set_vertex_filter(None)
+            vfilt = self.is_alive.copy()
         else:
             vfilt = vfilt.copy()
-            vfilt.a += (1 - self.is_cell_vert.a)
             vfilt.a *= self.is_alive.a
-            self.graph.set_vertex_filter(vfilt)
-        efilt = self.is_ctoj_edge.copy()
-        #efilt.a += (1 - self.at_boundary.a)
-        self.graph.set_edge_filter(efilt)
-        for cell in self.cells:
+        vfilt.a *= self.is_cell_vert.a
+        self.graph.set_vertex_filter(vfilt)
+        cells = [cell for cell in self.graph.vertices()]
+        self.graph.set_vertex_filter(None)
+        self.graph.set_edge_filter(self.is_ctoj_edge)
+        for cell in cells:
             j_sigma = 0.
             j_zed = 0.
-            if cell.out_degree() < 4:
-                continue
             for je in cell.out_edges():
                 sigma = self.sigmas[je.target()]
                 if not self.at_boundary[je]:
@@ -354,6 +358,77 @@ class Epithelium(AbstractRTZGraph):
         self.graph.set_vertex_filter(None)
         self.graph.set_edge_filter(None)
 
+    def type3_transition(self, cell, threshold):
+        self.graph.set_vertex_filter(None)
+        self.is_alive[cell] = 0
+        j_edges = eptm.cells.junction_edges(cell)
+        edge_lengths = np.array([self.edge_lengths[edge]
+                                 for edge in j_edges])
+        if edge_lengths.min() > threshold: return
+            
+        jvs = [jv in cell.out_neighbours()]
+        new_jv = eptm.graph.add_vertex()
+        for prop in eptm.graph.vertex_properties.values():
+            prop[new_jv] = prop[jvs[0]]
+        for jv in jvs:
+            self.is_alive[jv] = 0
+            for edge in jv.out_edges():
+                if edge in j_edges: continue
+                new_edge = self.graph.add_edge(new_jv, edge.target())
+                for prop in eptm.graph.edge_properties.values():
+                    prop[new_edge] = prop[edge]
+            for edge in jv.in_edges():
+                if edge not in j_edges: continue
+                self.graph.add_edge(edge.source(), new_jv)
+                for prop in eptm.graph.edge_properties.values():
+                    prop[new_edge] = prop[edge]
+            for edge in jv.all_edges(): self.graph.remove_edge(edge)
+        return new_jv
+            
+    def resolve_small_edges(self, threshold=5e-2, vfilt=None, efilt=None):
+
+        # Collapse 3 sided cells
+        if vfilt == None:
+            vfilt_3sides = self.is_cell_vert.copy()
+        else:
+            vfilt_3sides = vfilt.copy()
+        self.graph.set_edge_filter(self.is_ctoj_edge,
+                                   inverted=True)
+        degree_pm =  self.graph.degree_property_map('out').a
+        vfilt_3sides.a *= [degree_pm == 3][0] * eptm.is_alive.a
+        self.graph.set_vertex_filter(vfilt_3sides)
+        cells = [cell for cell in self.graph.vertices()]
+        self.graph.set_vertex_filter(None)
+        self.graph.set_edge_filter(None)
+        new_jvs = [self.type3_transition(cell, threshold)
+                   for cell in cells]
+        self.update_apical_geom()
+        # Type 1 transitions
+        if efilt == None:
+            efilt_je = self.is_junction_edge.copy()
+        else:
+            efilt_je = efilt.copy()
+            efilt_je.a *= self.is_junction_edge.a
+        efilt_je.a *= [self.edge_lengths.a < threshold][0]
+        self.graph.set_edge_filter(efilt_je)
+        visited_cells = []
+        old_local_edge = eptm.is_local_edge.copy()
+        old_local_vert = eptm.is_local_vert.copy()
+        for edge in self.graph.edges():
+            self.set_local_mask(None)
+            cell0, cell1 = eptm.adjacent_cells(edge)
+            if cell0 in visited_cells or cell1 in visited_cells:
+                continue
+            visited_cells.extend([cell0, cell1])
+            if (len(eptm.cells.junction_edges[cell0]) < 4) or (
+                len(eptm.cells.junction_edges[cell1]) < 4):
+                continue
+            print 'Type 1 transition'
+            self.type1_transition((cell0, cell1))
+            
+            pos0, pos1 = self.find_energy_min()
+        self.graph.set_edge_filter(None)
+        
     def update_gradient(self, vfilt=None, efilt=None):
         # Cell vertices
         if vfilt == None:
@@ -369,13 +444,17 @@ class Epithelium(AbstractRTZGraph):
         self.contractile_grad.fa =  self.cells.contractilities.fa \
                                     * self.cells.perimeters.fa
         self.graph.set_vertex_filter(None)
-
+        
         # Junction edges
         tension = self.junctions.line_tensions
         self.graph.set_edge_filter(efilt)
         self.grad_sigma.fa = 0.
         self.grad_zed.fa = 0.
-
+        self.radial_grad.fa = 0.
+        
+        u_rhosigma = self.dsigmas.copy()
+        u_rhosigma.fa = self.u_dsigmas.fa * np.sin(self.dthetas.fa / 2)
+        
         for edge in self.junctions:
             j_src, j_trgt = edge.source(), edge.target()
             u_sg = self.u_dsigmas[edge]
@@ -386,18 +465,27 @@ class Epithelium(AbstractRTZGraph):
                 self.grad_zed[j_src] += self.elastic_grad[cell] * perp_zed
                 self.grad_sigma[j_trgt] += self.elastic_grad[cell] * perp_sigma
                 self.grad_zed[j_trgt] += self.elastic_grad[cell] * perp_zed
-                self.grad_sigma[j_src] += self.contractile_grad[
+
+                self.grad_sigma[j_src] -= self.contractile_grad[
                     cell] * u_sg
-                self.grad_zed[j_src] += self.contractile_grad[
+                self.grad_zed[j_src] -= self.contractile_grad[
                     cell] * u_zg
-                self.grad_sigma[j_trgt] -= self.contractile_grad[
+                self.grad_sigma[j_trgt] += self.contractile_grad[
                     cell] * u_sg
-                self.grad_zed[j_trgt] -= self.contractile_grad[
+                self.grad_zed[j_trgt] += self.contractile_grad[
                     cell] * u_zg
-            self.grad_sigma[j_src] += tension[edge] * u_sg
-            self.grad_zed[j_src] += tension[edge] * u_zg
-            self.grad_sigma[j_trgt] += - tension[edge] * u_sg
-            self.grad_zed[j_trgt] += - tension[edge] * u_zg
+                self.radial_grad[j_src] += self.contractile_grad[
+                    cell] * u_rhosigma[edge]
+                self.radial_grad[j_trgt] += self.contractile_grad[
+                    cell] * u_rhosigma[edge]
+                
+            self.grad_sigma[j_src] += - tension[edge] * u_sg
+            self.grad_zed[j_src] += - tension[edge] * u_zg
+            self.grad_sigma[j_trgt] += tension[edge] * u_sg
+            self.grad_zed[j_trgt] += tension[edge] * u_zg
+            self.radial_grad[j_src] += tension[edge] * u_rhosigma[edge]
+            self.radial_grad[j_trgt] += tension[edge] * u_rhosigma[edge]
+
 
     def outward_uvect(self, cell, j_edge):
         """
@@ -419,6 +507,25 @@ class Epithelium(AbstractRTZGraph):
             perp_zed *= -1
         return perp_sigma, perp_zed
 
+    def check_phase_space(self, gamma, lbda):
+        # See the energies.pynb notebook for the derivation of this:
+        mu = 6 * np.sqrt(2. / (3 * np.sqrt(3)))
+        if (gamma < - lbda / (2 * mu)):
+            report= ("Contractility is too low,"
+                     "Soft network not supported")
+            return False, report
+        if 2 * gamma * mu**2 > 4:
+            lambda_max = 0.
+        else:
+            lambda_max = ((4 - 2 * gamma * mu**2) / 3.)**(3./2.) / mu
+        if lbda > lambda_max:
+            report = ("Invalid value for the line tension: "
+                      "it should be lower than %.2f "
+                      "for a contractility of %.2f "
+                    % (lambda_max, gamma))
+            return False, report
+        return True, 'ok!'
+        
     def set_local_mask(self, cell):
         
         self.graph.set_edge_filter(None)
@@ -427,6 +534,7 @@ class Epithelium(AbstractRTZGraph):
             self.is_local_edge.a[:] = 0
             self.is_local_vert.a[:] = 0
             self.is_local_cell.a[:] = 0
+            return None
         cell = self.graph.vertex(cell)
         self.is_local_vert[cell] = 1
         for neighbour in cell.all_neighbours():
@@ -598,89 +706,77 @@ class Epithelium(AbstractRTZGraph):
         return modified_cells, modified_jverts
 
     def cell_division(self, mother_cell,
-                      phi_division=np.pi/7,
+                      phi_division=None,
                       verbose=False):
         tau = 2 * np.pi
+        if phi_division is None:
+            phi_division = np.random.random() * tau
         daughter_cell = self.graph.add_vertex()
-        self.rhos[daughter_cell] = self.rhos[mother_cell]
-        self.zeds[daughter_cell] = self.zeds[mother_cell]
-        self.sigmas[daughter_cell] = self.sigmas[mother_cell]
+        for prop in self.graph.vertex_properties.values():
+            prop[daughter_cell] = prop[mother_cell]
         print "Cell %s is born" % str(daughter_cell)
         self.is_cell_vert[daughter_cell] = 1
-        if self.is_local_vert[mother_cell]:
-            self.set_local_mask(daughter_cell)
-        sigmas_rel = self.sigmas.fa  - self.sigmas[mother_cell]
-        zeds_rel = self.zeds.fa  - self.zeds[mother_cell]
-        # arctan is defined between -pi and pi
-        phi = np.arctan2(sigmas_rel, zeds_rel) + tau/2
-        phi_rel = (phi - phi_division ) % tau
         junction_trash = []
         new_junctions = []
         new_jvs = []
         for j_edge in self.cell_junctions(mother_cell):
-            if j_edge is None:
-                continue
+            if j_edge is None: continue
             j_src = j_edge.source()
-            j_trgt = j_edge.target() 
-            # 
-            phi_trgt, phi_src = phi_rel[j_trgt], phi_rel[j_src]
-            dphi = (phi_trgt - phi_src) % tau
-            if dphi < tau/2:
-                phi_trgt, phi_src = phi_src, phi_trgt
-                j_src, j_trgt = j_trgt, j_src
-                if verbose: print 'swap:!'
-            # print "Between %s and %s" %(j_src, j_trgt)
-            # print "@ "+str((phi_trgt, phi_src))
-            if phi_src > tau/2 and phi_trgt > tau/2:
-                # print 'both higher than pi'
-                continue
+            sigma_src = self.dsigmas[self.graph.edge(mother_cell, j_src)]
+            zed_src = self.dzeds[self.graph.edge(mother_cell, j_src)]
+            j_trgt = j_edge.target()
+            sigma_trgt = self.dsigmas[self.graph.edge(mother_cell, j_trgt)]
+            zed_trgt = self.dzeds[self.graph.edge(mother_cell, j_trgt)]
+
+            phi_trgt = np.arctan2(sigma_trgt, zed_trgt) + tau/2
+            phi_trgt = (phi_trgt - phi_division) % tau
+            phi_src = np.arctan2(sigma_src, zed_src) + tau/2
+            phi_src = (phi_src - phi_division) % tau
+            if phi_src > tau/2 and phi_trgt > tau/2: continue
             elif phi_src <= tau/2 and phi_trgt <= tau/2:
                 cell0, cell1 = self.adjacent_cells(j_edge)
                 junction_trash.append((j_src, j_trgt, cell0, cell1))
                 adj_cell = cell1 if cell0 == mother_cell else cell0
-                new_junctions.append((j_src, j_trgt, adj_cell, daughter_cell))
-                # print 'both lower than pi'
-            elif phi_src > tau/2 and phi_trgt <= tau/2:
+                new_junctions.append((j_src, j_trgt,
+                                      adj_cell, daughter_cell))
+            elif (phi_src > tau/2 and phi_trgt <= tau/2
+                 ) or ( phi_src <= tau/2 and phi_trgt > tau/2 ) :
                 cell0, cell1 = self.adjacent_cells(j_edge)
                 adj_cell = cell1 if cell0 == mother_cell else cell0
                 new_jv = self.graph.add_vertex()
+                for prop in self.graph.vertex_properties.values():
+                    prop[new_jv] = prop[j_src]
                 new_jvs.append(new_jv)
-                self.is_cell_vert[new_jv] = 0
-                # New junction in the midle of the edge
-                self.sigmas[new_jv] = (self.sigmas[j_src] +
-                                        self.sigmas[j_trgt]) / 2.
-                self.zeds[new_jv] = (self.zeds[j_src] +
-                                      self.zeds[j_trgt]) / 2.
+                sigma_n = - (sigma_src * zed_trgt - zed_src * sigma_trgt) / (
+                        zed_src - zed_trgt + (sigma_trgt - sigma_src)
+                        / np.tan(phi_division))
+                zed_n = sigma_n / np.tan(phi_division)
+                self.sigmas[new_jv] = sigma_n + self.sigmas[mother_cell]
+                self.zeds[new_jv] = zed_n + self.zeds[mother_cell]
                 self.rhos[new_jv] = (self.rhos[j_src] +
-                                      self.rhos[j_trgt]) / 2.
-                junction_trash.append((j_src, j_trgt, cell0, cell1))
-                new_junctions.append((new_jv, j_src,
-                                      adj_cell, mother_cell))
-                new_junctions.append((new_jv, j_trgt,
-                                      adj_cell, daughter_cell))
-                # print "Source to mother"
-                # print "Added vertex %s " % str(new_jv)
-            elif phi_src <= tau/2 and phi_trgt > tau/2:
-                cell0, cell1 = self.adjacent_cells(j_edge)
-                adj_cell = cell1 if cell0 == mother_cell else cell0
-                new_jv = self.graph.add_vertex()
-                new_jvs.append(new_jv)
-                self.is_cell_vert[new_jv] = 0
-                # New junction in the midle of the edge
-                self.sigmas[new_jv] = (self.sigmas[j_src] +
-                                        self.sigmas[j_trgt]) / 2.
-                self.zeds[new_jv] = (self.zeds[j_src] +
-                                      self.zeds[j_trgt]) / 2.
-                self.rhos[new_jv] = (self.rhos[j_src] +
-                                      self.rhos[j_trgt]) / 2.
-                junction_trash.append((j_src, j_trgt, cell0, cell1))
-                new_junctions.append((new_jv, j_src,
-                                      adj_cell, daughter_cell))
-                new_junctions.append((new_jv, j_trgt,
-                                      adj_cell, mother_cell))
-                # print "Source to daughter"
-                # print "Added vertex %s " % str(new_jv)
+                                     self.rhos[j_trgt]) / 2.
 
+                if self.sigmas[new_jv] >= tau * self.rhos[new_jv]:
+                    self.sigmas[new_jv] -= tau * self.rhos[new_jv]
+                elif self.sigmas[new_jv] < 0:
+                    self.sigmas[new_jv] += tau * self.rhos[new_jv]
+                self.thetas[new_jv] = self.sigmas[new_jv] / self.rhos[new_jv]
+                junction_trash.append((j_src, j_trgt,
+                                       cell0, cell1))
+                if phi_src <= tau/2:
+                    new_junctions.append((new_jv, j_trgt,
+                                          adj_cell, mother_cell))
+                    new_junctions.append((new_jv, j_src,
+                                          adj_cell, daughter_cell))
+                else:
+                    new_junctions.append((new_jv, j_src,
+                                          adj_cell, mother_cell))
+                    new_junctions.append((new_jv, j_trgt,
+                                          adj_cell, daughter_cell))
+        if not len(new_jvs) == 2:
+            print 'problem'
+            self.is_alive[daughter_cell] = 0
+            return
         for (j_src, j_trgt, cell0, cell1) in junction_trash:
             self.remove_junction(j_src, j_trgt, cell0, cell1)
         for (j_src, j_trgt, cell0, cell1) in new_junctions:
@@ -690,11 +786,11 @@ class Epithelium(AbstractRTZGraph):
                               mother_cell, daughter_cell)
         self.set_local_mask(daughter_cell)
         # Updates
-        vfilt = self.is_local_vert.copy()
-        vfilt.a = self.is_local_vert.a * self.is_cell_vert.a \
-                  + 1 - self.is_cell_vert.a
-        self.update_apical_geom(vfilt=vfilt)
-        #self.update_energy(vfilt=self.is_local_vert)
+        self.update_deltas(efilt=self.is_local_edge)
+        self.update_cell_positions(vfilt=self.is_local_vert)
+        self.update_apical_geom(vfilt=self.is_local_vert,
+                                efilt=self.is_local_edge)
+
         return j
 
         
@@ -717,6 +813,7 @@ class Epithelium(AbstractRTZGraph):
             self.graph.remove_edge(j_edgeab)
         j_edgeab = self.graph.add_edge(j_verta, j_vertb)
         self.is_junction_edge[j_edgeab] = 1
+        self.is_new_edge[j_edgeab] = 1
         self.is_ctoj_edge[j_edgeab] = 0
         line_tension0 = self.params['line_tension']
         self.junctions.line_tensions[j_edgeab] = line_tension0
@@ -817,6 +914,35 @@ class Epithelium(AbstractRTZGraph):
                 ce10 = self.graph.edge(cell1, cell0)
                 self.graph.remove_edge(ce10)
 
+    def merge_j_verts(self, jv0, jv1):
+
+        vertex_trash = []
+        edge_trash = []
+        je = self.any_edge(jv0, jv1)
+        if je is None:
+            raise ValueError('Can only merge connected edges')
+            
+        edge_trash.append(je)
+        self.graph.set_vertex_filter(None)
+        self.graph.set_edge_filter(None)
+        for vert in jv1.out_neighbours():
+            old_edge = self.graph.edge(jv1, vert)
+            if vert != jv0:
+                new_edge = self.graph.add_edge(jv0, vert)
+            for prop in self.graph.edge_properties.values():
+                prop[new_edge] = prop[old_edge]
+            edge_trash.append(old_edge)
+        for vert in jv1.in_neighbours():
+            old_edge = self.graph.edge(vert, jv1)
+            if vert != jv0:
+                new_edge = self.graph.add_edge(vert, jv0)
+            for prop in self.graph.edge_properties.values():
+                prop[new_edge] = prop[old_edge]
+            edge_trash.append(old_edge)
+        vertex_trash.append(jv1)
+        return vertex_trash, edge_trash
+
+        
     ## Junction edges related  functions 
     def adjacent_cells(self, j_edge, efilt=None):
         if efilt == None:
@@ -842,7 +968,9 @@ class Epithelium(AbstractRTZGraph):
                 if self.is_junction_edge[e]: j_edges.append(e)
         self.graph.set_edge_filter(None)
         return j_edges
-                
+
+
+        
 def triangle_geometry(sz0, sz1, sz2):
     c_code = """
     double s0 = sz0[0];
