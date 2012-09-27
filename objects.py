@@ -36,6 +36,7 @@ from scipy.interpolate import splrep, splev
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
+tau = 2 * np.pi
 
 class AbstractRTZGraph(object):
     '''
@@ -171,6 +172,9 @@ class AbstractRTZGraph(object):
     def dsigmas(self):
         return self.graph.edge_properties["dsigmas"]
     @property
+    def u_drhos(self):
+        return self.graph.edge_properties["u_drhos"]        
+    @property
     def u_dsigmas(self):
         return self.graph.edge_properties["u_dsigmas"]
     @property
@@ -209,11 +213,25 @@ class AbstractRTZGraph(object):
     def vecinos_indexes(self):
         return self.graph.vertex_properties["vecinos_indexes"]
 
-    
+    def periodic_boundary_condition(self, vfilt=None):
         
-
+        tau = 2 * np.pi
+        self.graph.set_vertex_filter(vfilt)
+        sigmas = self.sigmas.fa
+        rhos = self.rhos.fa
+        self.sigmas.fa[sigmas > tau * rhos] -= tau * rhos[self.sigmas.fa
+                                                          > tau * rhos]
+        self.sigmas.fa[self.sigmas.fa < 0] += tau * rhos[self.sigmas.fa < 0]
+        if len(self.sigmas.fa[sigmas > tau * rhos]) > 0:
+            print self.sigmas.fa[sigmas > tau * rhos]
+        self.thetas.fa = self.sigmas.fa / rhos
+        self.graph.set_vertex_filter(None)
         
     def any_edge(self, v0, v1):
+        '''
+        returns the edge between vertices v0 and v1 if it exists,
+        whether it goes from v0 to v1 or from v1 to v0 and None overwize
+        '''
         efilt = self.graph.get_edge_filter()
         self.graph.set_edge_filter(None)
         e = self.graph.edge(v0, v1)
@@ -264,7 +282,7 @@ class AbstractRTZGraph(object):
         self.graph.set_vertex_filter(None)
         
     def update_deltas(self, efilt=None):
-        tau = 2 * np.pi
+        self.graph.set_vertex_filter(None)
         self.graph.set_edge_filter(efilt)
         for edge in self.graph.edges():
             v0, v1 = edge.source(), edge.target()
@@ -290,22 +308,19 @@ class AbstractRTZGraph(object):
                         print str(v0), str(v1)
                     self.at_boundary[edge] = 0
                     dtheta = dsigma / self.rhos[v0]
-            if self.at_boundary[edge]:
+                    self.is_new_edge[edge] = 0
+            else:
                 rho0 = self.rhos[v0]
                 dsigma = self.sigmas[v1] - self.sigmas[v0]
-                if dsigma > tau * rho0 / 2.:
+                if dsigma >= tau * rho0 / 2.:
                     dsigma -= tau * rho0
+                    self.at_boundary[edge] = 1
                 elif dsigma < - tau * rho0 / 2.:
                     dsigma += tau * rho0
+                    self.at_boundary[edge] = 1
                 dtheta = dsigma / self.rhos[v0]
-
-            else:
-                dsigma = self.sigmas[v1] - self.sigmas[v0]
-                dtheta = dsigma / self.rhos[v0]
-                
-            self.is_new_edge[edge] = 0
-            self.graph.edge_properties["dthetas"][edge] = dtheta
-            self.graph.edge_properties["dsigmas"][edge] = dsigma
+            self.dthetas[edge] = dtheta
+            self.dsigmas[edge] = dsigma
         self.graph.set_edge_filter(None)
         
     def update_edge_lengths(self, efilt=None):
@@ -315,13 +330,10 @@ class AbstractRTZGraph(object):
                                + self.dsigmas.fa**2)
         cutoff = self.params["pos_cutoff"]
         edge_lengths = edge_lengths.clip(cutoff, edge_lengths.max())
-        self.graph.edge_properties["u_drhos"
-                                   ].fa = self.drhos.fa / edge_lengths
-        self.graph.edge_properties["u_dsigmas"
-                                   ].fa = self.dsigmas.fa / edge_lengths
-        self.graph.edge_properties["u_dzeds"
-                                   ].fa = self.dzeds.fa / edge_lengths
-        self.graph.edge_properties["edge_lengths"].fa = edge_lengths
+        self.u_drhos.fa = self.drhos.fa / edge_lengths
+        self.u_dsigmas.fa = self.dsigmas.fa / edge_lengths
+        self.u_dzeds.fa = self.dzeds.fa / edge_lengths
+        self.edge_lengths.fa = edge_lengths
         self.graph.set_edge_filter(None)
         
     def out_delta_sz(self, vertex0, vertex1 ):
@@ -412,23 +424,19 @@ class AbstractRTZGraph(object):
 
     def set_new_pos(self, new_sz_pos, vfilt=None):
         
-        tau = 2*np.pi
         new_sz_pos = new_sz_pos.flatten()
         if vfilt == None:
-            self.graph.set_vertex_filter(self.is_cell_vert, inverted=True)
+            vfilt_j = self.graph.new_vertex_property()
+            vfilt_j.a = (1 - self.is_cell_vert.a) * self.is_alive.a
         else:
-            vfilt = vfilt.copy()
-            vfilt.a *= (1 - self.is_cell_vert.a) * self.is_alive.a
-            self.graph.set_vertex_filter(vfilt)
+            vfilt_j = vfilt.copy()
+            vfilt_j.a *= (1 - self.is_cell_vert.a) * self.is_alive.a
+        self.graph.set_vertex_filter(vfilt_j)
         assert len(new_sz_pos) / 2 == self.graph.num_vertices()
-        rhos = self.rhos.fa
-        raw_sigma = new_sz_pos[::2]
-        raw_sigma[raw_sigma > tau * rhos] -= tau * rhos[raw_sigma > tau * rhos]
-        raw_sigma[raw_sigma < 0] += tau * rhos[raw_sigma < 0]
-        self.sigmas.fa = raw_sigma
+        self.sigmas.fa = new_sz_pos[::2]
         self.zeds.fa = new_sz_pos[1::2]
         self.graph.set_vertex_filter(None)
-
+        
     def add_position_noise(self, noise_amplitude):
         self.sigmas.a += normal(0, noise_amplitude,
                                 self.sigmas.a.size)

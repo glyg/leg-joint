@@ -4,17 +4,19 @@
 import os
 import numpy as np
 from numpy.random import normal, random_sample
+
+# import matplotlib.pyplot as plt
+# from mpl_toolkits.mplot3d import Axes3D
+
 import graph_tool.all as gt
 
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
 FLOAT = np.dtype('float32')
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
 
-def plot_gradients(epithelium, ax=None, scale=0.1):
+def plot_gradients(epithelium, ax=None, scale=1.):
     vfilt = epithelium.is_local_vert
     grad = epithelium.calc_gradient(vfilt=epithelium.is_local_vert)
 
@@ -191,7 +193,7 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
     edge_red.fa = 0.9
     edge_green.fa = 0.9
     edge_blue.fa = 0.9
-    edge_width.fa = 0.1
+    edge_width.fa = 0.3
     eptm.graph.set_edge_filter(None)
 
     rhos, sigmas, zeds = eptm.rhos, eptm.sigmas, eptm.zeds
@@ -206,7 +208,7 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
 
     depth = rhos.a * (1 - np.cos(thetas.a + d_theta))
     normed_depth = (depth - depth.min()) / (depth.max() - depth.min())
-    vertex_alpha.a = normed_depth * 0.7 + 0.3
+    vertex_alpha.a = normed_depth * 0.6 + 0.4
     for edge in eptm.graph.edges():
         edge_alpha[edge] = vertex_alpha[edge.source()]
 

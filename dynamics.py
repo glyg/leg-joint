@@ -43,7 +43,7 @@ class Epithelium(AbstractRTZGraph):
         self.update_edge_lengths()
         self.junctions = AppicalJunctions(self)
         self.graph.vertex_properties["is_alive"].a[:] = 1
-        
+        self.periodic_boundary_condition()
         self.update_apical_geom()
         self.isotropic_relax()
         self.compute_bending()
@@ -182,13 +182,17 @@ class Epithelium(AbstractRTZGraph):
     def opt_callback(self, sz_pos):
         """ Call back for the optimization """
 
-        self.resolve_small_edges(self.is_local_vert,
-                                 self.is_local_edge)
+        # self.resolve_small_edges(self.is_local_vert,
+        #                          self.is_local_edge)
         self.update_apical_geom(self.is_local_vert,
                                 self.is_local_edge)
         self.update_gradient(self.is_local_vert,
                              self.is_local_edge)
+        self.periodic_boundary_condition(self.is_local_vert,
+                                         self.is_local_edge)
 
+
+        
     def calc_energy(self, vfilt=None, efilt=None):
         """ Computes the apical energy on the filtered epithelium """
         # Cell vertices (filtered by the vertex filter `vfilt`)
@@ -204,7 +208,6 @@ class Epithelium(AbstractRTZGraph):
         contractile_term = 0.5 * self.cells.contractilities.fa * \
                            self.cells.perimeters.fa**2
         num_cells = vfilt.a.sum()
-        # print 'Computing energy for %i cells' % num_cells
         prefered_area0 =  self.params['prefered_area']
         elasticity0 = self.params['elasticity']
         self.graph.set_vertex_filter(None)
@@ -302,10 +305,16 @@ class Epithelium(AbstractRTZGraph):
             efilt_ctoj = efilt.copy()
             efilt_ctoj.a *= self.is_ctoj_edge.a
         self.graph.set_edge_filter(efilt_ctoj)
-        self.graph.set_vertex_filter(vfilt)
+        if vfilt is not None:
+            vfilt_cells = vfilt.copy()
+            vfilt_cells.a += (1 - self.is_cell_vert.a) * self.is_alive.a
+        else:
+            vfilt_cells = self.is_alive.copy()
+        self.graph.set_vertex_filter(vfilt_cells)
+        
         for cell in self.cells:
             if cell.out_degree() < 3:
-                #print 'Lonely cell %s' % cell
+                print 'Lonely cell %s' % cell
                 continue
             area = 0.
             perimeter = 0.
@@ -330,14 +339,13 @@ class Epithelium(AbstractRTZGraph):
         self.graph.set_edge_filter(None)
         
     def update_cell_positions(self, vfilt=None):
-
         if vfilt == None:
-            vfilt = self.is_alive.copy()
+            vfilt_cells = self.is_alive.copy()
         else:
-            vfilt = vfilt.copy()
-            vfilt.a *= self.is_alive.a
-        vfilt.a *= self.is_cell_vert.a
-        self.graph.set_vertex_filter(vfilt)
+            vfilt_cells = vfilt.copy()
+            vfilt_cells.a *= self.is_alive.a
+        vfilt_cells.a *= self.is_cell_vert.a
+        self.graph.set_vertex_filter(vfilt_cells)
         cells = [cell for cell in self.graph.vertices()]
         self.graph.set_vertex_filter(None)
         self.graph.set_edge_filter(self.is_ctoj_edge)
@@ -346,16 +354,15 @@ class Epithelium(AbstractRTZGraph):
             j_zed = 0.
             for je in cell.out_edges():
                 sigma = self.sigmas[je.target()]
-                if not self.at_boundary[je]:
-                    j_sigma += sigma
-                elif sigma > self.sigmas[cell]:
-                    j_sigma += sigma - tau * self.rhos[cell]
-                elif sigma < self.sigmas[cell]:
-                    j_sigma += sigma + tau * self.rhos[cell]
+                j_sigma += sigma
+                dsigma = sigma - self.sigmas[cell]
+                if dsigma  <= - np.pi * self.rhos[cell]:
+                    j_sigma += tau * self.rhos[cell]
+                elif dsigma > np.pi * self.rhos[cell]:
+                    j_sigma -= tau * self.rhos[cell]
                 j_zed += self.zeds[je.target()]
             self.sigmas[cell] = j_sigma / cell.out_degree()
             self.zeds[cell] = j_zed / cell.out_degree()
-        self.graph.set_vertex_filter(None)
         self.graph.set_edge_filter(None)
 
     def type3_transition(self, cell, threshold):
@@ -402,7 +409,7 @@ class Epithelium(AbstractRTZGraph):
         self.graph.set_edge_filter(None)
         new_jvs = [self.type3_transition(cell, threshold)
                    for cell in cells]
-        self.update_apical_geom()
+        self.update_apical_geom(vfilt)
         # Type 1 transitions
         if efilt == None:
             efilt_je = self.is_junction_edge.copy()
@@ -533,17 +540,13 @@ class Epithelium(AbstractRTZGraph):
         if cell is None:
             self.is_local_edge.a[:] = 0
             self.is_local_vert.a[:] = 0
-            self.is_local_cell.a[:] = 0
-            return None
+            return
         cell = self.graph.vertex(cell)
         self.is_local_vert[cell] = 1
         for neighbour in cell.all_neighbours():
             self.is_local_vert[neighbour] = 1
             for edge in neighbour.all_edges():
                 self.is_local_edge[edge] = 1
-        self.is_local_cell.a = self.is_local_vert.a \
-                               * self.is_cell_vert.a \
-                               + (1 - self.is_cell_vert.a)
 
     def remove_local_mask(self, cell):
         self.graph.set_edge_filter(None)
@@ -553,9 +556,6 @@ class Epithelium(AbstractRTZGraph):
             self.is_local_vert[neighbour] = 0
             for edge in neighbour.all_edges():
                 self.is_local_edge[edge] = 0
-        self.is_local_cell.a = self.is_local_vert.a \
-                               * self.is_cell_vert.a\
-                               + (1 - self.is_cell_vert.a)
     
     def type1_transition(self, elements):
         """
@@ -701,7 +701,7 @@ class Epithelium(AbstractRTZGraph):
         self.set_local_mask(cell1)
         self.set_local_mask(cell3)
         
-        self.update_apical_geom(vfilt=self.is_local_cell,
+        self.update_apical_geom(vfilt=self.is_local_vert,
                                 efilt=None)
         return modified_cells, modified_jverts
 
@@ -790,7 +790,6 @@ class Epithelium(AbstractRTZGraph):
         self.update_cell_positions(vfilt=self.is_local_vert)
         self.update_apical_geom(vfilt=self.is_local_vert,
                                 efilt=self.is_local_edge)
-
         return j
 
         
@@ -839,7 +838,6 @@ class Epithelium(AbstractRTZGraph):
         self.is_junction_edge[ctoj_0b] = 0
         self.is_ctoj_edge[ctoj_0b] = 1
         self.is_new_edge[ctoj_0b] = 1
-
 
         if cell1 is not None:
             ce01 = self.graph.edge(cell0, cell1)
@@ -968,8 +966,6 @@ class Epithelium(AbstractRTZGraph):
                 if self.is_junction_edge[e]: j_edges.append(e)
         self.graph.set_edge_filter(None)
         return j_edges
-
-
         
 def triangle_geometry(sz0, sz1, sz2):
     c_code = """
