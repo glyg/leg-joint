@@ -5,8 +5,8 @@ import os
 import numpy as np
 from numpy.random import normal, random_sample
 
-# import matplotlib.pyplot as plt
-# from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 import graph_tool.all as gt
 

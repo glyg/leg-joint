@@ -15,7 +15,7 @@ CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
 
-# See (the tau manifesto)[http://tauday.com/tau-manifesto]
+# See [the tau manifesto](http://tauday.com/tau-manifesto)
 tau = 2. * np.pi
 
 
@@ -24,7 +24,7 @@ class Epithelium(AbstractRTZGraph):
     The ::class::`Epithelium` is the container for all the simulation.
     
     """
-    def __init__(self, paramtree=None, paramfile=PARAMFILE):
+    def __init__(self, graphXMLfile=None, paramtree=None, paramfile=PARAMFILE):
         """
         """
         # Parametrisation
@@ -34,58 +34,82 @@ class Epithelium(AbstractRTZGraph):
             self.paramtree = paramtree
         self.params = self.paramtree.absolute_dic
         # Graph instanciation
-        self.graph = gt.Graph(directed=True)
+        if graphXMLfile is None:
+            new = True
+            self.graph = gt.Graph(directed=True)
+        else:
+            self.graph = gt.load_graph(graphXMLfile)
+            new = False
+            
         # All the geometrical properties are packed here
         AbstractRTZGraph.__init__(self)
         # Cells and Junctions subgraphs initialisation
-        self.cells = Cells(self)
-        self.update_deltas()
-        self.update_edge_lengths()
-        self.junctions = AppicalJunctions(self)
-        self.graph.vertex_properties["is_alive"].a[:] = 1
-        self.periodic_boundary_condition()
-        self.update_apical_geom()
-        self.isotropic_relax()
-        self.compute_bending()
+        self.cells = Cells(self, new)
+        self.junctions = AppicalJunctions(self, new)
+        print self.graph.vertex_properties.keys()
+        if new:
+            self.graph.vertex_properties["is_alive"].a[:] = 1
+            self._init_grad_and_energy()
+            # self.compute_bending()
+            self.isotropic_relax()
+            self.whole_space_update()
+        
+    def _init_grad_and_energy(self):
+        # Gradients amplitudes
+        elastic_grad = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["elastic_grad"] = elastic_grad
+        contractile_grad = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["contractile_grad"] = contractile_grad
+        radial_grad = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["radial_grad"] = radial_grad
 
-        # self.relax_rhos()
-        # self.update_energy()
+        # Gradients along sigma and zed
+        grad_sigma = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["grad_sigma"] = grad_sigma
+        grad_zed = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["grad_zed"] = grad_zed
 
+        # Energy per cell
+        energy_grad = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["energy_grad"] = energy_grad
+        
     @property
-    def is_cell_vert(self):
-        return self.graph.vertex_properties["is_cell_vert"]
+    def grad_sigma(self):
+        return self.graph.vertex_properties["grad_sigma"]
     @property
-    def is_junction_edge(self):
-        return self.graph.edge_properties["is_junction_edge"]
+    def grad_zed(self):
+        return self.graph.vertex_properties["grad_zed"]
     @property
-    def is_ctoj_edge(self):
-        return self.graph.edge_properties["is_ctoj_edge"]
+    def elastic_grad(self):
+        return self.graph.vertex_properties["elastic_grad"]
+    @property
+    def contractile_grad(self):
+        return self.graph.vertex_properties["contractile_grad"]
+    @property
+    def radial_grad(self):
+        return self.graph.vertex_properties["radial_grad"]
     @property
     def energy_grad(self):
         return self.graph.vertex_properties["energy_grad"]
-    @property
-    def is_local_vert(self):
-        return self.graph.vertex_properties["is_local_vert"]
-    @property
-    def is_local_cell(self):
-        return self.graph.vertex_properties["is_local_cell"]
-    @property
-    def is_local_j_vert(self):
-        return self.graph.vertex_properties["is_local_j_vert"]
-    @property
-    def is_local_j_edge(self):
-        return self.graph.edge_properties["is_local_j_edge"]
-    @property
-    def is_local_edge(self):
-        return self.graph.edge_properties["is_local_edge"]
-    @property
-    def is_local_both(self):
-        return self.graph.vertex_properties["is_local_both"]
+
+    def whole_space_update(self, vfilt=None, efilt=None):
+        '''
+        Sets every thing straight
+        '''
+        self.periodic_boundary_condition(vfilt)
+        # self.relax_rhos(vfilt)
+        self.update_apical_geom(vfilt, efilt)
+        self.update_gradient(vfilt, efilt)
 
     def compute_bending(self):
         pass
         
-    def find_energy_min(self, tol=1e-8):
+    def find_energy_min(self, method='fmin_l_bfgs_b', tol=1e-8):
+        '''
+        Performs the energy minimisation
+        '''
+
+        
         vfilt = self.is_local_vert.copy()
         vfilt.a *= (1 - self.is_cell_vert.a) * self.is_alive.a
         self.graph.set_vertex_filter(vfilt)
@@ -107,53 +131,64 @@ class Epithelium(AbstractRTZGraph):
         # print "bounds :"+str(bounds)
         self.graph.set_vertex_filter(None)
 
-        # output = optimize.fmin(self.opt_energy,
-        #                        pos0.flatten(),
-        #                        ftol=tol, xtol=0.01,
-        #                        args=(self.is_local_vert,),
-        #                        callback=self.opt_callback)
+        if method == 'fmin_l_bfgs_b':
+            output = optimize.fmin_l_bfgs_b(self.opt_energy,
+                                            pos0.flatten(),
+                                            fprime=self.opt_gradient,
+                                            args=(self.is_local_vert,
+                                                  self.is_local_edge),
+                                            approx_grad=1,
+                                            bounds=bounds.flatten(),
+                                            m=10,
+                                            factr=1e12,
+                                            pgtol=tol,
+                                            epsilon=1e-08,
+                                            iprint=1,
+                                            maxfun=150,
+                                            disp=None)
+        
+        elif method=='fmin':
+            output = optimize.fmin(self.opt_energy,
+                                   pos0.flatten(),
+                                   ftol=tol, xtol=0.01,
+                                   args=(self.is_local_vert,),
+                                   callback=self.opt_callback)
 
-        # try:
-        #     output = optimize.fmin_ncg(self.opt_energy,
-        #                                pos0.flatten(),
-        #                                fprime=self.opt_gradient,
-        #                                avextol=tol,
-        #                                retall=True,
-        #                                args=(self.is_local_vert,
-        #                                      self.is_local_edge),
-        #                                callback=self.opt_callback)
-        # except:
-        #     self.graph.set_vertex_filter(vfilt)
-        #     self.set_new_pos(pos0, vfilt)
-        #     self.graph.set_vertex_filter(None)
-        #     output = 0
+        elif method=='fmin_ncg':
+        
+            try:
+                output = optimize.fmin_ncg(self.opt_energy,
+                                           pos0.flatten(),
+                                           fprime=self.opt_gradient,
+                                           avextol=tol,
+                                           retall=True,
+                                           args=(self.is_local_vert,
+                                                 self.is_local_edge),
+                                           callback=self.opt_callback)
+            except:
+                self.graph.set_vertex_filter(vfilt)
+                self.set_new_pos(pos0, vfilt)
+                self.graph.set_vertex_filter(None)
+                output = 0
 
-        # output = optimize.fmin_bfgs(self.opt_energy,
-        #                             pos0.flatten(),
-        #                             fprime=self.opt_gradient,
-        #                             args=(self.is_local_vert,
-        #                                   self.is_local_edge),
-        #                             gtol=tol,
-        #                             norm=np.inf,
-        #                             retall=1,
-        #                             callback=self.opt_callback)
-
-        output = optimize.fmin_l_bfgs_b(self.opt_energy,
+        else:
+            output = optimize.fmin_bfgs(self.opt_energy,
                                         pos0.flatten(),
                                         fprime=self.opt_gradient,
                                         args=(self.is_local_vert,
                                               self.is_local_edge),
-                                        approx_grad=1,
-                                        bounds=bounds.flatten(),
-                                        m=10,
-                                        factr=1e12,
-                                        pgtol=tol,
-                                        epsilon=1e-08,
-                                        iprint=1,
-                                        maxfun=150,
-                                        disp=None)
+                                        gtol=tol,
+                                        norm=np.inf,
+                                        retall=1,
+                                        callback=self.opt_callback)
+
+
         return pos0, output
 
+
+
+
+        
     def opt_energy(self, sz_pos, vfilt, efilt):
         """
         After setting the sigma, zed position to sz_pos,
@@ -267,8 +302,6 @@ class Epithelium(AbstractRTZGraph):
         self.delta_o = delta_o
         self.ground_energy = self.isotropic_energy(delta_o, gamma, lbda)
         self.scale(correction)
-        self.update_apical_geom()
-
         
     def isotropic_grad(self, delta, gamma, lbda):
         mu = 6 * np.sqrt(2. / (3 * np.sqrt(3)))
@@ -289,6 +322,7 @@ class Epithelium(AbstractRTZGraph):
         self.sigmas.a *= scaling_factor
         self.zeds.a *= scaling_factor
         
+
     def update_apical_geom(self, vfilt=None, efilt=None, cutoff=1e-1):
         """
         The area is approximated as the sum
@@ -297,8 +331,13 @@ class Epithelium(AbstractRTZGraph):
         """
         self.update_deltas(efilt)
         self.update_edge_lengths(efilt)
+        self.update_cell_geom(vfilt, efilt)
         self.update_cell_positions(vfilt)
-        # cell to junctions edges only
+
+    def update_cell_geom(self, vfilt, efilt):
+        '''
+
+        '''
         if efilt == None:
             efilt_ctoj = self.is_ctoj_edge.copy()
         else:
@@ -335,6 +374,7 @@ class Epithelium(AbstractRTZGraph):
                                - self.dsigmas[ctoj1] * self.dzeds[ctoj0])/2.
             self.cells.areas[cell] = area
             self.cells.perimeters[cell] = perimeter
+            
         self.graph.set_vertex_filter(None)
         self.graph.set_edge_filter(None)
         
@@ -367,6 +407,8 @@ class Epithelium(AbstractRTZGraph):
 
     def type3_transition(self, cell, threshold):
         self.graph.set_vertex_filter(None)
+        self.graph.set_edge_filter(None)
+        
         self.is_alive[cell] = 0
         j_edges = eptm.cells.junction_edges(cell)
         edge_lengths = np.array([self.edge_lengths[edge]
@@ -374,11 +416,10 @@ class Epithelium(AbstractRTZGraph):
         if edge_lengths.min() > threshold: return
             
         jvs = [jv in cell.out_neighbours()]
-        new_jv = eptm.graph.add_vertex()
+        new_jv = cell
         for prop in eptm.graph.vertex_properties.values():
             prop[new_jv] = prop[jvs[0]]
         for jv in jvs:
-            self.is_alive[jv] = 0
             for edge in jv.out_edges():
                 if edge in j_edges: continue
                 new_edge = self.graph.add_edge(new_jv, edge.target())
@@ -390,6 +431,7 @@ class Epithelium(AbstractRTZGraph):
                 for prop in eptm.graph.edge_properties.values():
                     prop[new_edge] = prop[edge]
             for edge in jv.all_edges(): self.graph.remove_edge(edge)
+            self.is_alive[jv] = 0
         return new_jv
             
     def resolve_small_edges(self, threshold=5e-2, vfilt=None, efilt=None):
