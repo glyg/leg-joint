@@ -7,8 +7,9 @@ import graph_tool.all as gt
 import time
 from datetime import datetime
 
-from dynamics import Epithelium
-from graph_representation import epithelium_draw
+from src.dynamics import Epithelium
+from src.graph_representation import epithelium_draw
+from src.topology import division
 # eptm = Epithelium(paramfile='default/few_big_cells.xml')
 
 
@@ -35,8 +36,8 @@ def new_generation(eptm, name):
             pos0, pos1 = eptm.find_energy_min(tol=1e-5)
             now = datetime.datetime.now()
             eptm.graph.save("tmp/generation%s.xml") % now.isoformat()
-            outfname = 'drawings/generation_3d_%03i.png' % num
-            outfname2 = 'drawings/generation_sz_%03i.png' % num
+            outfname = 'saved_graph/png/generation_3d_%03i.png' % num
+            outfname2 = 'saved_graph/png/generation_sz_%03i.png' % num
             epithelium_draw(eptm, output=outfname, output2=outfname2)
         else:
             print 'division failed'
@@ -45,7 +46,7 @@ def new_generation(eptm, name):
         time_left = (elapsed / num) * (len(cells) - num)
         print str(num)+'/'+str(len(cells))
         print 'time left: %3f' % time_left
-    eptm.graph.save("saved_graph/generation%s.xml") % now.isoformat()
+    eptm.graph.save("saved_graph/xml/generation%s.xml") % now.isoformat()
     
 
 if __name__ == '__main__':

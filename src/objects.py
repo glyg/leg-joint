@@ -1,29 +1,29 @@
 #!/usr/bin/env python -*- coding: utf-8 -*-
 
-"""
-This module provides the basic elements composing the leg epithelium.
+"""This module provides the basic elements composing the leg epithelium.
 
-The architecture of the epithelium model consists in a graph devided
-in two graphviews
-two networks (aka graphs):
+The architecture of the epithelium model consists in a graph containing
+two types of vertices: 
 
- * The first graphview is composed by the cells themselves and is obtained by
- the Delaunay triangulation of a set of points in the ::math:(\rho, \sigma):
- plane, representing the cell centers. An edge of this graph defines a
- simple neighbourhood relationship. 
+* The cells themselves The appical junctions vertices (It is
+constructed initially as the Voronoi diagramm associated with the
+cell centers triangulation, again in the ::math:(\rho, \sigma):
+plane.)
 
- * The second graphview represents the appical junctions, and is constructed
- initially as the Voronoi diagramm associated with the cell centers
- triangulation, again in the ::math:(\rho, \sigma): plane.
- An edge of the appical junctions corresponds to the interface between
- two neighbouring cells.
- 
+and two types of edges:
+* The junction edges, structuring the apical surface of the
+epithelium
+* The cell to junction edges linking one cell to its
+neighbouring junction vertices.
+
+
 This graph implemented as a class wrapping a
 (`graph_tool`)[http://projects.skewed.de/graph-tool] object with the
 ::math:(\rho, \theta, z): coordinate system. The geometrical features
 are defined in an abstract class named ::class:`AbstractRTZGraph`:,
 from which ::class:`Epithelium`: and for commodity
 the ::class:`Cells`: and ::class:`AppicalJunctions` are derived.
+
 """
 
 import os
@@ -33,8 +33,11 @@ import graph_tool.all as gt
 from scipy import weave
 from scipy.interpolate import splrep, splev
 
+from filters import *
+
+
 CURRENT_DIR = os.path.dirname(__file__)
-ROOT_DIR = CURRENT_DIR # os.path.dirname(CURRENT_DIR)
+ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
 tau = 2 * np.pi
 
@@ -65,12 +68,11 @@ class AbstractRTZGraph(object):
         '''
         self.graph.set_directed(True) #So each edge is a defined vector
 
-        if len(self.graph.properties) == 0 :
-
-            self._init_vertex_bool_props()
+        if self.new :
             self._init_edge_bool_props()
             self._init_vertex_geometry()            
             self._init_edge_geometry()
+
             
     def _init_edge_bool_props(self):
         '''
@@ -82,18 +84,6 @@ class AbstractRTZGraph(object):
         is_new_edge.a[:] = 1
         self.graph.edge_properties["is_new_edge"] = is_new_edge
 
-        is_local_edge = self.graph.new_edge_property('bool')
-        is_local_edge.a[:] = 0
-        self.graph.edge_properties["is_local_edge"] = is_local_edge
-
-        is_active_edge = self.graph.new_edge_property('bool')
-        self.graph.edge_properties["is_active_edge"] = is_active_edge
-
-        is_junction_edge = self.graph.new_edge_property('bool')
-        self.graph.edge_properties["is_junction_edge"
-                                   ] = is_junction_edge
-        is_ctoj_edge = self.graph.new_edge_property('bool')
-        self.graph.edge_properties["is_ctoj_edge"] = is_ctoj_edge
 
     @property
     def at_boundary(self):
@@ -101,55 +91,6 @@ class AbstractRTZGraph(object):
     @property
     def is_new_edge(self):
         return self.graph.edge_properties["is_new_edge"]
-    @property
-    def is_local_edge(self):
-        '''boolean edge property'''
-        return self.graph.edge_properties["is_local_edge"]
-    @property
-    def is_junction_edge(self):
-        '''boolean edge property '''
-        return self.graph.edge_properties["is_junction_edge"]
-    @property
-    def is_ctoj_edge(self):
-        '''boolean edge property '''
-        return self.graph.edge_properties["is_ctoj_edge"]
-    @property
-    def is_active_edge(self):
-        return self.graph.edge_properties["is_active_edge"]
-
-    def _init_vertex_bool_props(self):
-        # Alive
-        is_alive = self.graph.new_vertex_property('bool')
-        is_alive.a[:] = 1
-        self.graph.vertex_properties["is_alive"] = is_alive
-        # Locality
-        is_local_vert = self.graph.new_vertex_property('bool')
-        is_local_vert.a[:] = 0
-        self.graph.vertex_properties["is_local_vert"] = is_local_vert
-        # Active verts can change
-        is_active_vert = self.graph.new_vertex_property('bool')
-        is_active_vert.a[:] = 0
-        self.graph.vertex_properties["is_active_vert"] = is_active_vert
-        # Is a cell
-        is_cell_vert = self.graph.new_vertex_property('bool')
-        self.graph.vertex_properties["is_cell_vert"] = is_cell_vert
-
-    @property
-    def is_alive(self):
-        return self.graph.vertex_properties["is_alive"]
-    @property
-    def is_local_vert(self):
-        return self.graph.vertex_properties["is_local_vert"]
-    @property
-    def is_local_vert(self):
-        return self.graph.vertex_properties["is_local_vert"]
-
-    @property
-    def is_active_vert(self):
-        return self.graph.vertex_properties["is_active_vert"]
-    @property
-    def is_cell_vert(self):
-        return self.graph.vertex_properties["is_cell_vert"]
         
     def _init_vertex_geometry(self):
         # Position in the rho theta zed space
@@ -305,6 +246,7 @@ class AbstractRTZGraph(object):
             self.dzeds[edge] = dzed
             drho = self.rhos[v1] - self.rhos[v0]
             self.drhos[edge] = drho
+
             if self.is_new_edge[edge]:
                 dtheta = self.thetas[v1] - self.thetas[v0]
                 # dtheta lies between -tau and tau
@@ -387,13 +329,11 @@ class AbstractRTZGraph(object):
         return np.array([self.sigmas().fa,
                          self.zeds().fa]).T
 
-    def ordered_neighbours(self, vertex, vfilt=None, inverted=False):
+    def ordered_neighbours(self, vertex):
         """
         in the (\sigma, z) coordinate system with it's origin
         at the vertex position, sort the neighbours counter-clockwise
         """
-        prev_vfilt, prev_inverted = self.graph.get_vertex_filter()
-        self.graph.set_vertex_filter(vfilt, inverted)
         phis_out = [np.arctan2(self.dsigmas[edge],
                                self.dzeds[edge])
                      for edge in vertex.out_edges()]
@@ -408,7 +348,6 @@ class AbstractRTZGraph(object):
         vecinos = np.append(vecinos_out, vecinos_in)
         indexes = np.argsort(phis)
         vecinos = vecinos.take(indexes)
-        self.graph.set_vertex_filter(prev_vfilt, prev_inverted)
         return vecinos
     
     def sigmaz_draw(self, output='sigmaz_graph.pdf', **kwargs):
@@ -444,20 +383,30 @@ class Cells():
     '''
     
     '''
-    def __init__(self, epithelium, new=True):
-        
+    def __init__(self, epithelium):
         self.epithelium = epithelium
         self.params = epithelium.params
-        if new :
-            rtz = self._generate_rtz()
-            self._generate_graph(rtz)
+        if self.epithelium.new :
+            #rhos, thetas, zeds = self._generate_rtz()
+            rhos, sigmas, zeds = self._generate_rsz()
+            rsz = rhos, sigmas, zeds
+            self.epithelium.graph = self._generate_graph(rsz)
+            EpitheliumFilters.__init__(self.epithelium)
+            AbstractRTZGraph.__init__(self.epithelium)
+
+            self.epithelium.rhos.a = rhos
+            self.epithelium.zeds.a = zeds
+            self.epithelium.sigmas.a = sigmas
+            self.epithelium.thetas.a = sigmas/rhos
+
             self.epithelium.is_cell_vert.a[:] = 1
+
             self._init_cell_gometry()
             self._init_cell_params()
-
             self.epithelium.update_deltas()
             self.epithelium.update_edge_lengths()
             self.epithelium.periodic_boundary_condition()
+
 
     def __iter__(self):
         # for vertex in gt.find_vertex(self.epithelium.graph,
@@ -520,27 +469,31 @@ class Cells():
     def prefered_area(self):
         return self.epithelium.graph.vertex_properties["prefered_area"]
 
-    def _generate_graph(self, rtz):
-        rhos, thetas, zeds = rtz
-        sigmas = rhos * (thetas % (2*np.pi))
-        sigmazs = np.array([sigmas, zeds]).T
+    def _generate_rsz(self):
+        rho_0 = self.epithelium.params['rho_0']
+        lambda_0 = self.epithelium.params['lambda_0']
 
-        radius = self.epithelium.params['lambda_0'] * 1.1
-        rhoc = rhos[0]
-        # Boundary conditions
-        s_min, s_max = 0, 2 * np.pi * rhoc
-        z_min, z_max = -10 * rhoc , 10 * rhoc
-        #Graph instanciation
-        graph, geom_pos = gt.geometric_graph(sigmazs, radius,
-                                             [(s_min, s_max),
-                                              (z_min, z_max)])
-        self.epithelium.graph = graph
-        AbstractRTZGraph.__init__(self.epithelium)
-        self.epithelium.rhos.a = rhos
-        self.epithelium.thetas.a = thetas
-        self.epithelium.zeds.a = zeds
-        self.epithelium.sigmas.a = sigmas
+        n_sigmas = np.int(2 * np.pi * rho_0 / lambda_0)
+        rho_c = (n_sigmas - 1) * lambda_0 / (2 * np.pi)
+        delta_sigma = 2 * np.pi * rho_c / n_sigmas
+        delta_z = delta_sigma * np.sqrt(3)/2.
+        n_zeds = np.int(5 * rho_0 / delta_z)
         
+        self.n_zeds = int(n_zeds)
+        self.n_sigmas = int(n_sigmas)
+        if __debug__ : print ('''Creating a %i x %i cells lattice'''
+                              % (self.n_zeds, self.n_sigmas))
+        rhos = np.ones(n_sigmas * n_zeds) * rho_c
+        zt_grid = np.mgrid[:n_zeds, :n_sigmas]
+        sigmas = zt_grid[1].astype('float')
+        sigmas[::2, ...] += 0.5
+        sigmas *= delta_sigma
+        zeds = zt_grid[0].astype('float')
+        zeds *= delta_z
+        zeds -= zeds.max() / 2
+        return rhos, sigmas.T.flatten(), zeds.T.flatten()
+        
+
     def _generate_rtz(self):
         """
         Returns hexagonaly packed vertices on a cylindre, in
@@ -559,7 +512,9 @@ class Cells():
         
         self.n_zeds = int(n_zeds)
         self.n_thetas = int(n_thetas)
-
+        if __debug__ : print ('''Creating
+                              a %i x %i cells lattice'''
+                              % (self.n_zeds, self.n_thetas))
         rhos = np.ones(n_thetas * n_zeds) * rho_c
         zt_grid = np.mgrid[:n_zeds, :n_thetas]
         thetas = zt_grid[1].astype('float')
@@ -570,6 +525,21 @@ class Cells():
         zeds -= zeds.max() / 2
         return rhos, thetas.T.flatten(), zeds.T.flatten()
 
+    def _generate_graph(self, rtz):
+        rhos, sigmas, zeds = rtz
+        sigmazs = np.array([sigmas, zeds]).T
+
+        radius = self.epithelium.params['lambda_0'] * 1.1
+        rhoc = rhos[0]
+        # Boundary conditions
+        s_min, s_max = 0, 2 * np.pi * rhoc
+        z_min, z_max = -10 * rhoc , 10 * rhoc
+        #Graph instanciation
+        graph, geom_pos = gt.geometric_graph(sigmazs, radius,
+                                             [(s_min, s_max),
+                                              (z_min, z_max)])
+        return graph
+
     def junction_edges(self, cell):
         jvs = [je.target() for je in cell.out_neighbours()]
 
@@ -578,12 +548,12 @@ class Cells():
         
 class AppicalJunctions():
 
-    def __init__(self, epithelium, new=True):
+    def __init__(self, epithelium):
 
         self.epithelium = epithelium
         self.graph = self.epithelium.graph
         self.params = epithelium.params
-        if new :
+        if self.epithelium.new :
             self._init_junction_params()
             self._compute_voronoi()
 
@@ -609,102 +579,104 @@ class AppicalJunctions():
     def _compute_voronoi(self):
         n_dropped = 0
         n_visited = 0
-        #cells = self.epithelium.cells
         eptm = self.epithelium
-        cutoff = eptm.params['pos_cutoff']
-        visited_cells = []
-        # Cell to cell graph to compute the junction vertices positions
-        cells_graph = gt.GraphView(eptm.graph,
-                                   vfilt=eptm.is_cell_vert)
-        for cell in cells_graph.vertices():
-            visited_cells.append(cell)
-            vecinos = eptm.ordered_neighbours(cell) #that's ordered
-            num_vecinos = len(vecinos)
-            for n0 in range(num_vecinos):
-                n1 = (n0 + 1) % num_vecinos
-                vecino0 = vecinos[n0]
-                vecino1 = vecinos[n1]
-                if vecino0 in visited_cells or vecino1 in visited_cells:
-                    n_visited += 1
-                    continue
-                v0_sz = eptm.out_delta_sz(cell, vecino0)
-                v1_sz = eptm.out_delta_sz(cell, vecino1)
-                sigma, zed = c_circumcircle([0,0], v0_sz,
-                                            v1_sz, cutoff)
-                sigma += eptm.sigmas[cell]
-                zed += eptm.zeds[cell]
-                if not np.isfinite(sigma) or sigma > 1e8:
-                    # print 'defective triangle %s, %s, %s' % (str(cell),
-                    #                                          str(vecino0),
-                    #                                          str(vecino1))
-                    n_dropped += 1
-                    continue
-                rho = (eptm.rhos[cell]
-                       + eptm.rhos[vecino0] + eptm.rhos[vecino1]) / 3.
-                theta = sigma / rho
+        self.visited_cells = []
 
-                # new junction vertex here
-                # **directly** in the epithelium graph
-                j_vertex = eptm.graph.add_vertex()
-                eptm.is_cell_vert[j_vertex] = 0
-
-                eptm.rhos[j_vertex] = rho
-                eptm.thetas[j_vertex] = theta
-                eptm.zeds[j_vertex] = zed
-                eptm.sigmas[j_vertex] = sigma
-
-                # new cell to junction edges here
-                cj = eptm.graph.add_edge(cell, j_vertex)
-                eptm.is_ctoj_edge[cj] = 1
-                eptm.is_junction_edge[cj] = 0
-                eptm.at_boundary[cj] = 0
-                eptm.is_new_edge[cj] = 1
-
-                v0j = eptm.graph.add_edge(vecino0, j_vertex)
-                eptm.is_ctoj_edge[v0j] = 1
-                eptm.is_junction_edge[v0j] = 0
-                eptm.at_boundary[v0j] = 0
-                eptm.is_new_edge[v0j] = 1
-
-                v1j = eptm.graph.add_edge(vecino1, j_vertex)
-                eptm.is_ctoj_edge[v1j] = 1
-                eptm.is_junction_edge[v1j] = 0
-                eptm.at_boundary[v1j] = 0
-                eptm.is_new_edge[v1j] = 1
-
+        for cell in self.epithelium.cells:
+            self.visited_cells.append(cell)
+            new_jvs, new_ctoj_edges, ndrp = self._voronoi_nodes(cell)
+            n_dropped += ndrp
+        print "%i triangles were dropped" % n_dropped
         # Cell to junction graph
         n_jdropped = 0
-        c2jgraph = gt.GraphView(eptm.graph,
-                                   efilt=eptm.is_ctoj_edge)
         eptm.update_deltas()
         eptm.update_edge_lengths()
-        print "%i triangles were dropped" % n_dropped
-        visited_cells = []
-        for link in c2jgraph.edges():
-            cell0_link = link.source()
-            j_verts0 = [jv for jv in cell0_link.out_neighbours()]
-            assert link.target() in j_verts0
-            cell0 = cells_graph.vertex(cell0_link)
-            visited_cells.append(cell0)
-            for cell1 in cell0.all_neighbours():
-                if cell1 in visited_cells:
-                    continue
-                cell1_link = c2jgraph.vertex(cell1)
-                j_verts1 = [jv for jv in cell1_link.out_neighbours()]
-                common_jvs = [jv for jv in j_verts0 if jv in j_verts1]
-                if len(common_jvs) == 2:
-                    j_v0, j_v1 = common_jvs[0], common_jvs[1]
-                    j_edge_out = eptm.graph.edge(j_v0, j_v1)
-                    j_edge_in = eptm.graph.edge(j_v1, j_v0)
-                    if j_edge_in is None and j_edge_out is None:
-                        j_edge = eptm.graph.add_edge(j_v0, j_v1)
-                        eptm.is_ctoj_edge[j_edge] = 0
-                        eptm.is_junction_edge[j_edge] = 1
-                        eptm.at_boundary[j_edge] = 0
-                        eptm.is_new_edge[j_edge] = 1
-                else:
-                    n_jdropped += 1
+        self.visited_cells = []
+        for ctoj_edge in eptm.graph.edges():
+            if not eptm.is_ctoj_edge[ctoj_edge]:
+                continue
+            new_edge, dropped = self._voronoi_edges(ctoj_edge)
+            n_jdropped += dropped
         print "%i junction edges were dropped" % n_dropped
+        del self.visited_cells
+
+    def _voronoi_nodes(self, cell):
+
+        eptm = self.epithelium
+        cutoff = eptm.params['pos_cutoff']
+        vecinos = [v for v in eptm.ordered_neighbours(cell)
+                   if eptm.is_cell_vert[v]]#that's ordered
+        
+        num_vecinos = len(vecinos)
+        new_jvs = []
+        new_ctoj_edges = []
+        n_dropped = 0
+        n_visited = 0
+        for n0 in range(num_vecinos):
+            # Loop over
+            n1 = (n0 + 1) % num_vecinos
+            vecino0, vecino1 = vecinos[n0], vecinos[n1]
+            if vecino0 in self.visited_cells or vecino1 in self.visited_cells:
+                n_visited += 1
+                continue
+            v0_sz = eptm.out_delta_sz(cell, vecino0)
+            v1_sz = eptm.out_delta_sz(cell, vecino1)
+            sigma, zed = c_circumcircle([0,0], v0_sz,
+                                        v1_sz, cutoff)
+            sigma += eptm.sigmas[cell]
+            zed += eptm.zeds[cell]
+            if not np.isfinite(sigma) or sigma > 1e8:
+                n_dropped += 1
+                continue
+            rho = (eptm.rhos[cell]
+                   + eptm.rhos[vecino0] + eptm.rhos[vecino1]) / 3.
+            try:
+                theta = sigma / rho
+            except ZeroDivisionError: 
+                print ('Error computing thetas')
+                theta = 0
+            # new junction vertex here
+            # **directly** in the epithelium graph
+            j_vertex = eptm.graph.add_vertex()
+            new_jvs.append(j_vertex)
+            eptm.is_cell_vert[j_vertex] = 0
+            eptm.rhos[j_vertex] = rho
+            eptm.thetas[j_vertex] = theta
+            eptm.zeds[j_vertex] = zed
+            eptm.sigmas[j_vertex] = sigma
+            new_ctoj_edges.extend([(cell, j_vertex),
+                                   (vecino0, j_vertex),
+                                   (vecino1, j_vertex)])
+
+        for (cell, jv) in new_ctoj_edges:
+            eptm.new_ctoj_edge(cell, jv)
+        return new_jvs, new_ctoj_edges, n_dropped
+        
+    def _voronoi_edges(self, ctoj_edge):
+        eptm = self.epithelium
+        cell0 = ctoj_edge.source()
+        self.visited_cells.append(cell0)
+
+        j_verts0 = [jv for jv in cell0.out_neighbours()
+                    if not eptm.is_cell_vert[jv]]
+        new_edges = []
+        dropped = 0
+        for cell1 in cell0.all_neighbours():
+            if not eptm.is_cell_vert[cell1]: continue
+            if cell1 in self.visited_cells:
+                continue
+            j_verts1 = [jv for jv in cell1.out_neighbours()
+                        if not eptm.is_cell_vert[jv]]
+            common_jvs = [jv for jv in j_verts0 if jv in j_verts1]
+            if len(common_jvs) == 2:
+                jv0, jv1 = common_jvs[0], common_jvs[1]
+                new_edges.append((jv0, jv1))
+                j_edge = eptm.new_j_edge(jv0, jv1)
+            else:
+                dropped += 1
+        return new_edges, dropped
+                
+
 
 
 def c_circumcircle(sz0, sz1, sz2, cutoff):

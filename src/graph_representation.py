@@ -4,10 +4,8 @@
 import os
 import numpy as np
 from numpy.random import normal, random_sample
-
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-
 import graph_tool.all as gt
 
 
@@ -93,7 +91,7 @@ def plot_edges_sz(epithelium, efilt=None,
     epithelium.graph.set_edge_filter(None)
 
 def sfdp_draw(graph, output="lattice_3d.pdf", **kwargs):
-    output = os.path.join('drawings', output)
+    output = os.path.join('saved_graph/pdf', output)
     sfdp_pos = gt.graph_draw(graph,
                              pos=gt.sfdp_layout(graph,
                                                 cooling_step=0.95,
@@ -109,7 +107,7 @@ def pseudo3d_draw(graph, rtz, output="lattice_3d.pdf",
                   RGB=(0.8, 0.1, 0.), **kwargs):
     rhos, thetas, zeds = rtz
     thetas += theta_rot
-    output = os.path.join('drawings', output)
+    output = os.path.join('saved_graph/pdf', output)
     red, green, blue = RGB
     
     pseudo_x = graph.new_vertex_property('float')
@@ -142,11 +140,15 @@ def pseudo3d_draw(graph, rtz, output="lattice_3d.pdf",
     return pseudo3d_pos
     
 def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
-                    output="tissue_3d.pdf", output2='tissue_sz.pdf',
+                    output3d="tissue_3d.pdf",
+                    output2d='tissue_sz.pdf',
                     **kwargs):
 
+
+    output3d = os.path.join('drawings', output3d)
+    output2d = os.path.join('drawings', output2d)
+
     graph = eptm.graph
-    
     vertex_red = eptm.graph.new_vertex_property('float')
     vertex_green = eptm.graph.new_vertex_property('float')
     vertex_blue = eptm.graph.new_vertex_property('float') 
@@ -236,8 +238,8 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
                          edge_color=edge_color,
                          vertex_size=vertex_size,
                          vorder=vorder, eorder=eorder,
-                         output=output, **kwargs)
-
+                         output=output3d, **kwargs)
+    print 'saved tissue to %s' % output3d
     
     sigma = eptm.sigmas
     zs = [sigma, zeds]
@@ -250,6 +252,7 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
                           vertex_size=vertex_size,
                           vorder=vorder, eorder=eorder,
                           output=output2, **kwargs)
+    print 'saved tissue to %s' % output2d
     del pmap, pmap2
 
 def cylindrical2cartesian(rtz):
