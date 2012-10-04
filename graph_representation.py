@@ -18,11 +18,14 @@ PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
 
 def plot_gradients(epithelium, ax=None, scale=1.):
     vfilt = epithelium.is_local_vert
-    grad = epithelium.calc_gradient(vfilt=epithelium.is_local_vert)
+
+    epithelium.graph.set_vertex_filter(vfilt)
+    grad = epithelium.gradient_array()
 
     vfilt = epithelium.is_local_vert.copy()
     vfilt.a *= (1 - epithelium.is_cell_vert.a)
     epithelium.graph.set_vertex_filter(vfilt)
+
     sigmas = epithelium.sigmas.fa
     zeds = epithelium.zeds.fa
     epithelium.graph.set_vertex_filter(None)    
