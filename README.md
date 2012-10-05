@@ -5,13 +5,13 @@ This work is still confidential
 ## Project Tree
 
 
-* [default](default) directory contains the parameters
-* [doc](doc) is pretty vaquant now
+* [default](tree/master/default) directory contains the parameters
+* [doc](tree/master/doc) is pretty vaquant now
 * [saved_graphs](saved_graphs) You'll find updated graphs in various formats here
   in  
-	  * [pdf](saved_graphs/pdf)
-	  * [png](saved_graphs/png)
-	  * [graphxml](saved_graphs/xml)
-* [notebooks](notebooks) Please explore in here for ipython notebooks
+	  * [pdf](tree/master/saved_graphs/pdf)
+	  * [png](tree/master/saved_graphs/png)
+	  * [graphxml](tree/master/saved_graphs/xml)
+* [notebooks](tree/master/notebooks) Please explore in here for ipython notebooks
   on the various aspect of the model
-* [src](src) Here goes the code
+* [src](tree/master/src) Here goes the Python code
