@@ -8,26 +8,16 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import graph_tool.all as gt
 
+import filters
 
 FLOAT = np.dtype('float32')
-CURRENT_DIR = os.path.dirname(__file__)
-ROOT_DIR = os.path.dirname(CURRENT_DIR)
-PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
 
+@filters.active
 def plot_gradients(epithelium, ax=None, scale=1.):
-    vfilt = epithelium.is_local_vert
 
-    epithelium.graph.set_vertex_filter(vfilt)
     grad = epithelium.gradient_array()
-
-    vfilt = epithelium.is_local_vert.copy()
-    vfilt.a *= (1 - epithelium.is_cell_vert.a)
-    epithelium.graph.set_vertex_filter(vfilt)
-
     sigmas = epithelium.sigmas.fa
     zeds = epithelium.zeds.fa
-    epithelium.graph.set_vertex_filter(None)    
-
     grad_sigmas = grad[::2] * scale
     grad_zeds = grad[1::2] * scale
     v_sigmas = np.array([sigmas, grad_sigmas]).T
@@ -42,6 +32,18 @@ def plot_gradients(epithelium, ax=None, scale=1.):
     plt.draw()
     return ax
 
+@filters.active
+def plot_active(epithelium, ax=None):
+    sigmas = epithelium.sigmas.fa
+    zeds = epithelium.zeds.fa
+    if ax is None:
+        ax =  plot_cells_sz(epithelium, ax=None,
+                            vfilt=epithelium.is_local_vert,
+                            efilt=epithelium.is_local_edge)
+    ax.plot(sigmas, zeds, 'o', mfc='None', mec='r', ms=10, mew=2)
+    plt.draw()
+    return ax
+    
 def plot_cells_sz(epithelium, ax=None, text=True,
                   vfilt=None, efilt=None):
     if ax is None:
@@ -90,6 +92,9 @@ def plot_edges_sz(epithelium, efilt=None,
     ax.set_aspect('equal')
     epithelium.graph.set_edge_filter(None)
 
+
+
+# FIXME: Broken due to incomplete compilation of Graph-tool
 def sfdp_draw(graph, output="lattice_3d.pdf", **kwargs):
     output = os.path.join('saved_graph/pdf', output)
     sfdp_pos = gt.graph_draw(graph,
@@ -102,6 +107,7 @@ def sfdp_draw(graph, output="lattice_3d.pdf", **kwargs):
     print 'graph view saved to %s' %output
     return sfdp_pos
 
+# FIXME: Broken due to incomplete compilation of Graph-tool
 def pseudo3d_draw(graph, rtz, output="lattice_3d.pdf",
                   z_angle=0.12, theta_rot=0.1,
                   RGB=(0.8, 0.1, 0.), **kwargs):
@@ -139,11 +145,11 @@ def pseudo3d_draw(graph, rtz, output="lattice_3d.pdf",
     del pmap
     return pseudo3d_pos
     
+# FIXME: Broken due to incomplete compilation of Graph-tool
 def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
                     output3d="tissue_3d.pdf",
                     output2d='tissue_sz.pdf',
                     **kwargs):
-
 
     output3d = os.path.join('drawings', output3d)
     output2d = os.path.join('drawings', output2d)
@@ -230,7 +236,6 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
     
     xy = [pseudo_x, pseudo_y]
     pseudo3d_pos = gt.group_vector_property(xy, value_type='float')
-    
     pmap = gt.graph_draw(eptm.graph, pseudo3d_pos,
                          vertex_fill_color=vertex_color,
                          vertex_color=vertex_color,

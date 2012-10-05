@@ -9,7 +9,8 @@ from scipy import optimize, weave
 
 from objects import  AbstractRTZGraph, Cells, AppicalJunctions
 from xml_handler import ParamTree
-from filters import *
+import filters
+EpitheliumFilters = filters.EpitheliumFilters
 
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
@@ -43,7 +44,8 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
             self.graph = gt.load_graph(graphXMLfile)
             self.new = False
             self.xmlfname = graphXMLfile
-            
+
+        self.__verbose__ = False
         EpitheliumFilters.__init__(self)
         # All the geometrical properties are packed here
         AbstractRTZGraph.__init__(self)
@@ -54,7 +56,7 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
         self.junctions = AppicalJunctions(self)
         if self.new:
             self.is_alive.a = 1
-            # Remove cell to cell edges
+            # Remove cell to cell edges after graph construction
             efilt = self.is_ctoj_edge.copy()
             efilt.a += self.is_junction_edge.a
             self.graph.set_edge_filter(efilt)
@@ -63,14 +65,14 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
             self.set_edge_state()
             self._init_grad_and_energy()
             # self.compute_bending()
-            if __debug__: print 'isotropic relaxation'
+            if self.__verbose__: print 'isotropic relaxation'
             self.isotropic_relax()
-            if __debug__: print 'Periodic boundary'
-            self.periodic_boundary_condition()
-            if __debug__: print 'Update appical'
-            self.update_apical_geom()
-            if __debug__: print 'Update gradient'
-            self.update_gradient()
+        if self.__verbose__: print 'Periodic boundary'
+        self.periodic_boundary_condition()
+        if self.__verbose__: print 'Update appical'
+        self.update_apical_geom()
+        if self.__verbose__: print 'Update gradient'
+        self.update_gradient()
 
     def __str__(self):
 
@@ -129,20 +131,20 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
     def compute_bending(self):
         pass
         
-    @filter_active
+    @filters.active
     def precondition(self):
         pos0 = np.vstack([self.sigmas.fa,
                           self.zeds.fa]).T.flatten()
         max_dsigma =  2 * self.edge_lengths.fa.mean()
         max_dzed = max_dsigma
-        if __debug__ : print ('Initial postion `pos0` has shape %s'
+        if self.__verbose__ : print ('Initial postion `pos0` has shape %s'
                               %str(pos0.shape))
-        if __debug__ : print ('Max displacement amplitude for : %.3f'
+        if self.__verbose__ : print ('Max displacement amplitude for : %.3f'
                              % max_dsigma)
         bounds = np.zeros((pos0.shape[0],),
                           dtype=[('min', np.float32),
                                  ('max', np.float32)])
-        if __debug__: print ('bounds array has shape: %s'
+        if self.__verbose__: print ('bounds array has shape: %s'
                              % str(bounds.shape))
         s_bounds = np.vstack((self.sigmas.fa - max_dsigma,
                              self.sigmas.fa + max_dsigma)).T
@@ -153,7 +155,7 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
             bounds[2 * n + 1] = (z_bounds[n, 0], z_bounds[n, 1])
         return pos0, bounds
 
-    @filter_local
+    @filters.local
     def find_energy_min(self, method='fmin_l_bfgs_b', tol=1e-8):
         '''
         Performs the energy minimisation
@@ -200,6 +202,14 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
                                         callback=self.opt_callback)
         return pos0, output
 
+    @filters.local
+    def check_local_grad(self, pos0):
+        if self.__verbose__: print "Checking gradient"
+        chk_out = optimize.check_grad(self.opt_energy,
+                                      self.opt_gradient,
+                                      pos0.flatten())
+        return chk_out
+
         
     def opt_energy(self, sz_pos):
         """
@@ -223,7 +233,7 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
         self.set_new_pos(sz_pos)
         self.update_apical_geom()
         self.update_gradient()
-        gradient = self.calc_gradient()
+        gradient = self.gradient_array()
         return gradient
 
     def opt_callback(self, sz_pos):
@@ -239,32 +249,32 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
         total_energy = cells_term + junction_term
         return total_energy / denominator
         
-    @filter_j_edges_in
+    @filters.j_edges_in
     def calc_junctions_energy(self):
         junctions_energy = self.junctions.line_tensions.fa\
                            * self.edge_lengths.fa
         return junctions_energy.sum()
         
-    @filter_cells_in
+    @filters.cells_in
     def calc_cells_energy(self):
         elastic_term = 0.5 * self.cells.elasticities.fa * (
             self.cells.areas.fa - self.cells.prefered_area.fa)**2
         contractile_term = 0.5 * self.cells.contractilities.fa * \
                            self.cells.perimeters.fa**2
-        num_cells = elastic_term.size
+        num_cells = self.graph.num_vertices() #elastic_term.size
         prefered_area0 =  self.params['prefered_area']
         elasticity0 = self.params['elasticity']
         denominator = num_cells * elasticity0 * prefered_area0**2
         cells_energy = elastic_term + contractile_term
         return cells_energy.sum(), denominator
         
-    @filter_active
+    @filters.active
     def gradient_array(self):
         prefered_area0 =  self.params['prefered_area']
         elasticity0 = self.params['elasticity']
         norm_factor = prefered_area0 * elasticity0
         gradient = np.zeros(self.graph.num_vertices() * 2)
-        if __debug__ : print 'Gradient shape: %s' % gradient.shape
+        if self.__verbose__ : print 'Gradient shape: %s' % gradient.shape
         gradient[::2] = self.grad_sigma.fa / norm_factor
         gradient[1::2] = self.grad_zed.fa / norm_factor
         return gradient
@@ -275,13 +285,13 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
 
     def update_junctions_grad(self):
         # Junction edges
-        if __debug__ :
+        if self.__verbose__ :
             num_cells = self.is_cell_vert.fa.sum()
             num_jverts = self.graph.num_vertices() - num_cells
             num_edges = self.is_junction_edge.fa.sum()
-            print ('''Updating gradient for %i cells,
-                   %i junctions vertices and  %i junctions edges'''
-                  ) % (num_cells, num_jverts, num_edges)
+            print ('''Updating gradient for %i cells,'''
+                   '''%i junctions vertices and  %i junctions edges'''
+                   % (num_cells, num_jverts, num_edges))
         self.grad_sigma.fa = 0.
         self.grad_zed.fa = 0.
         self.grad_radial.fa = 0.
@@ -316,7 +326,7 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
             # self.grad_radial[j_src] += tension[edge] * u_rhosigma[edge]
             # self.grad_radial[j_trgt] += tension[edge] * u_rhosigma[edge]
 
-    @filter_cells_in
+    @filters.cells_in
     def update_cells_grad(self):
         # Cell vertices
         self.elastic_grad.fa =  self.cells.elasticities.fa \
@@ -327,14 +337,13 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
         
     def update_apical_geom(self):
         # Edges
-        if __debug__: print ('Geometry update on %i edges'
-                             % self.graph.num_edges())
+        if self.__verbose__: print ('Geometry update on %i edges'
+                                    % self.graph.num_edges())
         self.update_deltas()
         self.update_edge_lengths()
-
         # Cells
-        if __debug__: print ('Cells geometry update on %i vertices'
-                             % self.graph.num_vertices())
+        if self.__verbose__: print ('Cells geometry update on %i vertices'
+                                    % self.graph.num_vertices())
         for cell in self.cells:
             j_edges = self.cell_junctions(cell)
             self._one_cell_geom(cell, j_edges)
@@ -347,8 +356,8 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
         """
         area = 0.
         perimeter = 0.
-        if len(j_edges) < 3:
-            if __debug__: print ('''Two edges ain't enough to compute '''
+        if len(j_edges) < 3 and self.is_alive[cell]:
+            if self.__verbose__: print ('''Two edges ain't enough to compute '''
                                  '''area for cell %s''' % cell)
             self.cells.areas[cell] = self.cells.prefered_area[cell]
             self.cells.perimeters[cell] = 0.
@@ -377,7 +386,7 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
         pbc_sigma[raw_dsigma >= period/2] -= period
         self.sigmas[cell] = pbc_sigma.mean()
 
-    @filter_active
+    @filters.active
     def set_new_pos(self, new_sz_pos):
         new_sz_pos = new_sz_pos.flatten()
         assert len(new_sz_pos) / 2 == self.graph.num_vertices()
@@ -521,7 +530,7 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
         ####
         j_edgeab = self.graph.edge(j_verta, j_vertb)
         if j_edgeab is not None:
-            if __debug__: print ("Warning: previous %s to %s "
+            if self.__verbose__: print ("Warning: previous %s to %s "
                                  "edge is re-created." % (str(j_verta),
                                                           str(j_vertb)))
             self.graph.remove_edge(j_edgeab)
@@ -545,7 +554,7 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
         
         ctoj_0b = self.graph.edge(cell0, j_vertb)
         if ctoj_0b is not None:
-            if __debug__:
+            if self.__verbose__:
                 print ("Warning: previous cell %s \n"
                        "to junction vertex %s edge is re-created.",
                        ) % (str(cell0), str(j_vertb))
@@ -611,7 +620,7 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
             if ctoj_1b is not None:
                 self.graph.remove_edge(ctoj_1b)
 
-    @filter_j_edges_in
+    @filters.j_edges_in
     def merge_j_verts(self, jv0, jv1):
         vertex_trash = []
         edge_trash = []

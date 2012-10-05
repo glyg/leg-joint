@@ -385,6 +385,7 @@ class Cells():
     '''
     def __init__(self, epithelium):
         self.epithelium = epithelium
+        self.__verbose__ = self.epithelium.__verbose__
         self.params = epithelium.params
         if self.epithelium.new :
             #rhos, thetas, zeds = self._generate_rtz()
@@ -406,7 +407,7 @@ class Cells():
             self.epithelium.update_deltas()
             self.epithelium.update_edge_lengths()
             self.epithelium.periodic_boundary_condition()
-
+        
 
     def __iter__(self):
         # for vertex in gt.find_vertex(self.epithelium.graph,
@@ -472,7 +473,6 @@ class Cells():
     def _generate_rsz(self):
         rho_0 = self.epithelium.params['rho_0']
         lambda_0 = self.epithelium.params['lambda_0']
-
         n_sigmas = np.int(2 * np.pi * rho_0 / lambda_0)
         rho_c = (n_sigmas - 1) * lambda_0 / (2 * np.pi)
         delta_sigma = 2 * np.pi * rho_c / n_sigmas
@@ -481,7 +481,7 @@ class Cells():
         
         self.n_zeds = int(n_zeds)
         self.n_sigmas = int(n_sigmas)
-        if __debug__ : print ('''Creating a %i x %i cells lattice'''
+        if self.__verbose__ : print ('''Creating a %i x %i cells lattice'''
                               % (self.n_zeds, self.n_sigmas))
         rhos = np.ones(n_sigmas * n_zeds) * rho_c
         zt_grid = np.mgrid[:n_zeds, :n_sigmas]
@@ -512,7 +512,7 @@ class Cells():
         
         self.n_zeds = int(n_zeds)
         self.n_thetas = int(n_thetas)
-        if __debug__ : print ('''Creating
+        if self.__verbose__ : print ('''Creating
                               a %i x %i cells lattice'''
                               % (self.n_zeds, self.n_thetas))
         rhos = np.ones(n_thetas * n_zeds) * rho_c
@@ -551,11 +551,12 @@ class AppicalJunctions():
     def __init__(self, epithelium):
 
         self.epithelium = epithelium
+        self.__verbose__ = self.epithelium.__verbose__
         self.graph = self.epithelium.graph
         self.params = epithelium.params
         if self.epithelium.new :
-            self._init_junction_params()
             self._compute_voronoi()
+            self._init_junction_params()
 
     def __iter__(self):
 

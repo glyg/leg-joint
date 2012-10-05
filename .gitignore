@@ -1,6 +1,7 @@
 #Project specific
 drawings/*.png
-
+tmp/*.*
+iterate.dat
 *.py[co]
 *.*~
 
