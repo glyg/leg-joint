@@ -151,8 +151,9 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
                     output2d='tissue_sz.pdf',
                     **kwargs):
 
-    output3d = os.path.join('drawings', output3d)
-    output2d = os.path.join('drawings', output2d)
+    file_type = output3d.split('.')[-1]
+    output3d = os.path.join('../saved_graphs', file_type, output3d)
+    output2d = os.path.join('../saved_graphs', file_type, output2d)
 
     graph = eptm.graph
     vertex_red = eptm.graph.new_vertex_property('float')
@@ -176,7 +177,6 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
     vertex_green.fa = 182/256.
     vertex_blue.fa = 40/256.
     vertex_size.fa = 1.
-    print vertex_size.fa.sum()
     eptm.graph.set_vertex_filter(None)
 
     eptm.graph.set_edge_filter(eptm.is_junction_edge,
@@ -185,7 +185,6 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
     edge_green.fa = 201/256.
     edge_blue.fa = 40/256.
     edge_width.fa = 1.
-    print edge_width.fa.size
     eptm.graph.set_edge_filter(None)
 
     cell_filt = eptm.is_cell_vert.copy()
@@ -200,7 +199,6 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
 
     eptm.graph.set_edge_filter(eptm.is_ctoj_edge,
                                inverted=False)
-    print eptm.graph.num_edges()
     edge_red.fa = 0.9
     edge_green.fa = 0.9
     edge_blue.fa = 0.9
@@ -256,7 +254,7 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
                           edge_color=edge_color,
                           vertex_size=vertex_size,
                           vorder=vorder, eorder=eorder,
-                          output=output2, **kwargs)
+                          output=output2d, **kwargs)
     print 'saved tissue to %s' % output2d
     del pmap, pmap2
 
