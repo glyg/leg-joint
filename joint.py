@@ -35,10 +35,10 @@ def new_generation(eptm):
         if j is not None:
             pos0, pos1 = eptm.find_energy_min(tol=1e-5)
             now = datetime.now()
-            eptm.graph.save("tmp/generation%s.xml" % now.isoformat())
-            # outfname = 'saved_graph/png/generation_3d_%03i.png' % num
-            # outfname2 = 'saved_graph/png/generation_sz_%03i.png' % num
-            # epithelium_draw(eptm, output=outfname, output2=outfname2)
+            #eptm.graph.save("tmp/generation%s.xml" % now.isoformat())
+            outfname = 'saved_graph/png/generation_3d_%03i.png' % num
+            outfname2 = 'saved_graph/png/generation_sz_%03i.png' % num
+            epithelium_draw(eptm, output=outfname, output2=outfname2)
         else:
             print 'division failed'
         num += 1
@@ -46,7 +46,7 @@ def new_generation(eptm):
         time_left = (elapsed / num) * (len(cells) - num)
         print str(num)+'/'+str(len(cells))
         print 'time left: %3f' % time_left
-    eptm.graph.save("saved_graphs/xml/generation%s.xml" % now.isoformat())
+    # eptm.graph.save("saved_graphs/xml/generation%s.xml" % now.isoformat())
     
 
 if __name__ == '__main__':

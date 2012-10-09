@@ -14,7 +14,7 @@ FLOAT = np.dtype('float32')
 
 @filters.active
 def plot_gradients(epithelium, ax=None, scale=1.):
-
+    epithelium.update_gradient()
     grad = epithelium.gradient_array()
     sigmas = epithelium.sigmas.fa
     zeds = epithelium.zeds.fa
@@ -145,11 +145,9 @@ def pseudo3d_draw(graph, rtz, output="lattice_3d.pdf",
     del pmap
     return pseudo3d_pos
     
-# FIXME: Broken due to incomplete compilation of Graph-tool
 def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
                     output3d="tissue_3d.pdf",
-                    output2d='tissue_sz.pdf',
-                    **kwargs):
+                    output2d='tissue_sz.pdf', verbose=False):
 
     file_type = output3d.split('.')[-1]
     output3d = os.path.join('../saved_graphs', file_type, output3d)
@@ -172,7 +170,7 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
     j_filt.a *= (1 - eptm.is_alive.a)
     eptm.graph.set_vertex_filter(j_filt,
                                  inverted=True)
-    print eptm.graph.num_vertices()
+    if verbose: print eptm.graph.num_vertices()
     vertex_red.fa = 105/256.
     vertex_green.fa = 182/256.
     vertex_blue.fa = 40/256.
@@ -217,7 +215,8 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
 
     depth = rhos.a * (1 - np.cos(thetas.a + d_theta))
     normed_depth = (depth - depth.min()) / (depth.max() - depth.min())
-    vertex_alpha.a = normed_depth * 0.6 + 0.4
+    vertex_alpha.a = normed_depth * 0.6 + 0.4 * eptm.is_alive.a
+    
     for edge in eptm.graph.edges():
         edge_alpha[edge] = vertex_alpha[edge.source()]
 
@@ -241,8 +240,8 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
                          edge_color=edge_color,
                          vertex_size=vertex_size,
                          vorder=vorder, eorder=eorder,
-                         output=output3d, **kwargs)
-    print 'saved tissue to %s' % output3d
+                         output=output3d)
+    if verbose: print 'saved tissue to %s' % output3d
     
     sigma = eptm.sigmas
     zs = [sigma, zeds]
@@ -254,7 +253,7 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
                           edge_color=edge_color,
                           vertex_size=vertex_size,
                           vorder=vorder, eorder=eorder,
-                          output=output2d, **kwargs)
+                          output=output2d)
     print 'saved tissue to %s' % output2d
     del pmap, pmap2
 

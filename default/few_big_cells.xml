@@ -40,4 +40,8 @@
     <unit></unit>
     <description>Z bin width</description>
   </param>
+  <param max="100" min="2." name="z_length" step="1." value="2.5">
+    <unit></unit>
+    <description>Z length in units of rho0</description>
+  </param>
 </parameters>

@@ -4,5 +4,31 @@
 
 import sys
 sys.path.append('..')
-%run ../__init__.py
+import leg_joint as lj
+import matplotlib.pyplot as plt
+
+
+def before_after(func):
+    def new_func(eptm, *args, **kwargs):
+        import leg_joint as lj
+        fig, axes = plt.subplots(1,2, figsize=(12,4))
+        lj.draw.plot_cells_sz(eptm, axes[0], text=False, 
+                              vfilt=eptm.is_local_vert,
+                              efilt=eptm.is_local_edge)
+        lj.draw.plot_gradients(eptm, axes[0])
+        foutput = func(eptm, *args, **kwargs)
+        lj.draw.plot_cells_sz(eptm, axes[1], text=False,
+                              vfilt=eptm.is_local_vert,
+                              efilt=eptm.is_local_edge)
+        lj.draw.plot_gradients(eptm, axes[1])
+        return foutput
+    return new_func
+
+@before_after
+def local_optimum(eptm, tol):
+    eptm.update_gradient()
+    pos0, pos1 = eptm.find_energy_min(tol=tol)
+    return pos0, pos1
+
+
 

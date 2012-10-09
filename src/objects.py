@@ -5,7 +5,8 @@
 The architecture of the epithelium model consists in a graph containing
 two types of vertices: 
 
-* The cells themselves The appical junctions vertices (It is
+* The cells themselves
+* The appical junctions vertices (It is
 constructed initially as the Voronoi diagramm associated with the
 cell centers triangulation, again in the ::math:(\rho, \sigma):
 plane.)
@@ -473,11 +474,13 @@ class Cells():
     def _generate_rsz(self):
         rho_0 = self.epithelium.params['rho_0']
         lambda_0 = self.epithelium.params['lambda_0']
+        z_length = self.epithelium.params['z_length']
+
         n_sigmas = np.int(2 * np.pi * rho_0 / lambda_0)
         rho_c = (n_sigmas - 1) * lambda_0 / (2 * np.pi)
         delta_sigma = 2 * np.pi * rho_c / n_sigmas
         delta_z = delta_sigma * np.sqrt(3)/2.
-        n_zeds = np.int(5 * rho_0 / delta_z)
+        n_zeds = np.int(z_length * rho_0 / delta_z)
         
         self.n_zeds = int(n_zeds)
         self.n_sigmas = int(n_sigmas)

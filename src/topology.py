@@ -2,12 +2,24 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
-
 import filters
+from graph_representation import epithelium_draw
 
+from datetime import datetime
 
+def snapshot(func, *args, **kwargs):
+    def new_func(self, *args, **kwargs):
+        out = func(self, *args, **kwargs)
+        now = datetime.now()
+        #eptm.graph.save("../tmp/eptm_%s.xml" % now.isoformat())
+        outfname2d = "tmp/eptm2d_%s.png" % now.isoformat()
+        outfname3d = "tmp/eptm3d_%s.png" % now.isoformat()
+        epithelium_draw(self, output2d=outfname2d, output3d=outfname3d)
+        return out
+    return new_func
 
-def type1_transition(eptm, elements):
+@snapshot
+def type1_transition(eptm, elements, verbose=False):
     """
     Type one transition (see the definition in
     Farhadifar et al. Curr Biol. 2007 Dec 18;17(24):2095-104.
@@ -95,7 +107,7 @@ def type1_transition(eptm, elements):
         j_verte, j_vertd = j_vertd, j_verte 
         j_edgebe = eptm.any_edge(j_vertb, j_verte)
     cell2 = eptm.adjacent_cells(j_edgebe)[1]
-    print "adjacent cells edge be : %s, %s" % (
+    if verbose : print "adjacent cells edge be : %s, %s" % (
         str(eptm.adjacent_cells(j_edgebe)[0]),
         str(eptm.adjacent_cells(j_edgebe)[1]))
     if cell2 == cell3:
@@ -107,10 +119,11 @@ def type1_transition(eptm, elements):
     modified_cells = [cell1, cell2, cell3, cell4]
     modified_jverts = [j_verta, j_vertb, j_vertc,
                        j_vertd, j_verte, j_vertf]
-    for cell, i in zip(modified_cells, [1, 2, 3, 4]):
-        print 'cell %i: %s' %(i, str(cell))
-    for jv, i in zip(modified_jverts, 'abcdef'):
-        print 'junction vertice %s: %s' %(i, str(jv))
+    if verbose : 
+        for cell, i in zip(modified_cells, [1, 2, 3, 4]):
+            print 'cell %i: %s' %(i, str(cell))
+        for jv, i in zip(modified_jverts, 'abcdef'):
+            print 'junction vertice %s: %s' %(i, str(jv))
 
     eptm.remove_junction(j_verta, j_vertb, cell1, cell3)
     eptm.remove_junction(j_verta, j_vertc, cell1, cell4)
@@ -148,52 +161,8 @@ def type1_transition(eptm, elements):
     eptm.update_apical_geom()
     return modified_cells, modified_jverts
 
-def type3_transition(eptm, cell, threshold=0.5, verbose=True):
-    '''
-    That's when a three faced cell disappears
-    '''
-    eptm.graph.set_vertex_filter(None)
-    eptm.graph.set_edge_filter(None)
-    j_edges = eptm.cell_junctions(cell)
-    edge_lengths = np.array([eptm.edge_lengths[edge]
-                             for edge in j_edges])
 
-    if len(j_edges) != 3:
-        if verbose:
-            print ('''%i edges left''' % len(j_edges))
-
-            je = j_edges[edge_lengths.argmin()]
-        cell1, cell3 = eptm.adjacent_cells(je)
-        modified = type1_transition(eptm, (cell1, cell3))
-        return 
-    if edge_lengths.min() > threshold: return
-    old_jvs = [old_jv for old_jv in cell.out_neighbours()]
-    new_jv = eptm.new_vertex(old_jvs[0])
-    edge_trash = []
-    for old_jv in old_jvs:
-        for edge in old_jv.out_edges():
-            if edge in j_edges: continue
-            new_edge = eptm.graph.add_edge(new_jv, edge.target())
-            for prop in eptm.graph.edge_properties.values():
-                prop[new_edge] = prop[edge]
-        for edge in old_jv.in_edges():
-            if edge in j_edges: continue
-            eptm.graph.add_edge(edge.source(), new_jv)
-            for prop in eptm.graph.edge_properties.values():
-                prop[new_edge] = prop[edge]
-
-        edge_trash.extend(old_jv.all_edges())
-        eptm.is_alive[old_jv] = 0
-    
-    for edge in edge_trash:
-        try:
-            eptm.graph.remove_edge(edge)
-        except ValueError:
-            continue
-    eptm.is_alive[cell] = 0
-    return new_jv
-
-
+@snapshot
 def cell_division(eptm, mother_cell,
                   phi_division=None,
                   verbose=False):
@@ -285,3 +254,72 @@ def cell_division(eptm, mother_cell,
     eptm.update_gradient()
     eptm.set_vertex_state()
     return j
+
+@snapshot
+def apoptosis(eptm, apoptotic_cell):
+    eptm.set_local_mask(None)
+    eptm.set_local_mask(apoptotic_cell)
+    j_edges = eptm.cell_junctions(apoptotic_cell)
+    edge_lengths = np.array([eptm.edge_lengths[je] for je in j_edges])
+    for n in range(len(j_edges) - 2):
+        je = j_edges[edge_lengths.argmin()]
+        new_jv = type3_transition(eptm, apoptotic_cell)
+        if new_jv is not None:
+            print "Cell's dead, baby, cell's dead"
+    return new_jv
+
+@snapshot
+def type3_transition(eptm, cell, reduce_edgenum=True, verbose=False):
+    """
+    
+    That's when a three faced cell disappears.
+    """
+    eptm.graph.set_vertex_filter(None)
+    eptm.graph.set_edge_filter(None)
+    j_edges = eptm.cell_junctions(cell)
+    edge_lengths = np.array([eptm.edge_lengths[edge]
+                             for edge in j_edges])
+    if len(j_edges) != 3 and reduce_edgenum:
+        if verbose:
+            print ('''%i edges left''' % len(j_edges))
+        je = j_edges[edge_lengths.argmin()]
+        cell1, cell3 = eptm.adjacent_cells(je)
+        modified = type1_transition(eptm, (cell1, cell3),
+                                    verbose=verbose)
+        return 
+    old_jvs = [old_jv for old_jv in cell.out_neighbours()]
+    new_jv = eptm.new_vertex(old_jvs[0])
+    if verbose: print ('Cell %s removed, edge %s created'
+                       % (cell, new_jv))
+    edge_trash = []
+    cell_neighbs = []
+    for old_jv in old_jvs:
+        for edge in old_jv.out_edges():
+            if edge in j_edges: continue
+            new_edge = eptm.new_j_edge(new_jv, edge.target())
+            if verbose: print 'new_j_edge %s ' %edge 
+        for edge in old_jv.in_edges():
+            if eptm.is_ctoj_edge[edge]:
+                cell0 = edge.source()
+                eptm.new_ctoj_edge(cell0, new_jv)
+                if verbose: print 'new_ctoj_edge %s ' %edge
+                if cell0 not in cell_neighbs:
+                    cell_neighbs.append(cell0)
+            elif edge in j_edges: continue
+            else:
+                if verbose: print 'new_j_edge %s ' %edge 
+                eptm.new_j_edge(edge.source(), new_jv)
+        edge_trash.extend(old_jv.all_edges())
+        eptm.is_alive[old_jv] = 0
+    
+    for edge in edge_trash:
+        try:
+            eptm.graph.remove_edge(edge)
+        except ValueError:
+            print 'invalid edge'
+            continue
+    eptm.set_local_mask(None)
+    for n_cell in cell_neighbs:
+        eptm.set_local_mask(n_cell)
+    eptm.is_alive[cell] = 0
+    return new_jv

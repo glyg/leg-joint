@@ -172,12 +172,15 @@ class EpitheliumFilters(object):
         return self.graph.vertex_properties["is_cell_vert"]
 
     def new_ctoj_edge(self, cell, jv):
-        cj = self.graph.add_edge(cell, jv)
-        self.is_ctoj_edge[cj] = 1
-        self.is_junction_edge[cj] = 0
-        self.at_boundary[cj] = 0
-        self.is_new_edge[cj] = 1
-        return cj
+        if self.graph.edge(cell, jv) is None:
+            cj = self.graph.add_edge(cell, jv)
+            self.is_ctoj_edge[cj] = 1
+            self.is_junction_edge[cj] = 0
+            self.at_boundary[cj] = 0
+            self.is_new_edge[cj] = 1
+            return cj
+        else:
+            return self.graph.edge(cell, jv)
 
     def new_j_edge(self, jv0, jv1):
         j_edge_out = self.graph.edge(jv0, jv1)
