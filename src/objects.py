@@ -390,7 +390,10 @@ class Cells():
         self.params = epithelium.params
         if self.epithelium.new :
             #rhos, thetas, zeds = self._generate_rtz()
-            rhos, sigmas, zeds = self._generate_rsz()
+            n_sigmas, n_zeds = (self.epithelium.params['n_sigmas'],
+                                self.epithelium.params['n_zeds'])
+            
+            rhos, sigmas, zeds = self._generate_rsz(n_sigmas, n_zeds)
             rsz = rhos, sigmas, zeds
             self.epithelium.graph = self._generate_graph(rsz)
             EpitheliumFilters.__init__(self.epithelium)
@@ -471,16 +474,16 @@ class Cells():
     def prefered_area(self):
         return self.epithelium.graph.vertex_properties["prefered_area"]
 
-    def _generate_rsz(self):
+    def _generate_rsz(self, n_sigmas=5, n_zeds=20):
         rho_0 = self.epithelium.params['rho_0']
         lambda_0 = self.epithelium.params['lambda_0']
         z_length = self.epithelium.params['z_length']
 
-        n_sigmas = np.int(2 * np.pi * rho_0 / lambda_0)
+        # n_sigmas = np.int(2 * np.pi * rho_0 / lambda_0)
         rho_c = (n_sigmas - 1) * lambda_0 / (2 * np.pi)
         delta_sigma = 2 * np.pi * rho_c / n_sigmas
         delta_z = delta_sigma * np.sqrt(3)/2.
-        n_zeds = np.int(z_length * rho_0 / delta_z)
+        # n_zeds = np.int(z_length * rho_0 / delta_z)
         
         self.n_zeds = int(n_zeds)
         self.n_sigmas = int(n_sigmas)

@@ -40,7 +40,7 @@ def plot_active(epithelium, ax=None):
         ax =  plot_cells_sz(epithelium, ax=None,
                             vfilt=epithelium.is_local_vert,
                             efilt=epithelium.is_local_edge)
-    ax.plot(sigmas, zeds, 'o', mfc='None', mec='r', ms=10, mew=2)
+    ax.plot(sigmas, zeds, 'ro', alpha=0.8, ms=8)
     plt.draw()
     return ax
     
@@ -53,11 +53,11 @@ def plot_cells_sz(epithelium, ax=None, text=True,
     zeds = epithelium.zeds.copy()
     for cell in epithelium.cells :
         if text:
-            ax.text(sigmas[cell],
-                    zeds[cell],
+            ax.text(zeds[cell],
+                    sigmas[cell],
                     str(cell))
-        ax.plot(sigmas[cell],
-                zeds[cell], 'bo', alpha=0.3)
+        ax.plot(zeds[cell], # FIXME this is not what the name suggests
+                sigmas[cell], 'bo', alpha=0.3)
     epithelium.graph.set_vertex_filter(None)
     epithelium.graph.set_edge_filter(efilt)
     plot_edges_sz(epithelium, efilt, ax=ax, text=text)
@@ -81,7 +81,9 @@ def plot_edges_sz(epithelium, efilt=None,
                   epithelium.sigmas[edge.target()])
         zeds = (epithelium.zeds[edge.source()],
                 epithelium.zeds[edge.target()])
-        ax.plot(sigmas, zeds, 'go-', lw=2, alpha=0.4, **kwargs)
+        ax.plot(zeds,
+                sigmas,
+                'go-', lw=2, alpha=0.4, **kwargs)
         if text:
             ax.text(epithelium.sigmas[edge.source()],
                     epithelium.zeds[edge.source()],
@@ -94,7 +96,7 @@ def plot_edges_sz(epithelium, efilt=None,
 
 
 
-# FIXME: Broken due to incomplete compilation of Graph-tool
+
 def sfdp_draw(graph, output="lattice_3d.pdf", **kwargs):
     output = os.path.join('saved_graph/pdf', output)
     sfdp_pos = gt.graph_draw(graph,

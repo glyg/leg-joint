@@ -1,5 +1,13 @@
 <?xml version="1.0"?>
 <parameters>
+  <param max="30" min="0" name="n_sigmas" step="1" value="5">
+    <unit>um</unit>
+    <description>Initial number of cell along sigma </description>
+  </param>
+  <param max="30" min="0" name="n_zeds" step="1" value="15">
+    <unit>um</unit>
+    <description>Initial number of cell along zed</description>
+  </param>
   <param max="10." min="0.1" name="lambda_0" step="0.1" value="8.3">
     <unit>um</unit>
     <description>Average cell to cell distance</description>
