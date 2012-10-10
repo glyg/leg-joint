@@ -40,7 +40,7 @@ def plot_active(epithelium, ax=None):
         ax =  plot_cells_sz(epithelium, ax=None,
                             vfilt=epithelium.is_local_vert,
                             efilt=epithelium.is_local_edge)
-    ax.plot(sigmas, zeds, 'ro', alpha=0.8, ms=8)
+    ax.plot(zeds, sigmas,  'ro', alpha=0.5, ms=8)
     plt.draw()
     return ax
     
@@ -97,7 +97,7 @@ def plot_edges_sz(epithelium, efilt=None,
 
 
 
-def sfdp_draw(graph, output="lattice_3d.pdf", **kwargs):
+def sfdp_draw(graph, output="lattice_3d.pdf"):
     output = os.path.join('saved_graph/pdf', output)
     sfdp_pos = gt.graph_draw(graph,
                              pos=gt.sfdp_layout(graph,
@@ -109,7 +109,7 @@ def sfdp_draw(graph, output="lattice_3d.pdf", **kwargs):
     print 'graph view saved to %s' %output
     return sfdp_pos
 
-# FIXME: Broken due to incomplete compilation of Graph-tool
+
 def pseudo3d_draw(graph, rtz, output="lattice_3d.pdf",
                   z_angle=0.12, theta_rot=0.1,
                   RGB=(0.8, 0.1, 0.), **kwargs):
@@ -246,7 +246,7 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
     if verbose: print 'saved tissue to %s' % output3d
     
     sigma = eptm.sigmas
-    zs = [sigma, zeds]
+    zs = [zeds, sigma]
     zs_pos = gt.group_vector_property(zs, value_type='float')
     pmap2 = gt.graph_draw(eptm.graph, zs_pos,
                           vertex_fill_color=vertex_color,
