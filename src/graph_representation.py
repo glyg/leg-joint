@@ -27,7 +27,7 @@ def plot_gradients(epithelium, ax=None, scale=1.):
                             vfilt=epithelium.is_local_vert,
                             efilt=epithelium.is_local_edge)
     for s, z in zip(v_sigmas, v_zeds):
-        ax.arrow(s[0], z[0], s[1], z[1], width=0.1,
+        ax.arrow(z[0], s[0], z[1], s[1], width=0.1,
                  ec='red', fc='red', alpha=0.5)
     plt.draw()
     return ax
@@ -62,6 +62,8 @@ def plot_cells_sz(epithelium, ax=None, text=True,
     epithelium.graph.set_edge_filter(efilt)
     plot_edges_sz(epithelium, efilt, ax=ax, text=text)
     epithelium.graph.set_edge_filter(None)
+    ax.set_xlabel('Proximo distal', fontsize='large')
+    ax.set_ylabel('Around the leg', fontsize='large')
     plt.draw()
     return ax
 
