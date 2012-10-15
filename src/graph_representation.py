@@ -45,14 +45,15 @@ def plot_active(epithelium, ax=None):
     return ax
     
 def plot_cells_sz(epithelium, ax=None, text=True,
-                  vfilt=None, efilt=None):
+                  vfilt=None, efilt=None,
+                  c_text=True, j_text=False):
     if ax is None:
         fig, ax = plt.subplots(1,1)
     epithelium.graph.set_vertex_filter(vfilt)
     sigmas = epithelium.sigmas.copy()
     zeds = epithelium.zeds.copy()
     for cell in epithelium.cells :
-        if text:
+        if text and c_text:
             ax.text(zeds[cell],
                     sigmas[cell],
                     str(cell))
@@ -60,7 +61,7 @@ def plot_cells_sz(epithelium, ax=None, text=True,
                 sigmas[cell], 'bo', alpha=0.3)
     epithelium.graph.set_vertex_filter(None)
     epithelium.graph.set_edge_filter(efilt)
-    plot_edges_sz(epithelium, efilt, ax=ax, text=text)
+    plot_edges_sz(epithelium, efilt, ax=ax, text=j_text)
     epithelium.graph.set_edge_filter(None)
     ax.set_xlabel('Proximo distal', fontsize='large')
     ax.set_ylabel('Around the leg', fontsize='large')
@@ -87,11 +88,11 @@ def plot_edges_sz(epithelium, efilt=None,
                 sigmas,
                 'go-', lw=2, alpha=0.4, **kwargs)
         if text:
-            ax.text(epithelium.sigmas[edge.source()],
-                    epithelium.zeds[edge.source()],
+            ax.text(epithelium.zeds[edge.source()],
+                    epithelium.sigmas[edge.source()],
                     str(edge.source()))
-            ax.text(epithelium.sigmas[edge.target()],
-                    epithelium.zeds[edge.target()],
+            ax.text(epithelium.zeds[edge.target()],
+                    epithelium.sigmas[edge.target()],
                     str(edge.target()))
     ax.set_aspect('equal')
     epithelium.graph.set_edge_filter(None)
@@ -108,7 +109,7 @@ def sfdp_draw(graph, output="lattice_3d.pdf"):
                                                 multilevel=True),
                              output_size=(300,300),
                              output=output)
-    print 'graph view saved to %s' %output
+    # print 'graph view saved to %s' %output
     return sfdp_pos
 
 
@@ -258,7 +259,7 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
                           vertex_size=vertex_size,
                           vorder=vorder, eorder=eorder,
                           output=output2d)
-    print 'saved tissue to %s' % output2d
+    if verbose: print 'saved tissue to %s' % output2d
     del pmap, pmap2
 
 def cylindrical2cartesian(rtz):
