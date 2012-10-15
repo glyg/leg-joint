@@ -2,15 +2,18 @@
 # -*- coding: utf-8 -*-
 
 
-import sys
-sys.path.append('..')
-import leg_joint as lj
-import matplotlib.pyplot as plt
+import sys, os
+curdir = os.path.abspath(os.path.curdir)
+print os.path.sep.join(curdir.split(os.path.sep)[:-1])
+sys.path.append(os.path.sep.join(curdir.split(os.path.sep)[:-1]))
 
+import leg_joint as lj
+
+import matplotlib.pyplot as plt
 
 def before_after(func):
     def new_func(eptm, *args, **kwargs):
-        import leg_joint as lj
+        
         fig, axes = plt.subplots(1,2, figsize=(12,4))
         lj.draw.plot_cells_sz(eptm, axes[0], text=False, 
                               vfilt=eptm.is_local_vert,
