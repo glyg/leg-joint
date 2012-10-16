@@ -7,10 +7,10 @@ import graph_tool.all as gt
 import time
 from datetime import datetime
 
-from src.dynamics import Epithelium
-from src.graph_representation import epithelium_draw
-from src.topology import cell_division
-# eptm = Epithelium(paramfile='default/few_big_cells.xml')
+import leg_joint as lj
+import random
+
+# eptm = lj.Epithelium(paramfile='default/few_big_cells.xml')
 
 
 def new_generation(eptm):
@@ -26,19 +26,20 @@ def new_generation(eptm):
         mkdir('tmp')
     except OSError:
         pass
+    random.shuffle(cells)
     for mother_cell in cells:
         eptm.set_local_mask(None)
         eptm.cells.prefered_area[mother_cell] /= 2.
         eptm.cells.contractilities[mother_cell] /= 2.
         eptm.set_local_mask(mother_cell)
-        j = cell_division(eptm, mother_cell, verbose=False)
+        j = lj.cell_division(eptm, mother_cell, verbose=False)
         if j is not None:
             pos0, pos1 = eptm.find_energy_min(tol=1e-5)
             now = datetime.now()
-            #eptm.graph.save("tmp/generation%s.xml" % now.isoformat())
-            outfname = 'saved_graph/png/generation_3d_%03i.png' % num
-            outfname2 = 'saved_graph/png/generation_sz_%03i.png' % num
-            epithelium_draw(eptm, output=outfname, output2=outfname2)
+            eptm.graph.save("saved_graphs/xml/tmp/generation%s.xml" % now.isoformat())
+            outfname3d = 'saved_graphs/png/tmp/generation_3d_%03i.png' % num
+            outfname2d = 'saved_graphs/png/tmp/generation_sz_%03i.png' % num
+            lj.draw.epithelium_draw(eptm, output2d=outfname2d, output3d=outfname3d)
         else:
             print 'division failed'
         num += 1
@@ -46,9 +47,9 @@ def new_generation(eptm):
         time_left = (elapsed / num) * (len(cells) - num)
         print str(num)+'/'+str(len(cells))
         print 'time left: %3f' % time_left
-    # eptm.graph.save("saved_graphs/xml/generation%s.xml" % now.isoformat())
+    eptm.graph.save("saved_graphs/xml/generation%s.xml" % now.isoformat())
     
 
 if __name__ == '__main__':
-    eptm = Epithelium(paramfile='default/few_big_cells.xml')
+    eptm = lj.Epithelium(paramfile='default/few_big_cells.xml')
     new_generation(eptm)

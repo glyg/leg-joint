@@ -86,7 +86,7 @@ def plot_edges_sz(epithelium, efilt=None,
                 epithelium.zeds[edge.target()])
         ax.plot(zeds,
                 sigmas,
-                'go-', lw=2, alpha=0.4, **kwargs)
+                'g-', lw=2, alpha=0.4, **kwargs)
         if text:
             ax.text(epithelium.zeds[edge.source()],
                     epithelium.sigmas[edge.source()],
@@ -155,8 +155,8 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
                     output2d='tissue_sz.pdf', verbose=False):
 
     file_type = output3d.split('.')[-1]
-    output3d = os.path.join('../saved_graphs', file_type, output3d)
-    output2d = os.path.join('../saved_graphs', file_type, output2d)
+    # output3d = os.path.join('saved_graphs', file_type, output3d)
+    # output2d = os.path.join('saved_graphs', file_type, output2d)
 
     graph = eptm.graph
     vertex_red = eptm.graph.new_vertex_property('float')

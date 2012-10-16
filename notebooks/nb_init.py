@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import matplotlib.pyplot as plt
+import IPython.core.display as disp
 
 import sys, os
 curdir = os.path.abspath(os.path.curdir)
@@ -9,8 +11,6 @@ sys.path.append(os.path.sep.join(curdir.split(os.path.sep)[:-2]))
 
 import leg_joint as lj
 
-import matplotlib.pyplot as plt
-import IPython.core.display as disp
 
 def before_after(func):
     def new_func(eptm, *args, **kwargs):

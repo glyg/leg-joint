@@ -1,4 +1,6 @@
-import leg_joint
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 from src.dynamics import Epithelium
 from src.topology import cell_division, type1_transition
 from src.topology import type3_transition, apoptosis

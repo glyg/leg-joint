@@ -1,6 +1,8 @@
 #Project specific
-drawings/*.png
-*/tmp/*.*
+saved_graphs/xml/tmp/*
+saved_graphs/pdf/tmp/*
+saved_graphs/png/tmp/*
+
 iterate.dat
 *.py[co]
 *.*~
