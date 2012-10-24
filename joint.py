@@ -3,6 +3,9 @@
 
 from os import mkdir
 import numpy as np
+# Import mpltlib before graph-tool to
+# avoid Gtk seg fault (don't ask why)
+import matplotlib.pyplot as plt
 import graph_tool.all as gt
 import time
 from datetime import datetime
@@ -14,7 +17,7 @@ import random
 
 
 def new_generation(eptm):
-
+    eptm.scale(np.sqrt(2.))
     eptm.graph.set_vertex_filter(eptm.is_cell_vert)
     cells =  [cell for cell in eptm.graph.vertices()
               if eptm.is_alive[cell]]
@@ -29,17 +32,17 @@ def new_generation(eptm):
     random.shuffle(cells)
     for mother_cell in cells:
         eptm.set_local_mask(None)
-        eptm.cells.prefered_area[mother_cell] /= 2.
-        eptm.cells.contractilities[mother_cell] /= 2.
         eptm.set_local_mask(mother_cell)
         j = lj.cell_division(eptm, mother_cell, verbose=False)
         if j is not None:
             pos0, pos1 = eptm.find_energy_min(tol=1e-5)
             now = datetime.now()
-            eptm.graph.save("saved_graphs/xml/tmp/generation%s.xml" % now.isoformat())
+            eptm.graph.save("saved_graphs/xml/tmp/generation%s.xml"
+                            % now.isoformat())
             outfname3d = 'saved_graphs/png/tmp/generation_3d_%03i.png' % num
             outfname2d = 'saved_graphs/png/tmp/generation_sz_%03i.png' % num
-            lj.draw.epithelium_draw(eptm, output2d=outfname2d, output3d=outfname3d)
+            lj.draw.epithelium_draw(eptm, output2d=outfname2d,
+                                    output3d=outfname3d)
         else:
             print 'division failed'
         num += 1

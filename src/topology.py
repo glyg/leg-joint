@@ -1,19 +1,30 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+import os
 import numpy as np
 import filters
 from graph_representation import epithelium_draw
 
 from datetime import datetime
 
+CURRENT_DIR = os.path.dirname(__file__)
+ROOT_DIR = os.path.dirname(CURRENT_DIR)
+GRAPH_SAVE_DIR = os.path.join(ROOT_DIR, 'saved_graphs')
+
 def snapshot(func, *args, **kwargs):
     def new_func(self, *args, **kwargs):
         out = func(self, *args, **kwargs)
         now = datetime.now()
-        #eptm.graph.save("../tmp/eptm_%s.xml" % now.isoformat())
-        outfname2d = "tmp/eptm2d_%s.png" % now.isoformat()
-        outfname3d = "tmp/eptm3d_%s.png" % now.isoformat()
+        xml_save = os.path.join(GRAPH_SAVE_DIR,
+                                'xml', 'tmp',
+                                'eptm_%s.xml' % now.isoformat())
+        self.graph.save(xml_save)
+        outfname2d = os.path.join(GRAPH_SAVE_DIR,
+                                  'png', 'tmp',
+                                  'eptm2d_%s.png' % now.isoformat())
+        outfname3d = os.path.join(GRAPH_SAVE_DIR,
+                                  'png', 'tmp',
+                                  'eptm3d_%s.png' % now.isoformat())
         epithelium_draw(self, output2d=outfname2d, output3d=outfname3d)
         return out
     return new_func

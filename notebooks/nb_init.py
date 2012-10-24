@@ -14,7 +14,8 @@ import leg_joint as lj
 
 def before_after(func):
     def new_func(eptm, *args, **kwargs):
-        
+        import matplotlib.pyplot as plt
+        import leg_joint as lj
         fig, axes = plt.subplots(1,2, figsize=(12,4))
         lj.draw.plot_cells_sz(eptm, axes[0], c_text=False, 
                               vfilt=eptm.is_local_vert,

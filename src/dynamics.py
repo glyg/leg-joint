@@ -65,8 +65,8 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
             self.set_edge_state()
             self._init_grad_and_energy()
             # self.compute_bending()
-            if self.__verbose__: print 'isotropic relaxation'
-            self.isotropic_relax()
+        if self.__verbose__: print 'isotropic relaxation'
+        self.isotropic_relax()
         if self.__verbose__: print 'Periodic boundary'
         self.periodic_boundary_condition()
         if self.__verbose__: print 'Update appical'
@@ -133,6 +133,11 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
         
     @filters.active
     def precondition(self):
+        if self.at_boundary.fa.sum() > 0:
+            self.rotate(np.pi)
+            self.current_angle = np.pi
+            print 'rotated'
+            
         pos0 = np.vstack([self.sigmas.fa,
                           self.zeds.fa]).T.flatten()
         max_dsigma =  2 * self.edge_lengths.fa.mean()
@@ -167,10 +172,10 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
                                             fprime=self.opt_gradient,
                                             approx_grad=1,
                                             bounds=bounds.flatten(),
+                                            factr=1e10,
                                             m=10,
-                                            factr=1e12,
                                             pgtol=tol,
-                                            epsilon=1e-08,
+                                            epsilon=1e-8,
                                             iprint=1,
                                             maxfun=150,
                                             disp=None)
@@ -200,6 +205,9 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
                                         norm=np.inf,
                                         retall=1,
                                         callback=self.opt_callback)
+        if not -1e-8 < self.current_angle < 1e-8:
+            self.rotate(-self.current_angle)
+            self.current_angle = 0.
         return pos0, output
 
     @filters.local
@@ -423,15 +431,16 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
         return grad
 
     def isotropic_energy(self, delta, gamma, lbda):
+        """
+        Computes the theoritical energy per cell for the given
+        parameters.
+        """
         mu = 6 * np.sqrt(2. / (3 * np.sqrt(3)))
         elasticity = (delta**2 - 1**2)**2 / 2.
         contractility = gamma * mu**2 * delta**2 / 2.
         tension = lbda * mu * delta / 2.
         energy = elasticity + contractility + tension
         return energy
-    
-        
-
 
     def outward_uvect(self, cell, j_edge):
         """

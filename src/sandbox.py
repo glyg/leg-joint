@@ -17,8 +17,6 @@ def perform_dilation(eptm,
     eptm.rhos.a *= sigma_dilation_along_z
     eptm.update_apical_geom()
     
-
-    
 def create_properties(eptm):
     # FIXME Should be implemented at init
     edge_zeds = eptm.graph.new_edge_property('float')

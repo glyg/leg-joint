@@ -68,7 +68,7 @@ class AbstractRTZGraph(object):
         
         '''
         self.graph.set_directed(True) #So each edge is a defined vector
-
+        self.current_angle = 0
         if self.new :
             self._init_edge_bool_props()
             self._init_vertex_geometry()            
@@ -169,6 +169,13 @@ class AbstractRTZGraph(object):
         self.rhos.a *= scaling_factor
         self.sigmas.a *= scaling_factor
         self.zeds.a *= scaling_factor
+        self.thetas.a = self.sigmas.a / self.rhos.a
+        
+    def rotate(self, angle):
+        self.thetas.a += angle
+        self.sigmas.a += angle * self.rhos.a
+        self.periodic_boundary_condition()
+
         
     def periodic_boundary_condition(self):
         '''
@@ -177,16 +184,15 @@ class AbstractRTZGraph(object):
         with their curent value for rho.
         '''
         tau = 2 * np.pi
-        sigmas = self.sigmas.fa
-        rhos = self.rhos.fa
+        sigmas = self.sigmas.a
+        rhos = self.rhos.a
         # Higher than the period points are shifted back
-        self.sigmas.fa[sigmas > tau * rhos] -= tau * rhos[sigmas > tau * rhos]
-                
+        self.sigmas.a[sigmas > tau * rhos] -= tau * rhos[sigmas > tau * rhos]
         # Lower than zeros points are shifted up
-        self.sigmas.fa[sigmas < 0] += tau * rhos[sigmas < 0]
-        if len(self.sigmas.fa[sigmas > tau * rhos]) > 0:
-            print self.sigmas.fa[sigmas > tau * rhos]
-        self.thetas.fa = self.sigmas.fa / rhos
+        self.sigmas.a[sigmas < 0] += tau * rhos[sigmas < 0]
+        if len(self.sigmas.a[sigmas > tau * rhos]) > 0:
+            print self.sigmas.a[sigmas > tau * rhos]
+        self.thetas.a = self.sigmas.a / rhos
         
     def any_edge(self, v0, v1):
         '''
@@ -239,6 +245,7 @@ class AbstractRTZGraph(object):
                                  s=0, k=3)
         rhos = splev(self.zeds.fa, rho_vs_zeds_tck)
         self.rhos.fa = rhos
+
         
     def update_deltas(self):
         for edge in self.graph.edges():
@@ -276,6 +283,8 @@ class AbstractRTZGraph(object):
                 elif dsigma < - tau * rho0 / 2.:
                     dsigma += tau * rho0
                     self.at_boundary[edge] = 1
+                else:
+                    self.at_boundary[edge] = 0
                 dtheta = dsigma / self.rhos[v0]
             self.dthetas[edge] = dtheta
             self.dsigmas[edge] = dsigma

@@ -70,12 +70,15 @@ def plot_cells_sz(epithelium, ax=None, text=True,
 
 def plot_edges_sz(epithelium, efilt=None,
                   text=False, ax=None, **kwargs):
+    edge_width = epithelium.junctions.line_tensions.copy()
     sigmas = []
     zeds = []
     if ax is None:
         fig, ax = plt.subplots(1,1)
     epithelium.graph.set_edge_filter(efilt)
     epithelium.graph.set_vertex_filter(None)
+    edge_width.fa = 2. * (epithelium.junctions.line_tensions.fa
+                          / epithelium.junctions.line_tensions.fa.mean())**0.5
     for edge in epithelium.junctions:
         if edge is None:
             print "invalid edge %s" %str(edge)
@@ -86,7 +89,8 @@ def plot_edges_sz(epithelium, efilt=None,
                 epithelium.zeds[edge.target()])
         ax.plot(zeds,
                 sigmas,
-                'g-', lw=2, alpha=0.4, **kwargs)
+                'g-', lw=edge_width[edge],
+                alpha=0.4, **kwargs)
         if text:
             ax.text(epithelium.zeds[edge.source()],
                     epithelium.sigmas[edge.source()],
@@ -187,7 +191,8 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
     edge_red.fa = 105/256.
     edge_green.fa = 201/256.
     edge_blue.fa = 40/256.
-    edge_width.fa = 1.
+    edge_width.fa = 1. * (eptm.junctions.line_tensions.fa /
+                          eptm.junctions.line_tensions.fa.mean())**0.5
     eptm.graph.set_edge_filter(None)
 
     cell_filt = eptm.is_cell_vert.copy()
