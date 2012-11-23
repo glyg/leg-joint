@@ -2,12 +2,27 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 from scipy.interpolate import splrep, splev
+import matplotlib.pyplot as plt
+import graph_tool.all as gt     # 
 
 
 import filters
 
 from graph_representation import epithelium_draw
 
+def closest_vert(eptm, sigma, zed, vfilt):
+
+    eptm.graph.set_vertex_filter(vfilt)
+    dist = np.hypot(eptm.sigmas.fa - sigma,
+                    eptm.zeds.fa - zed)
+    idx = np.argmin(dist)
+    sigma, zed = eptm.sigmas.fa[idx], eptm.zeds.fa[idx]
+    s_matches = gt.find_vertex(eptm.graph,
+                               eptm.sigmas, sigma)
+    z_matches = gt.find_vertex(eptm.graph,
+                               eptm.zeds, zed)
+    return [v for v in s_matches if v in z_matches][0]
+    
 def perform_dilation(eptm,
                      sigma_dilation_along_z,
                      zed_dilation_along_s):
@@ -65,8 +80,8 @@ def compute_aniso_dilation(eptm, bins, length_eq):
     eptm.graph.set_vertex_filter(None)
     eptm.graph.set_edge_filter(None)
     return sigma_dilation_along_z, zed_dilation_along_s
-    
 
+    
 def compute_distribution(prop_u, prop_v, bins, smth=0):
     
     hist_uv, bins_u, bins_v = np.histogram2d(prop_u,

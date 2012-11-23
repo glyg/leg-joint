@@ -176,6 +176,17 @@ class AbstractRTZGraph(object):
         self.sigmas.a += angle * self.rhos.a
         self.periodic_boundary_condition()
 
+    def closest_vert(self, sigma, zed):
+        dist = np.hypot(self.sigmas.fa - sigma,
+                        self.zeds.fa - zed)
+        idx = np.argmin(dist)
+        sigma, zed = self.sigmas.fa[idx], self.zeds.fa[idx]
+        s_matches = gt.find_vertex(self.graph,
+                                   self.sigmas, sigma)
+        z_matches = gt.find_vertex(self.graph,
+                                   self.zeds, zed)
+        if self.__verbose__: print len(s_matches), len(z_matches)
+        return [v for v in s_matches if v in z_matches][0]
         
     def periodic_boundary_condition(self):
         '''
@@ -229,25 +240,8 @@ class AbstractRTZGraph(object):
         sigmazs = [sigmas, zeds]
         return gt.group_vector_property(sigmazs, value_type='float')
     
-    def relax_rhos(self):
-        sigmas = self.sigmas.fa.copy()
-        zeds = self.zeds.fa.copy()
-        sorted_sigmas = sigmas[np.argsort(zeds)]
-        z_bin_width = self.params['z_bin_width']
-        n_zbins = np.floor(sorted_sigmas.size / z_bin_width)
-        zeds.sort()
-        sorted_sigmas = sorted_sigmas[:z_bin_width * n_zbins
-                                      ].reshape((z_bin_width, n_zbins))
-        ctrl_rhos = (sorted_sigmas.max(axis=0)
-                     - sorted_sigmas.min(axis=0)) / 2 * np.pi
-        rho_vs_zeds_tck = splrep(ctrl_rhos,
-                                 zeds[z_bin_width / 2 :: z_bin_width],
-                                 s=0, k=3)
-        rhos = splev(self.zeds.fa, rho_vs_zeds_tck)
-        self.rhos.fa = rhos
-
-        
     def update_deltas(self):
+        # http://projects.skewed.de/graph-tool/doc/spectral.html
         for edge in self.graph.edges():
             v0, v1 = edge.source(), edge.target()
             dzed = self.zeds[v1] - self.zeds[v0]
@@ -273,7 +267,7 @@ class AbstractRTZGraph(object):
                         print str(v0), str(v1)
                     self.at_boundary[edge] = 0
                     dtheta = dsigma / self.rhos[v0]
-                    self.is_new_edge[edge] = 0
+                self.is_new_edge[edge] = 0
             else:
                 rho0 = self.rhos[v0]
                 dsigma = self.sigmas[v1] - self.sigmas[v0]

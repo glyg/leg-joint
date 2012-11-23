@@ -6,10 +6,14 @@ import os
 import graph_tool.all as gt
 import numpy as np
 from scipy import optimize, weave
+from scipy.interpolate import splrep, splev
+
 
 from objects import  AbstractRTZGraph, Cells, AppicalJunctions
 from xml_handler import ParamTree
+from utils import compute_distribution
 import filters
+
 EpitheliumFilters = filters.EpitheliumFilters
 
 CURRENT_DIR = os.path.dirname(__file__)
@@ -401,6 +405,21 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
         self.sigmas.fa = new_sz_pos[::2]
         self.zeds.fa = new_sz_pos[1::2]
 
+    @filters.cells_in
+    def anisotropic_relax(self):
+        eq_area = self.cells.areas.fa.mean()
+        nz = self.params['n_zeds']
+        ns = self.params['n_sigmas']
+        
+        tck_area_vs_zed, H = compute_distribution(self.zeds.fa,
+                                                  self.cells.areas.fa,
+                                                  bins=(ns, nz), smth=3)
+        z_dilation = np.sqrt(splev(self.zeds.a, tck_area_vs_zed) / eq_area)
+        self.rhos.a /= z_dilation
+        self.zeds.a /= z_dilation
+        self.sigmas.a = self.thetas.a * self.rhos.a
+
+        
     def isotropic_relax(self):
         gamma = self.paramtree.relative_dic['contractility']
         lbda = self.paramtree.relative_dic['line_tension']

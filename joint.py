@@ -6,7 +6,7 @@ import numpy as np
 # Import mpltlib before graph-tool to
 # avoid Gtk seg fault (don't ask why)
 import matplotlib.pyplot as plt
-import graph_tool.all as gt
+import graph_tool.all as gt     # 
 import time
 from datetime import datetime
 
@@ -50,9 +50,22 @@ def new_generation(eptm):
         time_left = (elapsed / num) * (len(cells) - num)
         print str(num)+'/'+str(len(cells))
         print 'time left: %3f' % time_left
+    # eptm.anisotropic_relax()
+    eptm.update_apical_geom()
     eptm.graph.save("saved_graphs/xml/generation%s.xml" % now.isoformat())
     
 
 if __name__ == '__main__':
+
     eptm = lj.Epithelium(paramfile='default/few_big_cells.xml')
+    new_generation(eptm)
+
+    z_min = eptm.zeds.fa.min()
+    z_max = eptm.zeds.fa.max()
+    zed0 = (z_max - z_min) / 3.
+    zed1 = 2. * (z_max - z_min) / 3.
+    lj.create_frontier(eptm, zed0, tension_increase=4.)
+    lj.create_frontier(eptm, zed1, tension_increase=4.)
+    #eptm.anisotropic_relax()
+    
     new_generation(eptm)
