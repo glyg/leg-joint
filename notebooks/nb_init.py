@@ -6,7 +6,7 @@ import IPython.core.display as disp
 
 import sys, os
 curdir = os.path.abspath(os.path.curdir)
-print os.path.dirname(curdir)
+#print os.path.dirname(curdir)
 sys.path.append(os.path.dirname(curdir))
 
 import leg_joint as lj
@@ -17,22 +17,22 @@ def before_after(func):
         import matplotlib.pyplot as plt
         import leg_joint as lj
         fig, axes = plt.subplots(1,2, figsize=(12,4))
-        lj.draw.plot_cells_sz(eptm, axes[0], c_text=False, 
+        lj.plot_cells_sz(eptm, axes[0], c_text=False, 
                               vfilt=eptm.is_local_vert,
                               efilt=eptm.is_local_edge)
-        lj.draw.plot_gradients(eptm, axes[0])
+        lj.plot_gradients(eptm, axes[0])
         foutput = func(eptm, *args, **kwargs)
-        lj.draw.plot_cells_sz(eptm, axes[1], c_text=False,
+        lj.plot_cells_sz(eptm, axes[1], c_text=False,
                               vfilt=eptm.is_local_vert,
                               efilt=eptm.is_local_edge)
-        lj.draw.plot_gradients(eptm, axes[1])
+        lj.plot_gradients(eptm, axes[1])
         return foutput
     return new_func
 
 @before_after
-def local_optimum(eptm, tol):
+def local_optimum(eptm, **kwargs):
     # eptm.update_gradient()
-    pos0, pos1 = eptm.find_energy_min(tol=tol)
+    pos0, pos1 = eptm.find_energy_min(**kwargs)
     return pos0, pos1
 
 

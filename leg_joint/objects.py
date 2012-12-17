@@ -139,6 +139,12 @@ class AbstractRTZGraph(object):
         self.graph.edge_properties["u_dzeds"] = u_dzeds
         u_drhos = self.graph.new_edge_property('float')
         self.graph.edge_properties["u_drhos"] = u_drhos
+
+        # edge properties from vertex properties
+        self.edge_src_rhos = self.graph.new_edge_property('float')
+        self.edge_trgt_rhos = self.graph.new_edge_property('float')
+
+
         
     @property
     def dthetas(self):
@@ -198,11 +204,11 @@ class AbstractRTZGraph(object):
         sigmas = self.sigmas.fa
         rhos = self.rhos.fa
         # Higher than the period points are shifted back
-        self.sigmas.fa[sigmas > tau * rhos] -= tau * rhos[sigmas > tau * rhos]
+        higher = [self.sigmas.fa  > tau * rhos]
+        self.sigmas.fa[higher] -= tau * rhos[higher]
         # Lower than zeros points are shifted up
-        self.sigmas.fa[sigmas < 0] += tau * rhos[sigmas < 0]
-        if len(self.sigmas.fa[sigmas > tau * rhos]) > 0:
-            print self.sigmas.fa[sigmas > tau * rhos]
+        lower = [self.sigmas.fa  < 0]
+        self.sigmas.fa[lower] += tau * rhos[lower]
         self.thetas.fa = self.sigmas.fa / rhos
         
     def any_edge(self, v0, v1):
@@ -241,26 +247,28 @@ class AbstractRTZGraph(object):
         return gt.group_vector_property(sigmazs, value_type='float')
     
     def update_deltas(self):
-        # http://projects.skewed.de/graph-tool/doc/spectral.html
 
-        edge_rhos = np.array([self.rhos[e.source()]
-                              for e in self.graph.edges()])
-        
+        for e in self.graph.edges():
+            self.edge_src_rhos[e] = self.rhos[e.source()]
+            self.edge_trgt_rhos[e] = self.rhos[e.target()]
+            
         self.dzeds.fa = gt.edge_difference(self.graph, self.zeds).fa
         self.drhos.fa = gt.edge_difference(self.graph, self.rhos).fa
         self.dsigmas.fa = gt.edge_difference(self.graph, self.sigmas).fa
         self.dthetas.fa = gt.edge_difference(self.graph, self.thetas).fa
-
+        
         # Periodic boundary conditions
         self.at_boundary.fa = 0
-        self.dthetas.fa[self.dthetas.fa < 0.5 * tau] += tau
-        self.dsigmas.fa[self.dthetas.fa < 0.5 * tau] += tau * edge_rhos
-        self.at_boundary.fa[self.dthetas.fa < 0.5 * tau] = 1
 
-        self.dthetas.fa[self.dthetas.fa > 0.5 * tau] -= tau
-        self.dsigmas.fa[self.dthetas.fa > 0.5 * tau] -= tau * edge_rhos
-        self.at_boundary.fa[self.dthetas.fa > 0.5 * tau] = 1
-        
+        lower_than = [self.dsigmas.fa < - np.pi * self.edge_src_rhos.fa]
+        self.dthetas.fa[lower_than] += tau
+        self.dsigmas.fa[lower_than] += tau * self.edge_src_rhos.fa[lower_than]
+        self.at_boundary.fa[lower_than] = 1
+
+        higher_than = [self.dsigmas.fa > np.pi * self.edge_trgt_rhos.fa]
+        self.dthetas.fa[higher_than] -= tau
+        self.dsigmas.fa[higher_than] -= tau * self.edge_trgt_rhos.fa[higher_than]
+        self.at_boundary.fa[higher_than] = 1
         
     def update_edge_lengths(self):
         edge_lengths = np.sqrt(self.dzeds.fa**2
