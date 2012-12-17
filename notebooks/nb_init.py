@@ -6,8 +6,8 @@ import IPython.core.display as disp
 
 import sys, os
 curdir = os.path.abspath(os.path.curdir)
-print os.path.sep.join(curdir.split(os.path.sep)[:-2])
-sys.path.append(os.path.sep.join(curdir.split(os.path.sep)[:-2]))
+print os.path.dirname(curdir)
+sys.path.append(os.path.dirname(curdir))
 
 import leg_joint as lj
 

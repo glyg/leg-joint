@@ -170,10 +170,10 @@ class AbstractRTZGraph(object):
         self.sigmas.a *= scaling_factor
         self.zeds.a *= scaling_factor
         self.thetas.a = self.sigmas.a / self.rhos.a
-        
+    
     def rotate(self, angle):
-        self.thetas.a += angle
-        self.sigmas.a += angle * self.rhos.a
+        self.thetas.fa += angle
+        self.sigmas.fa += angle * self.rhos.fa
         self.periodic_boundary_condition()
 
     def closest_vert(self, sigma, zed):
@@ -195,15 +195,15 @@ class AbstractRTZGraph(object):
         with their curent value for rho.
         '''
         tau = 2 * np.pi
-        sigmas = self.sigmas.a
-        rhos = self.rhos.a
+        sigmas = self.sigmas.fa
+        rhos = self.rhos.fa
         # Higher than the period points are shifted back
-        self.sigmas.a[sigmas > tau * rhos] -= tau * rhos[sigmas > tau * rhos]
+        self.sigmas.fa[sigmas > tau * rhos] -= tau * rhos[sigmas > tau * rhos]
         # Lower than zeros points are shifted up
-        self.sigmas.a[sigmas < 0] += tau * rhos[sigmas < 0]
-        if len(self.sigmas.a[sigmas > tau * rhos]) > 0:
-            print self.sigmas.a[sigmas > tau * rhos]
-        self.thetas.a = self.sigmas.a / rhos
+        self.sigmas.fa[sigmas < 0] += tau * rhos[sigmas < 0]
+        if len(self.sigmas.fa[sigmas > tau * rhos]) > 0:
+            print self.sigmas.fa[sigmas > tau * rhos]
+        self.thetas.fa = self.sigmas.fa / rhos
         
     def any_edge(self, v0, v1):
         '''
@@ -242,46 +242,25 @@ class AbstractRTZGraph(object):
     
     def update_deltas(self):
         # http://projects.skewed.de/graph-tool/doc/spectral.html
-        for edge in self.graph.edges():
-            v0, v1 = edge.source(), edge.target()
-            dzed = self.zeds[v1] - self.zeds[v0]
-            self.dzeds[edge] = dzed
-            drho = self.rhos[v1] - self.rhos[v0]
-            self.drhos[edge] = drho
 
-            if self.is_new_edge[edge]:
-                dtheta = self.thetas[v1] - self.thetas[v0]
-                # dtheta lies between -tau and tau
-                if dtheta > 0.5 * tau :
-                    dtheta -= tau
-                    dsigma = self.rhos[v0] * dtheta
-                    self.at_boundary[edge] = 1
-                elif dtheta < - 0.5 * tau :
-                    dtheta += tau
-                    dsigma = self.rhos[v0] * dtheta
-                    self.at_boundary[edge] = 1
-                else :
-                    dsigma = self.sigmas[v1] - self.sigmas[v0]
-                    if abs(dsigma) > tau * self.rhos.a.max() :
-                        print dtheta
-                        print str(v0), str(v1)
-                    self.at_boundary[edge] = 0
-                    dtheta = dsigma / self.rhos[v0]
-                self.is_new_edge[edge] = 0
-            else:
-                rho0 = self.rhos[v0]
-                dsigma = self.sigmas[v1] - self.sigmas[v0]
-                if dsigma >= tau * rho0 / 2.:
-                    dsigma -= tau * rho0
-                    self.at_boundary[edge] = 1
-                elif dsigma < - tau * rho0 / 2.:
-                    dsigma += tau * rho0
-                    self.at_boundary[edge] = 1
-                else:
-                    self.at_boundary[edge] = 0
-                dtheta = dsigma / self.rhos[v0]
-            self.dthetas[edge] = dtheta
-            self.dsigmas[edge] = dsigma
+        edge_rhos = np.array([self.rhos[e.source()]
+                              for e in self.graph.edges()])
+        
+        self.dzeds.fa = gt.edge_difference(self.graph, self.zeds).fa
+        self.drhos.fa = gt.edge_difference(self.graph, self.rhos).fa
+        self.dsigmas.fa = gt.edge_difference(self.graph, self.sigmas).fa
+        self.dthetas.fa = gt.edge_difference(self.graph, self.thetas).fa
+
+        # Periodic boundary conditions
+        self.at_boundary.fa = 0
+        self.dthetas.fa[self.dthetas.fa < 0.5 * tau] += tau
+        self.dsigmas.fa[self.dthetas.fa < 0.5 * tau] += tau * edge_rhos
+        self.at_boundary.fa[self.dthetas.fa < 0.5 * tau] = 1
+
+        self.dthetas.fa[self.dthetas.fa > 0.5 * tau] -= tau
+        self.dsigmas.fa[self.dthetas.fa > 0.5 * tau] -= tau * edge_rhos
+        self.at_boundary.fa[self.dthetas.fa > 0.5 * tau] = 1
+        
         
     def update_edge_lengths(self):
         edge_lengths = np.sqrt(self.dzeds.fa**2
@@ -406,9 +385,7 @@ class Cells():
             self.epithelium.zeds.a = zeds
             self.epithelium.sigmas.a = sigmas
             self.epithelium.thetas.a = sigmas/rhos
-
             self.epithelium.is_cell_vert.a[:] = 1
-
             self._init_cell_gometry()
             self._init_cell_params()
             self.epithelium.update_deltas()
@@ -434,8 +411,8 @@ class Cells():
 
         perimeters =self.epithelium.graph.new_vertex_property('float')
         perimeters.a[:] = 6 * self.params['lambda_0']
-        self.epithelium.graph.vertex_properties["perimeters"
-                                     ] = perimeters
+        self.epithelium.graph.vertex_properties["perimeters"]\
+            = perimeters
 
     @property
     def areas(self):
@@ -452,20 +429,20 @@ class Cells():
         prefered_area0 =  self.params['prefered_area']
         prefered_area = self.epithelium.graph.new_vertex_property('float')
         prefered_area.a[:] = prefered_area0
-        self.epithelium.graph.vertex_properties["prefered_area"
-                                     ] = prefered_area
+        self.epithelium.graph.vertex_properties["prefered_area"]\
+            = prefered_area
 
         contractility0 = self.params['contractility']        
         contractilities =self.epithelium.graph.new_vertex_property('float')
         contractilities.a[:] = contractility0
-        self.epithelium.graph.vertex_properties["contractilities"
-                                     ] = contractilities
+        self.epithelium.graph.vertex_properties["contractilities"]\
+            = contractilities
 
         elasticity0 = self.params['elasticity']        
         elasticities =self.epithelium.graph.new_vertex_property('float')
         elasticities.a[:] = elasticity0
-        self.epithelium.graph.vertex_properties["elasticities"
-                                     ] = elasticities
+        self.epithelium.graph.vertex_properties["elasticities"]\
+            = elasticities
             
     @property
     def contractilities(self):

@@ -384,7 +384,7 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
         self.cells.areas[cell] = area
         self.cells.perimeters[cell] = perimeter
 
-        ##  Update cell posistion 
+        ##  Update cell position 
         j_sz = np.array([[self.sigmas[jv], self.zeds[jv]]
                          for jv in cell.out_neighbours()])
         ### set z
