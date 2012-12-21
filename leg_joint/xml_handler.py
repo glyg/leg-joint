@@ -153,30 +153,3 @@ class ParamTree(object):
         elif verbose:
             print "Warning: parameter %s changed but not written!" %key
 
-
-
-        
-class ResultTree(ParamTree):    
-
-    def __init__(self, xmlfname = "resuts.xml"):
-
-        xmlfname = os.path.abspath(xmlfname)
-        ParamTree.__init__(self, xmlfname, adimentionalized = False)
-        datafname = self.root.get("datafile")
-        if not os.path.isabs(datafname):
-            if '/' not in datafname:
-                self.datafname = os.path.join(os.path.dirname(xmlfname), 
-                                              datafname)
-            else:
-                self.datafname = os.path.join(os.path.dirname(xmlfname), 
-                                              datafname.split('/')[-1])
-        else:
-            self.datafname = datafname
-        if self.datafname is None or not os.path.isfile(self.datafname):
-            raise ValueError, "Corresponding data file not specified"
-        if self.datafname.endswith('.npy'):
-            self.data = np.load(self.datafname)
-        else:
-            self.data = np.loadtxt(self.datafname, delimiter=' ',
-                                comments = '#')        
-    

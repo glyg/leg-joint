@@ -12,25 +12,28 @@ import filters
 
 FLOAT = np.dtype('float32')
 
-@filters.active
-def plot_gradients(epithelium, ax=None, scale=1.):
-    epithelium.update_gradient()
-    grad = epithelium.gradient_array()
-    sigmas = epithelium.sigmas.fa
-    zeds = epithelium.zeds.fa
+@filters.local
+def plot_gradients(eptm, ax=None, scale=1., **kwargs):
+    grad = eptm.gradient_array()
+    eptm.graph.set_vertex_filter(eptm.is_active_vert)
+    sigmas = eptm.sigmas.fa
+    zeds = eptm.zeds.fa
+    eptm.graph.set_vertex_filter(eptm.is_local_vert)
     grad_sigmas = grad[::2] * scale
     grad_zeds = grad[1::2] * scale
-    v_sigmas = np.array([sigmas, grad_sigmas]).T
-    v_zeds = np.array([zeds, grad_zeds]).T
+    # We plot the forces, which is easier to understand
+    v_sigmas = np.array([sigmas, - grad_sigmas]).T
+    v_zeds = np.array([zeds, - grad_zeds]).T
     if ax is None:
-        ax =  plot_cells_sz(epithelium, ax=None,
-                            vfilt=epithelium.is_local_vert,
-                            efilt=epithelium.is_local_edge)
+        ax =  plot_cells_sz(eptm, ax=None,
+                            vfilt=eptm.is_local_vert,
+                            efilt=eptm.is_local_edge, **kwargs)
     for s, z in zip(v_sigmas, v_zeds):
         ax.arrow(z[0], s[0], z[1], s[1], width=0.1,
                  ec='red', fc='red', alpha=0.5)
     plt.draw()
     return ax
+    
 
 @filters.active
 def plot_active(epithelium, ax=None):
@@ -40,7 +43,7 @@ def plot_active(epithelium, ax=None):
         ax =  plot_cells_sz(epithelium, ax=None,
                             vfilt=epithelium.is_local_vert,
                             efilt=epithelium.is_local_edge)
-    ax.plot(zeds, sigmas,  'ro', alpha=0.5, ms=8)
+    ax.plot(zeds, sigmas, 'ro', alpha=0.5, ms=8)
     plt.draw()
     return ax
     
@@ -50,7 +53,10 @@ def plot_cells_sz(epithelium, ax=None, text=True,
     if ax is None:
         fig, ax = plt.subplots(1,1)
     epithelium.graph.set_vertex_filter(vfilt)
+    # We project the shape on the average cylinder
+    mean_rho = epithelium.rhos.fa.mean()
     sigmas = epithelium.sigmas.copy()
+    sigmas.fa = epithelium.thetas.fa * mean_rho
     zeds = epithelium.zeds.copy()
     for cell in epithelium.cells :
         if text and c_text:
@@ -349,5 +355,44 @@ def vertices_scatterplot(rtz, **kwargs):
     ax_3d.set_ylabel(u'Ventral - dorsal axis (µm)')
     ax_3d.set_zlabel(u'Proximal - distal axis (µm)')    
     plt.show()
-
     return fig, ax_3d 
+
+def plot_validation(eptm):
+    vfilt = eptm.is_cell_vert.copy()
+    vfilt.a *= eptm.is_alive.a
+    eptm.graph.set_vertex_filter(vfilt)
+    mean_area = eptm.cells.areas.fa.mean()
+    eptm.graph.set_vertex_filter(None)
+
+    eptm.graph.set_edge_filter(eptm.is_ctoj_edge)
+    eptm.graph.set_vertex_filter(eptm.is_alive)
+    degrees = eptm.graph.degree_property_map('out').fa
+    valid_degrees = degrees[degrees > 0]
+    normed_areas = eptm.cells.areas.fa[degrees > 0]/mean_area
+    unq_degrees = np.unique(valid_degrees)
+    avg_area = np.zeros_like(unq_degrees)
+    std_area = np.zeros_like(unq_degrees)
+    for n, k in enumerate(unq_degrees):
+        avg_area[n] = normed_areas[valid_degrees==k].mean()
+        std_area[n] = normed_areas[valid_degrees==k].std()
+
+    exp_degrees = np.array([[3, 4, 5, 6, 7, 8],
+                            [1, 7, 35, 38.5, 14.5, 2]])
+
+    exp_areas = np.array([[4, 5, 6, 7, 8],
+                          [0.55, 0.8, 1.08, 1.35, 1.5]])
+
+    fig, axes = plt.subplots(2, 1, sharex=True, figsize=(6,6))
+
+    axes[0].plot(valid_degrees, normed_areas, 'o', alpha=0.1)
+    axes[0].plot(exp_areas[0,:], exp_areas[1,:], 'gs-')
+    axes[0].errorbar(unq_degrees, avg_area, yerr=std_area, fmt='k-o')
+    ylblb = axes[0].set_ylabel('Normalized cell area')
+
+    h = axes[1].hist(valid_degrees, bins=8, range=(2.5,10.5), normed=True, fc='w')
+    axes[1].plot(exp_degrees[0, :], exp_degrees[1, :]/100., 'gs')
+    xlblb = axes[1].set_xlabel('Number of sides')
+    ylblb = axes[1].set_ylabel('Number of cells')
+
+    eptm.graph.set_vertex_filter(None)
+    eptm.graph.set_edge_filter(None)

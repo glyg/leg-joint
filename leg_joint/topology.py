@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import os
 import numpy as np
-import filters
+#import filters
 from graph_representation import epithelium_draw
 
 from datetime import datetime
@@ -180,8 +180,12 @@ def cell_division(eptm, mother_cell,
     tau = 2 * np.pi
     if phi_division is None:
         phi_division = np.random.random() * tau
+
+    a0 = eptm.params['prefered_area']
+    eptm.cells.prefered_area[mother_cell] = a0
     daughter_cell = eptm.new_vertex(mother_cell)
     print "Cell %s is born" % str(daughter_cell)
+    
     eptm.is_cell_vert[daughter_cell] = 1
     junction_trash = []
     new_junctions = []
@@ -201,20 +205,23 @@ def cell_division(eptm, mother_cell,
         phi_src = np.arctan2(sigma_src, zed_src) + tau/2
         phi_src = (phi_src - phi_division) % tau
         
+        ## edge is on the mother side
         if phi_src > tau/2 and phi_trgt > tau/2:
             continue
         
+        ## edge is on the daughter side
         elif phi_src <= tau/2 and phi_trgt <= tau/2:
-        
+
             cell0, cell1 = eptm.adjacent_cells(j_edge)
             junction_trash.append((j_src, j_trgt, cell0, cell1))
 
             adj_cell = cell1 if cell0 == mother_cell else cell0
             new_junctions.append((j_src, j_trgt, adj_cell, daughter_cell))
-
+        
+        ## edge is cut by the division    
         elif ((phi_src > tau/2 and phi_trgt <= tau/2)
               or ( phi_src <= tau/2 and phi_trgt > tau/2 )) :
-
+            
             cell0, cell1 = eptm.adjacent_cells(j_edge)
             adj_cell = cell1 if cell0 == mother_cell else cell0
             new_jv = eptm.new_vertex(j_src)
@@ -260,10 +267,9 @@ def cell_division(eptm, mother_cell,
     j = eptm.add_junction(new_jvs[0], new_jvs[1],
                           mother_cell, daughter_cell)
     eptm.set_local_mask(daughter_cell)
-    # Updates
-    eptm.update_apical_geom()
-    eptm.update_gradient()
     eptm.set_vertex_state()
+    eptm.set_edge_state()
+    if eptm.__verbose__: print 'Division completed'
     return j
 
 @snapshot
@@ -304,6 +310,7 @@ def type3_transition(eptm, cell, reduce_edgenum=True, verbose=False):
                        % (cell, new_jv))
     edge_trash = []
     cell_neighbs = []
+
     for old_jv in old_jvs:
         for edge in old_jv.out_edges():
             if edge in j_edges: continue
@@ -334,3 +341,65 @@ def type3_transition(eptm, cell, reduce_edgenum=True, verbose=False):
         eptm.set_local_mask(n_cell)
     eptm.is_alive[cell] = 0
     return new_jv
+
+
+def resolve_small_edges(eptm, threshold=5e-2, vfilt=None, efilt=None):
+    # Collapse 3 sided cells
+    if vfilt == None:
+        vfilt_3sides = eptm.is_cell_vert.copy()
+    else:
+        vfilt_3sides = vfilt.copy()
+    eptm.graph.set_edge_filter(eptm.is_ctoj_edge,
+                               inverted=True)
+    degree_pm =  eptm.graph.degree_property_map('out').a
+    vfilt_3sides.a *= [degree_pm == 3][0] * eptm.is_alive.a
+    eptm.graph.set_vertex_filter(vfilt_3sides)
+    cells = [cell for cell in eptm.graph.vertices()]
+    if eptm.__verbose__:
+        print(''' There are %i three sided cells
+              ''' % len(cells))
+
+    eptm.graph.set_vertex_filter(None)
+    eptm.graph.set_edge_filter(None)
+    new_jvs = [eptm.type3_transition(cell, threshold)
+               for cell in cells]
+    eptm.update_apical_geom()
+    # Type 1 transitions
+    if efilt == None:
+        efilt_je = eptm.is_junction_edge.copy()
+    else:
+        efilt_je = efilt.copy()
+        efilt_je.a *= eptm.is_junction_edge.a
+    efilt_je.a *= [eptm.edge_lengths.a < threshold][0]
+    eptm.graph.set_edge_filter(efilt_je)
+    visited_cells = []
+    if eptm.__verbose__:
+        print('%i  type 1 transitions are going to take place'
+              % efilt_je.a.sum())
+    short_edges = [e for e in eptm.graph.edges()]
+    eptm.graph.set_edge_filter(None)
+    eptm.graph.set_edge_filter(None)
+    for edge in short_edges:
+        eptm.set_local_mask(None)
+        cells = eptm.adjacent_cells(edge)
+        if len(cells) != 2:
+            continue
+        else:
+            cell0, cell1 = cells
+        if cell0 in visited_cells or cell1 in visited_cells:
+            continue
+        visited_cells.extend([cell0, cell1])
+        if (len(eptm.cell_junctions(cell0)) < 4) or (
+            len(eptm.cell_junctions(cell1)) < 4):
+            continue
+        print 'Type 1 transition'
+        energy0 = eptm.calc_energy()
+        backup_graph = eptm.graph.copy()
+        modified_cells, modified_jverts = type1_transition(eptm,
+                                                           (cell0, cell1))
+        pos0, pos1 = eptm.find_energy_min()
+        energy1 = eptm.calc_energy()
+        if energy0 < energy1:
+            print 'Undo transition!'
+            eptm.graph = backup_graph
+    eptm.graph.set_edge_filter(None)

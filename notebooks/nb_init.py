@@ -10,7 +10,8 @@ curdir = os.path.abspath(os.path.curdir)
 sys.path.append(os.path.dirname(curdir))
 
 import leg_joint as lj
-
+import matplotlib.pyplot as plt
+    
 
 def before_after(func):
     def new_func(eptm, *args, **kwargs):

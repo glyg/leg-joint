@@ -1,10 +1,18 @@
 <?xml version="1.0"?>
 <parameters>
-  <param max="10." min="0.1" name="lambda_0" step="0.1" value="4.">
+  <param max="30" min="0" name="n_sigmas" step="1" value="7">
+    <unit>um</unit>
+    <description>Initial number of cell along sigma </description>
+  </param>
+  <param max="30" min="0" name="n_zeds" step="1" value="5">
+    <unit>um</unit>
+    <description>Initial number of cell along zed</description>
+  </param>
+  <param max="10." min="0.1" name="lambda_0" step="0.1" value="4.3">
     <unit>um</unit>
     <description>Average cell to cell distance</description>
   </param>
-  <param max="100." min="0.1" name="rho_0" step="0.1" value="12.">
+  <param max="100." min="0.1" name="rho_0" step="0.1" value="13.">
     <unit>um</unit>
     <description>epithelium radius</description>
   </param>
@@ -12,7 +20,7 @@
     <unit>um</unit>
     <description>vertex position noise</description>
   </param>
-  <param max="10." min="0.001" name="pos_cutoff" step="0.001" value="0.001">
+  <param max="10." min="0.001" name="pos_cutoff" step="0.0001" value="1e-35">
     <unit>um</unit>
     <description>Distance cut-off </description>
   </param>
@@ -28,16 +36,20 @@
     <unit>um2</unit>
     <description>Prefered area</description>
   </param>
-  <param max="10." min="0.1" name="contractility" step="0.01" value="0.">
-    <unit>pN/um</unit>
+  <param max="10." min="0.001" name="contractility" step="0.01" value="0.04">
+    <unit>adim</unit>
     <description>Cell contractility</description>
   </param>
-  <param max="10." min="-10." name="line_tension" step="0.01" value="0.">
-    <unit>pN</unit>
+  <param max="10." min="-10." name="line_tension" step="0.01" value="0.12">
+    <unit>adim</unit>
     <description>Line tension</description>
   </param>
   <param max="100" min="2" name="z_bin_width" step="1" value="4">
     <unit></unit>
-    <description>Line tension</description>
+    <description>Z bin width</description>
+  </param>
+  <param max="100" min="2." name="z_length" step="1." value="2.5">
+    <unit></unit>
+    <description>Z length in units of rho0</description>
   </param>
 </parameters>

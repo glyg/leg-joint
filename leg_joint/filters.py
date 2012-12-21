@@ -11,7 +11,7 @@ def local(meth):
         self.set_vertex_state([(self.is_local_vert, False),])
         self.set_edge_state([(self.is_local_edge, False)])
         out = meth(self, *args, **kwargs)
-        if self.__verbose__ : print 'retore from local filter'
+        if self.__verbose__ : print 'restore from local filter'
         self.graph.set_vertex_filter(prev_vstate, prev_inverted_v)
         self.graph.set_edge_filter(prev_estate, prev_inverted_e)
         return out
@@ -25,7 +25,7 @@ def active(meth):
         self.set_vertex_state([(self.is_active_vert, False),])
         self.set_edge_state([(self.is_active_edge, False)])
         out = meth(self, *args, **kwargs)
-        if self.__verbose__ : print 'retore from active filter'
+        if self.__verbose__ : print 'restore from active filter'
         self.graph.set_vertex_filter(prev_vstate, prev_inverted_v)
         self.graph.set_edge_filter(prev_estate, prev_inverted_e)
         return out
@@ -113,27 +113,34 @@ class EpitheliumFilters(object):
 
     def _init_edge_filters(self):
         is_junction_edge = self.graph.new_edge_property('bool')
+        is_junction_edge.a[:] = 0
         self.graph.edge_properties["is_junction_edge"
                                    ] = is_junction_edge
+
         is_ctoj_edge = self.graph.new_edge_property('bool')
+        is_ctoj_edge.a[:] = 0
         self.graph.edge_properties["is_ctoj_edge"] = is_ctoj_edge
         is_local_edge = self.graph.new_edge_property('bool')
         is_local_edge.a[:] = 0
         self.graph.edge_properties["is_local_edge"] = is_local_edge
         is_active_edge = self.graph.new_edge_property('bool')
+        is_active_edge.a[:] = 0
         self.graph.edge_properties["is_active_edge"] = is_active_edge
 
     @property
     def is_local_edge(self):
         '''boolean edge property'''
         return self.graph.edge_properties["is_local_edge"]
+
     @property
     def is_active_edge(self):
         return self.graph.edge_properties["is_active_edge"]
+        
     @property
     def is_junction_edge(self):
         '''boolean edge property '''
         return self.graph.edge_properties["is_junction_edge"]
+        
     @property
     def is_ctoj_edge(self):
         '''boolean edge property '''
@@ -214,8 +221,12 @@ class EpitheliumFilters(object):
             tmp_vfilt = self.graph.new_vertex_property('bool')
             tmp_vfilt.a[:] = 1
         for prop, inverted in properties:
-            tmp_vfilt.a *= (1 - prop.a) if inverted else prop.a
-        if self.__verbose__: print '%i vertices filtered in' % tmp_vfilt.a.sum()        
+            if inverted:
+                tmp_vfilt.a *= (1 - prop.a)
+            else:
+                tmp_vfilt.a *= prop.a
+        if self.__verbose__:
+            print '%i vertices filtered in' % tmp_vfilt.a.sum()        
         self.graph.set_vertex_filter(tmp_vfilt)
 
     def set_edge_state(self,  properties=[]):
