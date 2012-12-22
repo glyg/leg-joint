@@ -46,6 +46,29 @@ def plot_active(epithelium, ax=None):
     ax.plot(zeds, sigmas, 'ro', alpha=0.5, ms=8)
     plt.draw()
     return ax
+
+def sz_scatter(eptm, pmap, ax, log=False, vfilt=(None, False), clip=0):
+    
+    eptm.graph.set_vertex_filter(vfilt[0], vfilt[1])   
+    n_data = pmap.fa - pmap.fa.min()
+    if clip > 0. :
+        h, bins = np.histogram(n_data, bins=100, normed=True)
+        cumhist = np.cumsum(h)
+        norm = 100. / cumhist[-1]
+        cumhist *= norm
+        bin_inf = bins[cumhist > clip][0]     
+        bin_sup = bins[cumhist < 100 - clip][-1]
+        n_data = n_data.clip(bin_inf, bin_sup)
+    n_data /= n_data.max()
+    if log: 
+        n_data = np.log(1 + n_data)
+        
+    proj_sigma = eptm.sigmas.copy()
+    mean_rho = eptm.rhos.fa.mean()
+    proj_sigma.fa = eptm.thetas.fa * mean_rho
+    ax.scatter(eptm.zeds.fa, eptm.sigmas.fa, c=n_data, cmap=plt.cm.jet, )
+    eptm.graph.set_vertex_filter(None)
+
     
 def plot_cells_sz(epithelium, ax=None, text=True,
                   vfilt=None, efilt=None,
@@ -75,7 +98,8 @@ def plot_cells_sz(epithelium, ax=None, text=True,
     return ax
 
 def plot_edges_sz(epithelium, efilt=None,
-                  text=False, ax=None, **kwargs):
+                  text=False, ax=None,
+                  ls='g-', **kwargs):
     edge_width = epithelium.junctions.line_tensions.copy()
     sigmas = []
     zeds = []

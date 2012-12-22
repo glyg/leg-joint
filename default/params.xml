@@ -12,9 +12,13 @@
     <unit>um</unit>
     <description>Average cell to cell distance</description>
   </param>
-  <param max="100." min="0.1" name="rho_0" step="0.1" value="13.">
+  <param max="100." min="0.1" name="rho0" step="0.1" value="13.">
     <unit>um</unit>
     <description>epithelium radius</description>
+  </param>
+  <param max="100." min="0.1" name="rho_lumen" step="0.1" value="4.">
+    <unit>um</unit>
+    <description>lumen radius</description>
   </param>
   <param max="10." min="0." name="pos_noise" step="0.01" value="0.01">
     <unit>um</unit>
@@ -32,7 +36,7 @@
     <unit>pN/um2</unit>
     <description>Area elasticity</description>
   </param>
-  <param max="10." min="0.1" name="prefered_area" step="0.01" value="12.">
+  <param max="50." min="0.1" name="prefered_area" step="0.01" value="12.">
     <unit>um2</unit>
     <description>Prefered area</description>
   </param>
@@ -44,12 +48,12 @@
     <unit>adim</unit>
     <description>Line tension</description>
   </param>
-  <param max="100" min="2" name="z_bin_width" step="1" value="4">
-    <unit></unit>
-    <description>Z bin width</description>
+  <param max="10." min="0." name="radial_tension" step="0.01" value="0.1">
+    <unit>adim</unit>
+    <description>Appical-basal tension</description>
   </param>
-  <param max="100" min="2." name="z_length" step="1." value="2.5">
-    <unit></unit>
-    <description>Z length in units of rho0</description>
+  <param max="1." min="0." name="vol_elasticity" step="0.001" value="0.01">
+    <unit>adim</unit>
+    <description>Volume elasticity</description>
   </param>
 </parameters>

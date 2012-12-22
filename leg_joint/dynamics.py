@@ -6,12 +6,13 @@ import os
 import graph_tool.all as gt
 import numpy as np
 from scipy import optimize, weave
-from scipy.interpolate import splrep, splev
+from scipy.interpolate import splev
 
 
 from objects import  AbstractRTZGraph, Cells, AppicalJunctions
 from xml_handler import ParamTree
 from utils import compute_distribution
+from energies import EpitheliumEnergies
 import filters
 
 EpitheliumFilters = filters.EpitheliumFilters
@@ -24,7 +25,9 @@ PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
 tau = 2. * np.pi
 
 
-class Epithelium(EpitheliumFilters, AbstractRTZGraph):
+class Epithelium(EpitheliumFilters,
+                 AbstractRTZGraph,
+                 EpitheliumEnergies):
     """
     The ::class::`Epithelium` is the container for all the simulation.
     
@@ -67,8 +70,8 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
             self.graph.purge_edges()
             self.set_vertex_state()
             self.set_edge_state()
-            self._init_grad_and_energy()
-            # self.compute_bending()
+        EpitheliumEnergies.__init__(self)    
+
         if self.__verbose__: print 'isotropic relaxation'
         self.isotropic_relax()
         if self.__verbose__: print 'Periodic boundary'
@@ -93,46 +96,6 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
             str1.append('    * %s' % key)
         return '\n'.join(str1)
         
-    def _init_grad_and_energy(self):
-        # Gradients amplitudes
-        elastic_grad = self.graph.new_vertex_property('float')
-        self.graph.vertex_properties["elastic_grad"] = elastic_grad
-        contractile_grad = self.graph.new_vertex_property('float')
-        self.graph.vertex_properties["contractile_grad"] = contractile_grad
-        grad_radial = self.graph.new_vertex_property('float')
-        self.graph.vertex_properties["grad_radial"] = grad_radial
-
-        # Gradients along sigma and zed
-        grad_sigma = self.graph.new_vertex_property('float')
-        self.graph.vertex_properties["grad_sigma"] = grad_sigma
-        grad_zed = self.graph.new_vertex_property('float')
-        self.graph.vertex_properties["grad_zed"] = grad_zed
-
-        # Energy per cell
-        energy_grad = self.graph.new_vertex_property('float')
-        self.graph.vertex_properties["energy_grad"] = energy_grad
-        
-    @property
-    def grad_sigma(self):
-        return self.graph.vertex_properties["grad_sigma"]
-    @property
-    def grad_zed(self):
-        return self.graph.vertex_properties["grad_zed"]
-    @property
-    def elastic_grad(self):
-        return self.graph.vertex_properties["elastic_grad"]
-    @property
-    def contractile_grad(self):
-        return self.graph.vertex_properties["contractile_grad"]
-    @property
-    def grad_radial(self):
-        return self.graph.vertex_properties["grad_radial"]
-    @property
-    def energy_grad(self):
-        return self.graph.vertex_properties["energy_grad"]
-
-    def compute_bending(self):
-        pass
         
     @filters.active
     def precondition(self):
@@ -204,7 +167,6 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
                 self.graph.set_vertex_filter(None)
                 output = 0
         elif method=='fmin_tnc':
-            #
             output = optimize.fmin_tnc(self.opt_energy,
                                        pos0.flatten(),
                                        fprime=self.opt_gradient,
@@ -212,12 +174,6 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
                                        bounds=bounds,
                                        maxCGit=0,
                                        disp=5)
-            # # except:
-            #     self.set_new_pos(pos0)
-            #     self.graph.set_vertex_filter(None)
-            #     output = 0
-
-
         elif method=='fmin_bfgs':
             output = optimize.fmin_bfgs(self.opt_energy,
                                         pos0.flatten(),
@@ -230,138 +186,6 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
             self.rotate(-self.current_angle)
             self.current_angle = 0.
         return pos0, output
-
-    @filters.local
-    def check_local_grad(self, pos0):
-        if self.__verbose__: print "Checking gradient"
-        chk_out = optimize.check_grad(self.opt_energy,
-                                      self.opt_gradient,
-                                      pos0.flatten())
-        return chk_out
-
-        
-    def opt_energy(self, sz_pos):
-        """
-        After setting the sigma, zed position to sz_pos,
-        computes the energy over the graph as filtered
-        by vfilt and efilt vertex and edge filters (respectively)
-        """
-        # Position setting
-        self.set_new_pos(sz_pos)
-        self.update_apical_geom()
-        energy = self.calc_energy()
-        return energy
-
-    def opt_gradient(self, sz_pos):
-        """
-        After setting the sigma, zed position to sz_pos,
-        computes the gradient over the graph as filtered
-        """
-        # # position setting
-        self.set_new_pos(sz_pos)
-        self.update_apical_geom()
-        self.update_gradient()
-        gradient = self.gradient_array()
-        return gradient
-
-    def opt_callback(self, sz_pos):
-        """ Call back for the optimization """
-        self.periodic_boundary_condition()
-        self.update_apical_geom()
-        self.update_gradient()
-
-    def calc_energy(self):
-        """ Computes the apical energy on the filtered epithelium """
-        cells_term, denominator = self.calc_cells_energy()
-        junction_term = self.calc_junctions_energy()
-        total_energy = cells_term + junction_term
-        return total_energy / denominator
-        
-    @filters.j_edges_in
-    def calc_junctions_energy(self):
-        junctions_energy = self.junctions.line_tensions.fa\
-                           * self.edge_lengths.fa
-        return junctions_energy.sum()
-        
-    @filters.cells_in
-    def calc_cells_energy(self):
-        elastic_term = 0.5 * self.cells.elasticities.fa * (
-            self.cells.areas.fa - self.cells.prefered_area.fa)**2
-        contractile_term = 0.5 * self.cells.contractilities.fa * \
-                           self.cells.perimeters.fa**2
-        num_cells = self.graph.num_vertices() #elastic_term.size
-        prefered_area0 =  self.params['prefered_area']
-        elasticity0 = self.params['elasticity']
-        denominator = num_cells * elasticity0 * prefered_area0**2
-        cells_energy = elastic_term + contractile_term
-        return cells_energy.sum(), denominator
-        
-    @filters.active
-    def gradient_array(self):
-        prefered_area0 =  self.params['prefered_area']
-        elasticity0 = self.params['elasticity']
-        norm_factor = prefered_area0 * elasticity0
-        gradient = np.zeros(self.graph.num_vertices() * 2)
-        if self.__verbose__ : print 'Gradient shape: %s' % gradient.shape
-        gradient[::2] = self.grad_sigma.fa / norm_factor
-        gradient[1::2] = self.grad_zed.fa / norm_factor
-        return gradient
-
-    def update_gradient(self):
-        self.update_cells_grad()
-        self.update_junctions_grad()
-
-    def update_junctions_grad(self):
-        # Junction edges
-        if self.__verbose__ :
-            num_cells = self.is_cell_vert.fa.sum()
-            num_jverts = self.graph.num_vertices() - num_cells
-            num_edges = self.is_junction_edge.fa.sum()
-            num_ctoj = self.is_ctoj_edge.fa.sum()
-            print (
-                '''Updating gradient for %i cells,
-                %i junctions vertices, %i junctions edges
-                and %i cell to junction edges'''
-                % (num_cells, num_jverts, num_edges, num_ctoj))
-        self.grad_sigma.fa = 0.
-        self.grad_zed.fa = 0.
-        self.grad_radial.fa = 0.
-        u_rhosigma = self.dsigmas.copy()
-        #u_rhosigma.fa = self.u_dsigmas.fa * np.sin(self.dthetas.fa / 2)
-        for edge in self.junctions:
-            tension = self.junctions.line_tensions[edge]
-            j_src, j_trgt = edge.source(), edge.target()
-            u_sg = self.u_dsigmas[edge]
-            u_zg = self.u_dzeds[edge]
-            # u_rs = u_rhosigma[edge]
-            for cell in self.adjacent_cells(edge):
-                perp_sigma, perp_zed =  self.outward_uvect(cell, edge)
-                el_grad = self.elastic_grad[cell]
-                ctr_grad = self.contractile_grad[cell]
-                self.grad_sigma[j_src] += el_grad * perp_sigma\
-                                          - ctr_grad * u_sg   
-                self.grad_sigma[j_trgt] += el_grad * perp_sigma\
-                                           + ctr_grad * u_sg
-                self.grad_zed[j_src] += el_grad * perp_zed\
-                                        - ctr_grad * u_zg
-                self.grad_zed[j_trgt] += el_grad * perp_zed\
-                                        + ctr_grad * u_zg
-                #self.grad_radial[j_src] += (el_grad  + ctr_grad ) * u_rs
-            self.grad_sigma[j_src] += - tension * u_sg
-            self.grad_zed[j_src] += - tension * u_zg
-            self.grad_sigma[j_trgt] += tension * u_sg
-            self.grad_zed[j_trgt] += tension * u_zg
-            # self.grad_radial[j_src] += tension[edge] * u_rhosigma[edge]
-            # self.grad_radial[j_trgt] += tension[edge] * u_rhosigma[edge]
-
-    @filters.cells_in
-    def update_cells_grad(self):
-        # Cell vertices
-        self.elastic_grad.fa =  self.cells.elasticities.fa \
-                                * (self.cells.areas.fa -
-                                   self.cells.prefered_area.fa )
-        self.contractile_grad.fa =  self.cells.contractilities.fa \
-                                    * self.cells.perimeters.fa
         
     def update_apical_geom(self):
         # Edges
@@ -372,10 +196,12 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
         # Cells
         if self.__verbose__: print ('Cells geometry update on %i vertices'
                                     % self.graph.num_vertices())
+        rho_lumen = self.params['rho_lumen']
         for cell in self.cells:
             j_edges = self.cell_junctions(cell)
             self._one_cell_geom(cell, j_edges)
-    
+        self.cells.vols.fa = self.cells.areas.fa * (self.rhos.fa - rho_lumen)
+            
     def _one_cell_geom(self, cell, j_edges):
         """
         The area is approximated as the sum
@@ -385,8 +211,9 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
         area = 0.
         perimeter = 0.
         if len(j_edges) < 3 and self.is_alive[cell]:
-            if self.__verbose__: print ('''Two edges ain't enough to compute '''
-                                 '''area for cell %s''' % cell)
+            if self.__verbose__:
+                print('''Two edges ain't enough to compute
+                      area for cell %s''' % cell)
             self.cells.areas[cell] = self.cells.prefered_area[cell]
             self.cells.perimeters[cell] = 0.
             self.is_alive[cell] = 0
@@ -416,9 +243,6 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
         pbc_sigma[raw_dsigma >= period/2] -= period
         self.sigmas[cell] = pbc_sigma.mean()
 
-        
-
-        
     @filters.active
     def set_new_pos(self, new_sz_pos):
         new_sz_pos = new_sz_pos.flatten()
@@ -426,61 +250,6 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
         self.sigmas.fa = new_sz_pos[::2]
         self.zeds.fa = new_sz_pos[1::2]
 
-    @filters.cells_in
-    def anisotropic_relax(self):
-        eq_area = self.cells.areas.fa.mean()
-        nz = self.params['n_zeds']
-        ns = self.params['n_sigmas']
-        
-        tck_area_vs_zed, H = compute_distribution(self.zeds.fa,
-                                                  self.cells.areas.fa,
-                                                  bins=(ns, nz), smth=3)
-        z_dilation = np.sqrt(splev(self.zeds.a, tck_area_vs_zed) / eq_area)
-        self.rhos.a /= z_dilation
-        #self.zeds.a /= z_dilation
-        self.sigmas.a = self.thetas.a * self.rhos.a
-
-        
-    def isotropic_relax(self):
-        gamma = self.paramtree.relative_dic['contractility']
-        lbda = self.paramtree.relative_dic['line_tension']
-        good, report = self.check_phase_space(gamma, lbda)
-        if not good:
-            raise ValueError("Invalid values for "
-                             "the average contractility and elasticity \n"
-                             +report)
-        delta0 = 0.9
-        delta_o,  = optimize.fsolve(self.isotropic_grad, delta0,
-                                    args=(gamma, lbda))
-
-        self.set_vertex_state([(self.is_cell_vert, False),
-                               (self.is_alive, False)])
-        area = self.cells.areas.fa.mean()
-        area0 = self.params['prefered_area']
-        area_opt = delta_o**2 * area0
-        correction = np.sqrt(area_opt / area)
-        print "Scaling all the distances by a factor %.3f" %correction
-        self.delta_o = delta_o
-        self.ground_energy = self.isotropic_energy(delta_o, gamma, lbda)
-        self.scale(correction)
-        self.set_vertex_state()
-
-    def isotropic_grad(self, delta, gamma, lbda):
-        mu = 6 * np.sqrt(2. / (3 * np.sqrt(3)))
-        grad = 4 * delta**3 + (2 * gamma * mu**2 - 4) * delta + lbda * mu
-        return grad
-
-    def isotropic_energy(self, delta, gamma, lbda):
-        """
-        Computes the theoritical energy per cell for the given
-        parameters.
-        """
-        mu = 6 * np.sqrt(2. / (3 * np.sqrt(3)))
-        elasticity = (delta**2 - 1**2)**2 / 2.
-        contractility = gamma * mu**2 * delta**2 / 2.
-        tension = lbda * mu * delta / 2.
-        energy = elasticity + contractility + tension
-        return energy
 
     def outward_uvect(self, cell, j_edge):
         """
@@ -646,7 +415,6 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
             edge_trash.append(old_edge)
         vertex_trash.append(jv1)
         return vertex_trash, edge_trash
-
         
     ## Junction edges related  functions 
     def adjacent_cells(self, j_edge):
@@ -663,6 +431,7 @@ class Epithelium(EpitheliumFilters, AbstractRTZGraph):
     def cell_junctions(self, cell):
         jvs = [jv for jv in cell.out_neighbours()]
         j_edges = []
+
         for jv0 in jvs:
             for jv1 in jvs:
                 if jv1 == jv0 : continue
