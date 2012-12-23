@@ -265,13 +265,13 @@ class EpitheliumFilters(object):
                 self.is_local_edge[edge] = 1
                 self.is_active_edge[edge] = 1
                 if self.is_junction_edge[edge]:
-                    cell0, cell1 = self.adjacent_cells(edge)
+                    cell0, cell1 = self.junctions.adjacent_cells[edge]
                     adj_cell = cell0 if cell1 == cell else cell1
                     self.is_local_vert[adj_cell] = 1
                     for jv in adj_cell.out_neighbours():
                         self.is_local_vert[jv] = 1
                         self.is_local_edge[self.graph.edge(adj_cell, jv)] = 1
-                    for je in self.cell_junctions(adj_cell):
+                    for je in self.cells.junctions[adj_cell]:
                         self.is_local_edge[je] = 1
 
     @no_filter
@@ -284,11 +284,11 @@ class EpitheliumFilters(object):
                 self.is_local_edge[edge] = 0
                 self.is_active_edge[edge] = 0
                 if self.is_junction_edge[edge]:
-                    cell0, cell1 = self.adjacent_cells(edge)
+                    cell0, cell1 = self.junctions.adjacent_cells[edge]
                     adj_cell = cell0 if cell1 == cell else cell1
                     self.is_local_vert[adj_cell] = 0
                     for jv in adj_cell.out_neighbours():
                         self.is_local_vert[jv] = 0
                         self.is_local_edge[self.graph.edge(adj_cell, jv)] = 0
-                    for je in self.cell_junctions(adj_cell):
+                    for je in self.cell.junctions[adj_cell]:
                         self.is_local_edge[je] = 0

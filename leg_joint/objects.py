@@ -33,6 +33,7 @@ from numpy.random import normal
 import graph_tool.all as gt
 from scipy import weave
 from filters import EpitheliumFilters
+import filters
 
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
@@ -86,7 +87,6 @@ class AbstractRTZGraph(object):
         is_new_edge = self.graph.new_edge_property('bool')
         is_new_edge.a[:] = 1
         self.graph.edge_properties["is_new_edge"] = is_new_edge
-
 
     @property
     def at_boundary(self):
@@ -375,37 +375,38 @@ class Cells():
     '''
     
     '''
-    def __init__(self, epithelium):
-        self.epithelium = epithelium
-        self.__verbose__ = self.epithelium.__verbose__
-        self.params = epithelium.params
-        if self.epithelium.new :
-            n_sigmas, n_zeds = (self.epithelium.params['n_sigmas'],
-                                self.epithelium.params['n_zeds'])
+    def __init__(self, eptm):
+        self.eptm = eptm
+        self.__verbose__ = self.eptm.__verbose__
+        self.params = eptm.params
+        self.junctions = self.eptm.graph.new_vertex_property('object')
+        if self.eptm.new :
+            n_sigmas, n_zeds = (self.eptm.params['n_sigmas'],
+                                self.eptm.params['n_zeds'])
             
             rhos, sigmas, zeds = self._generate_rsz(n_sigmas, n_zeds)
             rsz = rhos, sigmas, zeds
-            self.epithelium.graph = self._generate_graph(rsz)
-            EpitheliumFilters.__init__(self.epithelium)
-            AbstractRTZGraph.__init__(self.epithelium)
+            self.eptm.graph = self._generate_graph(rsz)
+            EpitheliumFilters.__init__(self.eptm)
+            AbstractRTZGraph.__init__(self.eptm)
 
-            self.epithelium.rhos.a = rhos
-            self.epithelium.zeds.a = zeds
-            self.epithelium.sigmas.a = sigmas
-            self.epithelium.thetas.a = sigmas/rhos
-            self.epithelium.is_cell_vert.a[:] = 1
+            self.eptm.rhos.a = rhos
+            self.eptm.zeds.a = zeds
+            self.eptm.sigmas.a = sigmas
+            self.eptm.thetas.a = sigmas/rhos
+            self.eptm.is_cell_vert.a[:] = 1
             self._init_cell_gometry()
             self._init_cell_params()
-            self.epithelium.update_deltas()
-            self.epithelium.update_edge_lengths()
-            self.epithelium.periodic_boundary_condition()
+            self.eptm.update_deltas()
+            self.eptm.update_edge_lengths()
+            self.eptm.periodic_boundary_condition()
         
 
     def __iter__(self):
-        # for vertex in gt.find_vertex(self.epithelium.graph,
-        #                              self.epithelium.is_cell_vert, 1):
-        for vertex in self.epithelium.graph.vertices():
-            if self.epithelium.is_cell_vert[vertex]:
+        # for vertex in gt.find_vertex(self.eptm.graph,
+        #                              self.eptm.is_cell_vert, 1):
+        for vertex in self.eptm.graph.vertices():
+            if self.eptm.is_cell_vert[vertex]:
                 yield vertex
 
     def _init_cell_gometry(self):
@@ -415,83 +416,83 @@ class Cells():
         area0 = self.params['prefered_area']
         rho_lumen = self.params['rho_lumen']
         rho0 = self.params['rho0']
-        areas = self.epithelium.graph.new_vertex_property('float')
+        areas = self.eptm.graph.new_vertex_property('float')
         areas.a[:] = area0
-        self.epithelium.graph.vertex_properties["areas"] = areas
+        self.eptm.graph.vertex_properties["areas"] = areas
 
-        perimeters =self.epithelium.graph.new_vertex_property('float')
+        perimeters =self.eptm.graph.new_vertex_property('float')
         perimeters.a[:] = 6 * self.params['lambda_0']
-        self.epithelium.graph.vertex_properties["perimeters"]\
+        self.eptm.graph.vertex_properties["perimeters"]\
             = perimeters
         vol0 = area0 * (rho0 - rho_lumen)
-        vols = self.epithelium.graph.new_vertex_property('float')
+        vols = self.eptm.graph.new_vertex_property('float')
         vols.a[:] = vol0
-        self.epithelium.graph.vertex_properties["vols"] = vols
+        self.eptm.graph.vertex_properties["vols"] = vols
         
     @property
     def vols(self):
-        return self.epithelium.graph.vertex_properties["vols"]
+        return self.eptm.graph.vertex_properties["vols"]
     @property
     def areas(self):
-        return self.epithelium.graph.vertex_properties["areas"]
+        return self.eptm.graph.vertex_properties["areas"]
     @property
     def perimeters(self):
-        return self.epithelium.graph.vertex_properties["perimeters"]
+        return self.eptm.graph.vertex_properties["perimeters"]
         
     def _init_cell_params(self):
         '''
         Creates the parameter dependant propery maps
         '''
         prefered_area0 =  self.params['prefered_area']
-        prefered_area = self.epithelium.graph.new_vertex_property('float')
+        prefered_area = self.eptm.graph.new_vertex_property('float')
         prefered_area.a[:] = prefered_area0
-        self.epithelium.graph.vertex_properties["prefered_area"]\
+        self.eptm.graph.vertex_properties["prefered_area"]\
             = prefered_area
 
         rho_lumen = self.params['rho_lumen']
         rho0 = self.params['rho0']
-        prefered_height = self.epithelium.graph.new_vertex_property('float')
+        prefered_height = self.eptm.graph.new_vertex_property('float')
         prefered_height.a = rho0 - rho_lumen 
-        self.epithelium.graph.vertex_properties['prefered_height']\
+        self.eptm.graph.vertex_properties['prefered_height']\
             = prefered_height
         
         contractility0 = self.params['contractility']        
-        contractilities =self.epithelium.graph.new_vertex_property('float')
+        contractilities =self.eptm.graph.new_vertex_property('float')
         contractilities.a[:] = contractility0
-        self.epithelium.graph.vertex_properties["contractilities"]\
+        self.eptm.graph.vertex_properties["contractilities"]\
             = contractilities
 
         elasticity0 = self.params['elasticity']        
-        elasticities =self.epithelium.graph.new_vertex_property('float')
+        elasticities =self.eptm.graph.new_vertex_property('float')
         elasticities.a[:] = elasticity0
-        self.epithelium.graph.vertex_properties["elasticities"]\
+        self.eptm.graph.vertex_properties["elasticities"]\
             = elasticities
 
         vol_elasticity0 = self.params['vol_elasticity']
-        vol_elasticities =self.epithelium.graph.new_vertex_property('float')
+        vol_elasticities =self.eptm.graph.new_vertex_property('float')
         vol_elasticities.a[:] = vol_elasticity0
-        self.epithelium.graph.vertex_properties["vol_elasticities"]\
+        self.eptm.graph.vertex_properties["vol_elasticities"]\
             = vol_elasticities
         
     @property
     def contractilities(self):
-        return self.epithelium.graph.vertex_properties["contractilities"]
+        return self.eptm.graph.vertex_properties["contractilities"]
     @property
     def elasticities(self):
-        return self.epithelium.graph.vertex_properties["elasticities"]
+        return self.eptm.graph.vertex_properties["elasticities"]
     @property
     def vol_elasticities(self):
-        return self.epithelium.graph.vertex_properties["vol_elasticities"]
+        return self.eptm.graph.vertex_properties["vol_elasticities"]
     @property
     def prefered_area(self):
-        return self.epithelium.graph.vertex_properties["prefered_area"]
+        return self.eptm.graph.vertex_properties["prefered_area"]
     @property
     def prefered_height(self):
-        return self.epithelium.graph.vertex_properties["prefered_height"]
+        return self.eptm.graph.vertex_properties["prefered_height"]
         
     def _generate_rsz(self, n_sigmas=5, n_zeds=20):
 
-        lambda_0 = self.epithelium.params['lambda_0']
+        lambda_0 = self.eptm.params['lambda_0']
         rho_c = (n_sigmas - 1) * lambda_0 / (2 * np.pi)
         delta_sigma = 2 * np.pi * rho_c / n_sigmas
         delta_z = delta_sigma * np.sqrt(3)/2.
@@ -515,7 +516,7 @@ class Cells():
         rhos, sigmas, zeds = rtz
         sigmazs = np.array([sigmas, zeds]).T
 
-        radius = self.epithelium.params['lambda_0'] * 1.1
+        radius = self.eptm.params['lambda_0'] * 1.1
         rhoc = rhos[0]
         # Boundary conditions
         s_min, s_max = 0, 2 * np.pi * rhoc
@@ -525,55 +526,70 @@ class Cells():
                                              [(s_min, s_max),
                                               (z_min, z_max)])
         return graph
+
+    def update_junctions(self):
+        for cell in self:
+            self.junctions[cell] = self.get_cell_junctions(cell)
+        
+    def get_cell_junctions(self, cell):
+        jvs = [jv for jv in cell.out_neighbours()]
+        j_edges = []
+        for jv0 in jvs:
+            for jv1 in jvs:
+                if jv1 == jv0 : continue
+                e = self.eptm.graph.edge(jv0, jv1)
+                if e is not None: j_edges.append(e)
+        return j_edges
         
 class AppicalJunctions():
 
-    def __init__(self, epithelium):
+    def __init__(self, eptm):
 
-        self.epithelium = epithelium
-        self.__verbose__ = self.epithelium.__verbose__
-        self.graph = self.epithelium.graph
-        self.params = epithelium.params
-        if self.epithelium.new :
+        self.eptm = eptm
+        self.__verbose__ = self.eptm.__verbose__
+        self.graph = self.eptm.graph
+        self.params = eptm.params
+        self.adjacent_cells = self.eptm.graph.new_edge_property('object')
+        if self.eptm.new :
             self._compute_voronoi()
             self._init_junction_params()
 
     def __iter__(self):
 
-        # for edge in gt.find_edge(self.epithelium.graph,
+        # for edge in gt.find_edge(self.eptm.graph,
         #                          self.is_junction_edge, 1):
 
-        for edge in self.epithelium.graph.edges():
-            if self.epithelium.is_junction_edge[edge] :
+        for edge in self.eptm.graph.edges():
+            if self.eptm.is_junction_edge[edge] :
                 yield edge
 
     def _init_junction_params(self):
                                  
-        line_tension0 = self.epithelium.params['line_tension']
-        line_tensions = self.epithelium.graph.new_edge_property('float')
+        line_tension0 = self.eptm.params['line_tension']
+        line_tensions = self.eptm.graph.new_edge_property('float')
         line_tensions.a[:] = line_tension0
-        self.epithelium.graph.edge_properties["line_tensions"] = line_tensions
+        self.eptm.graph.edge_properties["line_tensions"] = line_tensions
 
-        radial_tension0 = self.epithelium.params['radial_tension']
-        radial_tensions = self.epithelium.graph.new_edge_property('float')
+        radial_tension0 = self.eptm.params['radial_tension']
+        radial_tensions = self.eptm.graph.new_vertex_property('float')
         radial_tensions.a[:] = radial_tension0
-        self.epithelium.graph.edge_properties["radial_tensions"]\
+        self.eptm.graph.vertex_properties["radial_tensions"]\
                                  = radial_tensions
 
     @property
     def line_tensions(self):
-        return self.epithelium.graph.edge_properties["line_tensions"]
+        return self.eptm.graph.edge_properties["line_tensions"]
 
     @property
     def radial_tensions(self):
-        return self.epithelium.graph.edge_properties["radial_tensions"]
+        return self.eptm.graph.vertex_properties["radial_tensions"]
         
     def _compute_voronoi(self):
         n_dropped = 0
-        eptm = self.epithelium
+        eptm = self.eptm
         self.visited_cells = []
 
-        for cell in self.epithelium.cells:
+        for cell in self.eptm.cells:
             self.visited_cells.append(cell)
             new_jvs, new_ctoj_edges, ndrp = self._voronoi_nodes(cell)
             n_dropped += ndrp
@@ -593,7 +609,7 @@ class AppicalJunctions():
 
     def _voronoi_nodes(self, cell):
 
-        eptm = self.epithelium
+        eptm = self.eptm
         cutoff = eptm.params['pos_cutoff']
         vecinos = [v for v in eptm.ordered_neighbours(cell)
                    if eptm.is_cell_vert[v]]#that's ordered
@@ -627,7 +643,7 @@ class AppicalJunctions():
                 print ('Error computing thetas')
                 theta = 0
             # new junction vertex here
-            # **directly** in the epithelium graph
+            # **directly** in the eptm graph
             j_vertex = eptm.graph.add_vertex()
             new_jvs.append(j_vertex)
             eptm.is_cell_vert[j_vertex] = 0
@@ -644,7 +660,7 @@ class AppicalJunctions():
         return new_jvs, new_ctoj_edges, n_dropped
         
     def _voronoi_edges(self, ctoj_edge):
-        eptm = self.epithelium
+        eptm = self.eptm
         cell0 = ctoj_edge.source()
         self.visited_cells.append(cell0)
 
@@ -661,15 +677,27 @@ class AppicalJunctions():
             common_jvs = [jv for jv in j_verts0 if jv in j_verts1]
             if len(common_jvs) == 2:
                 jv0, jv1 = common_jvs[0], common_jvs[1]
-                new_edges.append((jv0, jv1))
-                j_edge = eptm.new_j_edge(jv0, jv1)
+                new_edges.append(eptm.new_j_edge(jv0, jv1))
             else:
                 dropped += 1
         return new_edges, dropped
-                
 
+    def update_adjacent(self):
+        for j_edge in self:
+            self.adjacent_cells[j_edge] =  self.get_adjacent_cells(j_edge)
 
+    @filters.no_filter
+    def get_adjacent_cells(self, j_edge):
+        jv0 = j_edge.source()
+        jv1 = j_edge.target()
+        cells_a = [cell for cell in jv0.in_neighbours()
+                   if self.eptm.is_cell_vert[cell]]
+        cells_b = [cell for cell in jv1.in_neighbours()
+                   if self.eptm.is_cell_vert[cell]]
+        common_cells = [cell for cell in cells_a if cell in cells_b]
+        return common_cells
 
+        
 def c_circumcircle(sz0, sz1, sz2, cutoff):
 
     c_code = '''

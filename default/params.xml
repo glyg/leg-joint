@@ -52,7 +52,7 @@
     <unit>adim</unit>
     <description>Appical-basal tension</description>
   </param>
-  <param max="1." min="0." name="vol_elasticity" step="0.001" value="0.01">
+  <param max="1." min="0." name="vol_elasticity" step="0.001" value="1.">
     <unit>adim</unit>
     <description>Volume elasticity</description>
   </param>

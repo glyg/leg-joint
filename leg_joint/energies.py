@@ -1,5 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import numpy as np
+from scipy import optimize
+
+from utils import compute_distribution
+from scipy.interpolate import splev
+
+import filters
+
 
 class EpitheliumEnergies(object):
 
@@ -62,10 +70,16 @@ class EpitheliumEnergies(object):
         energy = self.calc_energy()
         return energy
 
+    def opt_radial_energy(self, rhos):
+        self.set_rhos(rhos)
+        self.update_apical_geom()
+        energy = self.calc_radial_energy()
+        return energy
+        
     def opt_gradient(self, sz_pos):
         """
         After setting the sigma, zed position to sz_pos,
-        computes the gradient over the graph as filtered
+        computes the gradient over the filtered graph
         """
         # # position setting
         self.set_new_pos(sz_pos)
@@ -74,6 +88,32 @@ class EpitheliumEnergies(object):
         gradient = self.gradient_array()
         return gradient
 
+    def opt_radial_grad(self, rhos):
+        """
+        After setting the sigma, zed position to sz_pos,
+        computes the gradient over the filtered graph
+        """
+        # # position setting
+        self.set_rhos(rhos)
+        self.update_apical_geom()
+        self.update_gradient()
+        gradient = self.radial_grad_array()
+        return gradient
+
+        
+    @filters.active
+    def radial_grad_array(self):
+
+        rho_lumen = self.params['rho_lumen']
+        rho0 = self.params['rho0']
+        prefered_vol =  self.params['prefered_area'] * (rho0 - rho_lumen)
+        vol_elasticity0 = self.params['vol_elasticity']
+        norm_factor = prefered_vol * vol_elasticity0
+        gradient = np.zeros(self.graph.num_vertices())
+        if self.__verbose__ : print 'Gradient shape: %s' % gradient.shape
+        gradient = self.grad_radial.fa / norm_factor
+        return gradient
+        
     def opt_callback(self, sz_pos):
         """ Call back for the optimization """
         self.periodic_boundary_condition()
@@ -95,13 +135,22 @@ class EpitheliumEnergies(object):
         return junctions_energy.sum()
 
     def calc_radial_energy(self):
-        radial_tension_energy = self.radial_tensions.fa * self.rhos.fa
+
+        rho_lumen = self.params['rho_lumen']
+        rho0 = self.params['rho0']
+        prefered_vol =  self.params['prefered_area'] * (rho0 - rho_lumen)
+        vol_elasticity0 = self.params['vol_elasticity']
+        num_cells = self.graph.num_vertices() #elastic_term.size
+        norm_factor = num_cells * prefered_vol * vol_elasticity0**2
+        radial_tension_energy = self.junctions.radial_tensions.fa \
+                                * self.rhos.fa
         radial_tension_energy *= self.is_cell_vert.fa * self.is_alive.fa
         prefered_vol = self.cells.prefered_area.fa \
                        * self.cells.prefered_height.fa
         volume_energy = self.cells.vol_elasticities.fa \
                         * (self.cells.vols.fa - prefered_vol)**2
-        return radial_tension_energy.sum() + volume_energy.sum()
+        total_energy = radial_tension_energy.sum() + volume_energy.sum()
+        return total_energy / norm_factor
         
     @filters.cells_in
     def calc_cells_energy(self):
@@ -150,7 +199,7 @@ class EpitheliumEnergies(object):
             j_src, j_trgt = edge.source(), edge.target()
             u_sg = self.u_dsigmas[edge]
             u_zg = self.u_dzeds[edge]
-            for cell in self.adjacent_cells(edge):
+            for cell in self.junctions.adjacent_cells[edge]:
                 perp_sigma, perp_zed =  self.outward_uvect(cell, edge)
                 el_grad = self.elastic_grad[cell]
                 ctr_grad = self.contractile_grad[cell]
@@ -181,7 +230,7 @@ class EpitheliumEnergies(object):
                               * (self.cells.vols.fa - prefered_vol)
     @filters.ctoj_in
     def calc_radial_grad(self):
-        self.grad_radial.fa = self.radial_tensions.fa
+        self.grad_radial.fa = self.junctions.radial_tensions.fa
         if self.__verbose__:
             print('''Updating radial gradient
                   for %i cell to junction edges

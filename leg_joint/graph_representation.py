@@ -47,7 +47,8 @@ def plot_active(epithelium, ax=None):
     plt.draw()
     return ax
 
-def sz_scatter(eptm, pmap, ax, log=False, vfilt=(None, False), clip=0):
+def sz_scatter(eptm, pmap, ax, log=False,
+               vfilt=(None, False), clip=0, **kwargs):
     
     eptm.graph.set_vertex_filter(vfilt[0], vfilt[1])   
     n_data = pmap.fa - pmap.fa.min()
@@ -66,7 +67,8 @@ def sz_scatter(eptm, pmap, ax, log=False, vfilt=(None, False), clip=0):
     proj_sigma = eptm.sigmas.copy()
     mean_rho = eptm.rhos.fa.mean()
     proj_sigma.fa = eptm.thetas.fa * mean_rho
-    ax.scatter(eptm.zeds.fa, eptm.sigmas.fa, c=n_data, cmap=plt.cm.jet, )
+    ax.scatter(eptm.zeds.fa, eptm.sigmas.fa, c=n_data,
+               cmap=plt.cm.jet, **kwargs)
     eptm.graph.set_vertex_filter(None)
 
     

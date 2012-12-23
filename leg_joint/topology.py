@@ -12,23 +12,23 @@ ROOT_DIR = os.path.dirname(CURRENT_DIR)
 GRAPH_SAVE_DIR = os.path.join(ROOT_DIR, 'saved_graphs')
 
 def snapshot(func, *args, **kwargs):
-    def new_func(self, *args, **kwargs):
-        out = func(self, *args, **kwargs)
+    def new_func(eptm, *args, **kwargs):
+        out = func(eptm, *args, **kwargs)
         now = datetime.now()
         xml_save = os.path.join(GRAPH_SAVE_DIR,
                                 'xml', 'tmp',
                                 'eptm_%s.xml' % now.isoformat())
-        self.graph.save(xml_save)
+        eptm.graph.save(xml_save)
         outfname2d = os.path.join(GRAPH_SAVE_DIR,
                                   'png', 'tmp',
                                   'eptm2d_%s.png' % now.isoformat())
         outfname3d = os.path.join(GRAPH_SAVE_DIR,
                                   'png', 'tmp',
                                   'eptm3d_%s.png' % now.isoformat())
-        epithelium_draw(self, output2d=outfname2d, output3d=outfname3d)
+        epithelium_draw(eptm, output2d=outfname2d, output3d=outfname3d)
         return out
     return new_func
-
+    
 @snapshot
 def type1_transition(eptm, elements, verbose=False):
     """
@@ -59,8 +59,8 @@ def type1_transition(eptm, elements, verbose=False):
     if len(elements) == 2 and eptm.is_cell_vert[elements[0]]:
         cell1 = elements[0]
         cell3 = elements[1]
-        j_edges1 =  eptm.cell_junctions(cell1)
-        j_edges3 =  eptm.cell_junctions(cell3)
+        j_edges1 =  eptm.cells.junctions[cell1]
+        j_edges3 =  eptm.cells.junctions[cell3]
         try:
             j_edgeab = [je for je in j_edges1 if je in j_edges3][0]
         except IndexError:
@@ -77,7 +77,7 @@ def type1_transition(eptm, elements, verbose=False):
             print "Invalid junction %s" % str(j_edgeab)
             return
         try:
-            cell1, cell3 = eptm.adjacent_cells(j_edgeab)
+            cell1, cell3 = eptm.junctions.adjacent_cells[j_edgeab]
         except ValueError:
             print ("No adgacent cells found"
                    "for junction %s" % str(j_edgeab))
@@ -87,7 +87,7 @@ def type1_transition(eptm, elements, verbose=False):
         j_edgeab = elements
         j_verta, j_vertb = j_edgeab.source(), j_edgeab.target()
         try:
-            cell1, cell3 = eptm.adjacent_cells(j_edgeab)
+            cell1, cell3 = eptm.junctions.adjacent_cells[j_edgeab]
         except ValueError:
             print ("No adgacent cells found"
                    "for junction %s" % str(j_edgeab))
@@ -107,25 +107,25 @@ def type1_transition(eptm, elements, verbose=False):
     j_edgeac = eptm.any_edge(j_verta, j_vertc)
     j_edgebe = eptm.any_edge(j_vertb, j_verte)
     if j_edgebe is None or j_edgeac is None:
-        print "Invalid geometry"
-        return
-    if not cell1 in eptm.adjacent_cells(j_edgeac):
+        raise ValueError("Invalid geometry")
+    if not cell1 in eptm.junctions.adjacent_cells[j_edgeac]:
         #Switch f and c
         j_vertc, j_vertf = j_vertf, j_vertc 
         j_edgeac = eptm.any_edge(j_verta, j_vertc)
-    if not cell3 in eptm.adjacent_cells(j_edgebe):
+    if not cell3 in eptm.junctions.adjacent_cells[j_edgebe]:
         #Switch d and e
         j_verte, j_vertd = j_vertd, j_verte 
         j_edgebe = eptm.any_edge(j_vertb, j_verte)
-    cell2 = eptm.adjacent_cells(j_edgebe)[1]
-    if verbose : print "adjacent cells edge be : %s, %s" % (
-        str(eptm.adjacent_cells(j_edgebe)[0]),
-        str(eptm.adjacent_cells(j_edgebe)[1]))
+    cell2 = eptm.junctions.adjacent_cells[j_edgebe][1]
+    if verbose : print(''' adjacent cells edge be : %s, %s
+                       ''' % (
+                           str(eptm.junctions.adjacent_cells[j_edgebe][0]),
+                           str(eptm.junctions.adjacent_cells[j_edgebe][1])))
     if cell2 == cell3:
-        cell2 = eptm.adjacent_cells(j_edgebe)[0]
-    cell4 = eptm.adjacent_cells(j_edgeac)[1]
+        cell2 = eptm.junctions.adjacent_cells[j_edgebe][0]
+    cell4 = eptm.junctions.adjacent_cells[j_edgeac][1]
     if cell4 == cell1:
-        cell4 = eptm.adjacent_cells(j_edgeac)[0]
+        cell4 = eptm.junctions.adjacent_cells[j_edgeac][0]
 
     modified_cells = [cell1, cell2, cell3, cell4]
     modified_jverts = [j_verta, j_vertb, j_vertc,
@@ -168,8 +168,7 @@ def type1_transition(eptm, elements, verbose=False):
 
     eptm.set_local_mask(cell1)
     eptm.set_local_mask(cell3)
-
-    eptm.update_apical_geom()
+    eptm.reset_topology()
     return modified_cells, modified_jverts
 
 
@@ -184,13 +183,15 @@ def cell_division(eptm, mother_cell,
     a0 = eptm.params['prefered_area']
     eptm.cells.prefered_area[mother_cell] = a0
     daughter_cell = eptm.new_vertex(mother_cell)
+    eptm.cells.junctions[daughter_cell] = []
+    
     print "Cell %s is born" % str(daughter_cell)
     
     eptm.is_cell_vert[daughter_cell] = 1
     junction_trash = []
     new_junctions = []
     new_jvs = []
-    for j_edge in eptm.cell_junctions(mother_cell):
+    for j_edge in eptm.cells.junctions[mother_cell]:
         if j_edge is None:
             continue
         j_src, j_trgt = j_edge
@@ -212,7 +213,7 @@ def cell_division(eptm, mother_cell,
         ## edge is on the daughter side
         elif phi_src <= tau/2 and phi_trgt <= tau/2:
 
-            cell0, cell1 = eptm.adjacent_cells(j_edge)
+            cell0, cell1 = eptm.junctions.adjacent_cells[j_edge]
             junction_trash.append((j_src, j_trgt, cell0, cell1))
 
             adj_cell = cell1 if cell0 == mother_cell else cell0
@@ -222,7 +223,7 @@ def cell_division(eptm, mother_cell,
         elif ((phi_src > tau/2 and phi_trgt <= tau/2)
               or ( phi_src <= tau/2 and phi_trgt > tau/2 )) :
             
-            cell0, cell1 = eptm.adjacent_cells(j_edge)
+            cell0, cell1 = eptm.junctions.adjacent_cells[j_edge]
             adj_cell = cell1 if cell0 == mother_cell else cell0
             new_jv = eptm.new_vertex(j_src)
             new_jvs.append(new_jv)
@@ -264,25 +265,28 @@ def cell_division(eptm, mother_cell,
     for (j_src, j_trgt, cell0, cell1) in new_junctions:
         j = eptm.add_junction(j_src, j_trgt, cell0, cell1)
     # Cytokinesis
-    j = eptm.add_junction(new_jvs[0], new_jvs[1],
-                          mother_cell, daughter_cell)
+    septum = eptm.add_junction(new_jvs[0], new_jvs[1],
+                               mother_cell, daughter_cell)
+    
     eptm.set_local_mask(daughter_cell)
     eptm.set_vertex_state()
     eptm.set_edge_state()
+    eptm.reset_topology()
     if eptm.__verbose__: print 'Division completed'
-    return j
+    return septum
 
 @snapshot
 def apoptosis(eptm, apoptotic_cell):
     eptm.set_local_mask(None)
     eptm.set_local_mask(apoptotic_cell)
-    j_edges = eptm.cell_junctions(apoptotic_cell)
+    j_edges = eptm.cells.junctions[apoptotic_cell]
     edge_lengths = np.array([eptm.edge_lengths[je] for je in j_edges])
     for n in range(len(j_edges) - 2):
         je = j_edges[edge_lengths.argmin()]
         new_jv = type3_transition(eptm, apoptotic_cell)
         if new_jv is not None:
             print "Cell's dead, baby, cell's dead"
+    eptm.reset_topology()
     return new_jv
 
 @snapshot
@@ -293,14 +297,14 @@ def type3_transition(eptm, cell, reduce_edgenum=True, verbose=False):
     """
     eptm.graph.set_vertex_filter(None)
     eptm.graph.set_edge_filter(None)
-    j_edges = eptm.cell_junctions(cell)
+    j_edges = eptm.cells.junctions[cell]
     edge_lengths = np.array([eptm.edge_lengths[edge]
                              for edge in j_edges])
     if len(j_edges) != 3 and reduce_edgenum:
         if verbose:
             print ('''%i edges left''' % len(j_edges))
         je = j_edges[edge_lengths.argmin()]
-        cell1, cell3 = eptm.adjacent_cells(je)
+        cell1, cell3 = eptm.junctions.adjacent_cells[je]
         modified = type1_transition(eptm, (cell1, cell3),
                                     verbose=verbose)
         return 
@@ -340,6 +344,7 @@ def type3_transition(eptm, cell, reduce_edgenum=True, verbose=False):
     for n_cell in cell_neighbs:
         eptm.set_local_mask(n_cell)
     eptm.is_alive[cell] = 0
+    eptm.reset_topology()
     return new_jv
 
 
@@ -381,7 +386,7 @@ def resolve_small_edges(eptm, threshold=5e-2, vfilt=None, efilt=None):
     eptm.graph.set_edge_filter(None)
     for edge in short_edges:
         eptm.set_local_mask(None)
-        cells = eptm.adjacent_cells(edge)
+        cells = eptm.junctions.adjacent_cells[edge]
         if len(cells) != 2:
             continue
         else:
@@ -389,8 +394,8 @@ def resolve_small_edges(eptm, threshold=5e-2, vfilt=None, efilt=None):
         if cell0 in visited_cells or cell1 in visited_cells:
             continue
         visited_cells.extend([cell0, cell1])
-        if (len(eptm.cell_junctions(cell0)) < 4) or (
-            len(eptm.cell_junctions(cell1)) < 4):
+        if (len(eptm.cells.junctions[cell0]) < 4) or (
+            len(eptm.cells.junctions[cell1]) < 4):
             continue
         print 'Type 1 transition'
         energy0 = eptm.calc_energy()

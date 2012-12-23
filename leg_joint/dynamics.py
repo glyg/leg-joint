@@ -6,12 +6,10 @@ import os
 import graph_tool.all as gt
 import numpy as np
 from scipy import optimize, weave
-from scipy.interpolate import splev
 
 
 from objects import  AbstractRTZGraph, Cells, AppicalJunctions
 from xml_handler import ParamTree
-from utils import compute_distribution
 from energies import EpitheliumEnergies
 import filters
 
@@ -70,8 +68,10 @@ class Epithelium(EpitheliumFilters,
             self.graph.purge_edges()
             self.set_vertex_state()
             self.set_edge_state()
+        self.cells.update_junctions()
+        self.junctions.update_adjacent()
+        
         EpitheliumEnergies.__init__(self)    
-
         if self.__verbose__: print 'isotropic relaxation'
         self.isotropic_relax()
         if self.__verbose__: print 'Periodic boundary'
@@ -198,18 +198,23 @@ class Epithelium(EpitheliumFilters,
                                     % self.graph.num_vertices())
         rho_lumen = self.params['rho_lumen']
         for cell in self.cells:
-            j_edges = self.cell_junctions(cell)
-            self._one_cell_geom(cell, j_edges)
+            self._one_cell_geom(cell)
+        self.thetas.fa = self.sigmas.fa / self.rhos.fa
         self.cells.vols.fa = self.cells.areas.fa * (self.rhos.fa - rho_lumen)
             
-    def _one_cell_geom(self, cell, j_edges):
+    def _one_cell_geom(self, cell):
         """
         The area is approximated as the sum
         of the areas of the triangles
         formed by the cell position and each junction
         """
+        if not self.is_alive[cell]: return
         area = 0.
         perimeter = 0.
+        j_edges = self.cells.junctions[cell]
+        if self.__verbose__:
+            print(''' Cell %s has %i junction edges'''
+                  % (cell, len(j_edges)))
         if len(j_edges) < 3 and self.is_alive[cell]:
             if self.__verbose__:
                 print('''Two edges ain't enough to compute
@@ -224,33 +229,45 @@ class Epithelium(EpitheliumFilters,
             ctoj1 = self.graph.edge(cell, j_edge.target())
             area += np.abs(self.dsigmas[ctoj0] * self.dzeds[ctoj1]
                            - self.dsigmas[ctoj1] * self.dzeds[ctoj0])/2.
+            self.zeds[cell] += self.zeds[j_edge.target()]
+            self.rhos[cell] += self.rhos[j_edge.target()]
+
         self.cells.areas[cell] = area
         self.cells.perimeters[cell] = perimeter
 
         ##  Update cell position 
-        j_sz = np.array([[self.sigmas[jv], self.zeds[jv]]
-                         for jv in cell.out_neighbours()])
-        rhos = np.array([self.rhos[jv] for jv in cell.out_neighbours()])
+        j_rsz = np.array([[self.rhos[jv], self.sigmas[jv], self.zeds[jv]]
+                          for jv in cell.out_neighbours()])
         ### set z and rho
-        self.zeds[cell] = j_sz[:,1].mean()
-        self.rhos[cell] = rhos.mean()
+        self.zeds[cell] = j_rsz[:,2].mean()
+        self.rhos[cell] = j_rsz[:,0].mean()
         
         ### set periodic sigma
-        raw_dsigma = j_sz[:,0] - self.sigmas[cell]
+        raw_dsigma = j_rsz[:,1] - self.sigmas[cell]
         period = tau * self.rhos[cell] 
-        pbc_sigma = j_sz[:,0]
-        pbc_sigma[raw_dsigma <=- period/2] += period
-        pbc_sigma[raw_dsigma >= period/2] -= period
+        pbc_sigma = j_rsz[:,1]
+        pbc_sigma[raw_dsigma <= -period/2] += period
+        pbc_sigma[raw_dsigma > period/2] -= period
         self.sigmas[cell] = pbc_sigma.mean()
-
+        
     @filters.active
     def set_new_pos(self, new_sz_pos):
         new_sz_pos = new_sz_pos.flatten()
         assert len(new_sz_pos) / 2 == self.graph.num_vertices()
         self.sigmas.fa = new_sz_pos[::2]
         self.zeds.fa = new_sz_pos[1::2]
+        self.thetas.fa = self.sigmas.fa / self.rhos.fa
 
-
+    @filters.active
+    def set_new_rhos(self, rhos):
+        self.rhos.fa = rhos
+        
+    def reset_topology(self):
+        self.junctions.update_adjacent()
+        self.cells.update_junctions()
+        self.update_apical_geom()
+        self.update_gradient()
+        
     def outward_uvect(self, cell, j_edge):
         """
         Returns the (sigma, zed) coordinates of the unitary vector
@@ -310,6 +327,16 @@ class Epithelium(EpitheliumFilters,
         self.is_ctoj_edge[j_edgeab] = 0
         line_tension0 = self.params['line_tension']
         self.junctions.line_tensions[j_edgeab] = line_tension0
+        self.junctions.adjacent_cells[j_edgeab] = cell0, cell1
+        if self.cells.junctions[cell0] is None:
+            self.cells.junctions[cell0] = [j_edgeab,]
+        else:
+            self.cells.junctions[cell0].append(j_edgeab)
+
+        if self.cells.junctions[cell1] is None:
+            self.cells.junctions[cell1] = [j_edgeab,]
+        else:
+            self.cells.junctions[cell1].append(j_edgeab)
 
         ctoj_0a = self.graph.edge(cell0, j_verta)
         if ctoj_0a is not None:
@@ -375,6 +402,9 @@ class Epithelium(EpitheliumFilters,
             print "Warning: junction from %s to %s doesn't exist" % (
                 str(j_edgeab.source()), str(j_edgeab.target()))
             return
+        self.cells.junctions[cell0].remove(j_edgeab)
+        self.cells.junctions[cell1].remove(j_edgeab)
+        self.junctions.adjacent_cells[j_edgeab] = []
         self.graph.remove_edge(j_edgeab)
         ctoj_0a = self.graph.edge(cell0, j_verta)
         if ctoj_0a is not None:
@@ -416,28 +446,6 @@ class Epithelium(EpitheliumFilters,
         vertex_trash.append(jv1)
         return vertex_trash, edge_trash
         
-    ## Junction edges related  functions 
-    def adjacent_cells(self, j_edge):
-        jv0 = j_edge.source()
-        jv1 = j_edge.target()
-        cells_a = [cell for cell in jv0.in_neighbours()
-                   if self.is_cell_vert[cell]]
-        cells_b = [cell for cell in jv1.in_neighbours()
-                   if self.is_cell_vert[cell]]
-        common_cells = [cell for cell in cells_a if cell in cells_b]
-        return common_cells
-
-    ## Cell vertices topological functions
-    def cell_junctions(self, cell):
-        jvs = [jv for jv in cell.out_neighbours()]
-        j_edges = []
-
-        for jv0 in jvs:
-            for jv1 in jvs:
-                if jv1 == jv0 : continue
-                e = self.graph.edge(jv0, jv1)
-                if e is not None: j_edges.append(e)
-        return j_edges
         
 def triangle_geometry(sz0, sz1, sz2):
     c_code = """

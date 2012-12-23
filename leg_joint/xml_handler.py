@@ -92,13 +92,25 @@ class ParamTree(object):
 
         prefered_area = self.absolute_dic["prefered_area"]
         elasticity = self.absolute_dic["elasticity"]
+        rho_lumen = self.absolute_dic['rho_lumen']
+        rho0 = self.absolute_dic['rho0']
+        prefered_vol =  prefered_area * (rho0 - rho_lumen)
+
         contractility = self.relative_dic["contractility"]
         line_tension = self.relative_dic["line_tension"]
+        radial_tension = self.relative_dic["radial_tension"]
+        vol_elasticity = self.relative_dic["vol_elasticity"]
+        self.absolute_dic['vol_elasticity'] \
+            = vol_elasticity * elasticity / prefered_area
+        
+        self.absolute_dic["radial_tension"] \
+            = radial_tension * elasticity * prefered_area**(3 / 2.)
 
-        self.absolute_dic["line_tension"] = line_tension *\
-                                            elasticity * prefered_area**(3 / 2.)
-        self.absolute_dic["contractility"] = contractility *\
-                                             elasticity * prefered_area
+        self.absolute_dic["line_tension"] \
+            = line_tension * elasticity * prefered_area**(3 / 2.)
+
+        self.absolute_dic["contractility"] \
+            = contractility * elasticity * prefered_area
 
     def change_dic(self, key, new_value, write=False,
                    back_up=False, verbose=False):
