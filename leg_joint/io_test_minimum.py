@@ -7,7 +7,7 @@ from xml.etree.ElementTree import Element
 from xml.etree.ElementTree import parse, tostring
 # The graph
 import graph_tool.all as gt
-from dynamics import Epithelium
+from epithelium import Epithelium
 
 def test1():
     eptm1 = Epithelium(paramfile='default/few_big_cells.xml')

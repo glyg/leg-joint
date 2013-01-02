@@ -6,7 +6,7 @@ The architecture of the epithelium model consists in a graph containing
 two types of vertices: 
 
 * The cells themselves
-* The appical junctions vertices (It is
+* The apical junctions vertices (It is
 constructed initially as the Voronoi diagramm associated with the
 cell centers triangulation, again in the ::math:(\rho, \sigma):
 plane.)
@@ -23,7 +23,7 @@ This graph implemented as a class wrapping a
 ::math:(\rho, \theta, z): coordinate system. The geometrical features
 are defined in an abstract class named ::class:`AbstractRTZGraph`:,
 from which ::class:`Epithelium`: and for commodity
-the ::class:`Cells`: and ::class:`AppicalJunctions` are derived.
+the ::class:`Cells`: and ::class:`ApicalJunctions` are derived.
 
 """
 
@@ -451,10 +451,10 @@ class Cells():
 
         rho_lumen = self.params['rho_lumen']
         rho0 = self.params['rho0']
-        prefered_height = self.eptm.graph.new_vertex_property('float')
-        prefered_height.a = rho0 - rho_lumen 
-        self.eptm.graph.vertex_properties['prefered_height']\
-            = prefered_height
+        prefered_vol = self.eptm.graph.new_vertex_property('float')
+        prefered_vol.a = (rho0 - rho_lumen ) * prefered_area0
+        self.eptm.graph.vertex_properties['prefered_vol']\
+            = prefered_vol
         
         contractility0 = self.params['contractility']        
         contractilities =self.eptm.graph.new_vertex_property('float')
@@ -473,6 +473,15 @@ class Cells():
         vol_elasticities.a[:] = vol_elasticity0
         self.eptm.graph.vertex_properties["vol_elasticities"]\
             = vol_elasticities
+
+        ages = self.eptm.graph.new_vertex_property('int')
+        ages.a[:] = 0
+        self.eptm.graph.vertex_properties["ages"]\
+            = ages
+
+    @property
+    def ages(self):
+        return self.eptm.graph.vertex_properties["ages"]
         
     @property
     def contractilities(self):
@@ -487,8 +496,8 @@ class Cells():
     def prefered_area(self):
         return self.eptm.graph.vertex_properties["prefered_area"]
     @property
-    def prefered_height(self):
-        return self.eptm.graph.vertex_properties["prefered_height"]
+    def prefered_vol(self):
+        return self.eptm.graph.vertex_properties["prefered_vol"]
         
     def _generate_rsz(self, n_sigmas=5, n_zeds=20):
 
@@ -541,7 +550,7 @@ class Cells():
                 if e is not None: j_edges.append(e)
         return j_edges
         
-class AppicalJunctions():
+class ApicalJunctions():
 
     def __init__(self, eptm):
 

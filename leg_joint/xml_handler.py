@@ -3,22 +3,18 @@
 
 # Handler for the parameters xml files -- to allow phase space exploration
 
-import sys, os
-import numpy as np
-
-from xml.etree.ElementTree import Element
-from xml.etree.ElementTree import parse, tostring
+from xml.etree.ElementTree import parse
 
 #Those strings should be respected in the xml file
-SPRING_UNIT=u'pN/µm' 
-DRAG_UNIT = u'pN.s/µm' 
-LENGTH_UNIT = u'µm' 
-FREQ_UNIT = u'Hz' 
-FORCE_UNIT = u'pN' 
-SPEED_UNIT = u'µm/s'
+SPRING_UNIT='pN/um' 
+DRAG_UNIT = 'pN.s/um' 
+LENGTH_UNIT = 'um' 
+FREQ_UNIT = 'Hz' 
+FORCE_UNIT = 'pN' 
+SPEED_UNIT = 'um/s'
 
 
-__all__ = ["ParamTree", "indent", "ResultTree"]
+__all__ = ["ParamTree", "indent"]
 
 def indent(elem, level=0):
     '''utility to have a nice printing of the xml tree
@@ -91,24 +87,19 @@ class ParamTree(object):
         '''
 
         prefered_area = self.absolute_dic["prefered_area"]
+        
         elasticity = self.absolute_dic["elasticity"]
-        rho_lumen = self.absolute_dic['rho_lumen']
-        rho0 = self.absolute_dic['rho0']
-        prefered_vol =  prefered_area * (rho0 - rho_lumen)
-
         contractility = self.relative_dic["contractility"]
         line_tension = self.relative_dic["line_tension"]
         radial_tension = self.relative_dic["radial_tension"]
         vol_elasticity = self.relative_dic["vol_elasticity"]
+
         self.absolute_dic['vol_elasticity'] \
             = vol_elasticity * elasticity / prefered_area
-        
         self.absolute_dic["radial_tension"] \
             = radial_tension * elasticity * prefered_area**(3 / 2.)
-
         self.absolute_dic["line_tension"] \
             = line_tension * elasticity * prefered_area**(3 / 2.)
-
         self.absolute_dic["contractility"] \
             = contractility * elasticity * prefered_area
 

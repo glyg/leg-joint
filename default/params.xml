@@ -20,6 +20,10 @@
     <unit>um</unit>
     <description>lumen radius</description>
   </param>
+  <param max="100." min="0.1" name="cell_volume" step="0.1" value="60.">
+    <unit>um3</unit>
+    <description>cell volume</description>
+  </param>
   <param max="10." min="0." name="pos_noise" step="0.01" value="0.01">
     <unit>um</unit>
     <description>vertex position noise</description>
@@ -50,9 +54,9 @@
   </param>
   <param max="10." min="0." name="radial_tension" step="0.01" value="0.1">
     <unit>adim</unit>
-    <description>Appical-basal tension</description>
+    <description>Apical-basal tension</description>
   </param>
-  <param max="1." min="0." name="vol_elasticity" step="0.001" value="1.">
+  <param max="1." min="0." name="vol_elasticity" step="0.001" value="10.">
     <unit>adim</unit>
     <description>Volume elasticity</description>
   </param>

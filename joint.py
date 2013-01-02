@@ -14,8 +14,6 @@ import leg_joint as lj
 import random
 
 # eptm = lj.Epithelium(paramfile='default/few_big_cells.xml')
-
-
 def new_generation(eptm, growth_rate=1.8):
     eptm.graph.set_vertex_filter(eptm.is_cell_vert)
     cells =  [cell for cell in eptm.graph.vertices()
@@ -33,14 +31,16 @@ def new_generation(eptm, growth_rate=1.8):
         eptm.set_local_mask(None)
         eptm.set_local_mask(mother_cell)
         eptm.cells.prefered_area[mother_cell] *= growth_rate
-        eptm.update_apical_geom()
+        eptm.update_geometry()
         eptm.update_gradient()
-        pos0, pos1 = eptm.find_energy_min(tol=1e-4)
+        pos0, pos1 = eptm.find_energy_min(apical_tol=1e-4,
+                                          radial_tol=1e-5)
         j = lj.cell_division(eptm, mother_cell, verbose=False)
-        eptm.update_apical_geom()
+        eptm.update_geometry()
         eptm.update_gradient()
         if j is not None:
-            pos0, pos1 = eptm.find_energy_min(tol=1e-4)
+            pos0, pos1 = eptm.find_energy_min(apical_tol=1e-4,
+                                              radial_tol=1e-5)
             now = datetime.now()
             eptm.graph.save("saved_graphs/xml/tmp/generation%s.xml"
                             % now.isoformat())
@@ -58,7 +58,7 @@ def new_generation(eptm, growth_rate=1.8):
         print str(num)+'/'+str(len(cells))
         print 'time left: %3f' % time_left
     # eptm.anisotropic_relax()
-    eptm.update_apical_geom()
+    eptm.update_geometry()
     eptm.params['n_zeds'] *= 2
     eptm.params['n_sigmas'] *= 2
     eptm.graph.save("saved_graphs/xml/generation%s.xml" % now.isoformat())

@@ -147,11 +147,17 @@ def type1_transition(eptm, elements, verbose=False):
     sigma_b = eptm.sigmas[j_vertb]
     zed_a = eptm.zeds[j_verta]
     zed_b = eptm.zeds[j_vertb]
-
-    center_sigma = (sigma_a + sigma_b)/2.
-    center_zed = (zed_a + zed_b)/2.
-
+    rhos_a = eptm.rhos[j_verta]
+    rhos_b = eptm.rhos[j_vertb]
+    period = rhos_a * 2 * np.pi
     delta_s = np.abs(sigma_b - sigma_a)
+    if delta_s > period / 2:
+        delta_s -= period / 2
+        center_sigma = (sigma_a + period + sigma_b) / 2
+    else:
+        center_sigma = (sigma_a + sigma_b)/2.
+    center_zed = (zed_a + zed_b)/2.
+        
     delta_z = np.abs(zed_b - zed_a)
     if eptm.sigmas[cell1] < eptm.sigmas[cell3]:
         eptm.sigmas[j_verta] = center_sigma + delta_z/2.
@@ -183,11 +189,13 @@ def cell_division(eptm, mother_cell,
     a0 = eptm.params['prefered_area']
     eptm.cells.prefered_area[mother_cell] = a0
     daughter_cell = eptm.new_vertex(mother_cell)
+    eptm.is_cell_vert[daughter_cell] = 1
+    eptm.cells.ages[mother_cell] += 1
+    eptm.cells.ages[daughter_cell] = 0
     eptm.cells.junctions[daughter_cell] = []
     
     print "Cell %s is born" % str(daughter_cell)
     
-    eptm.is_cell_vert[daughter_cell] = 1
     junction_trash = []
     new_junctions = []
     new_jvs = []
@@ -368,7 +376,7 @@ def resolve_small_edges(eptm, threshold=5e-2, vfilt=None, efilt=None):
     eptm.graph.set_edge_filter(None)
     new_jvs = [eptm.type3_transition(cell, threshold)
                for cell in cells]
-    eptm.update_apical_geom()
+    eptm.update_geometry()
     # Type 1 transitions
     if efilt == None:
         efilt_je = eptm.is_junction_edge.copy()

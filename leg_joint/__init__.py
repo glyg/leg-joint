@@ -1,4 +1,4 @@
-from .dynamics import Epithelium
+from .epithelium import Epithelium
 from .topology import cell_division, type1_transition
 from .topology import type3_transition, apoptosis
 from .topology import resolve_small_edges
