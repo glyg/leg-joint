@@ -5,7 +5,9 @@ import os
 import numpy as np
 from numpy.random import normal, random_sample
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+#from mpl_toolkits.mplot3d import Axes3
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 import graph_tool.all as gt
 
 import filters
@@ -25,7 +27,7 @@ def plot_gradients(eptm, ax=None, scale=1., **kwargs):
     v_sigmas = np.array([sigmas, - grad_sigmas]).T
     v_zeds = np.array([zeds, - grad_zeds]).T
     if ax is None:
-        ax =  plot_cells_sz(eptm, ax=None,
+        ax =  plot_cells_zs(eptm, ax=None,
                             vfilt=eptm.is_local_vert,
                             efilt=eptm.is_local_edge, **kwargs)
     for s, z in zip(v_sigmas, v_zeds):
@@ -33,7 +35,41 @@ def plot_gradients(eptm, ax=None, scale=1., **kwargs):
                  ec='red', fc='red', alpha=0.5)
     plt.draw()
     return ax
-    
+
+
+@filters.local
+def plot_ortho_gradients(eptm, axes=None,
+                         scale=1., **kwargs):
+    grad_sz = eptm.gradient_array()
+    grad_r = eptm.radial_grad_array()
+    eptm.graph.set_vertex_filter(eptm.is_active_vert)
+    sigmas = eptm.sigmas.fa
+    zeds = eptm.zeds.fa
+    rhos = eptm.rhos.fa
+    grad_sigmas = grad_sz[::2] * scale
+    grad_zeds = grad_sz[1::2] * scale
+    # We plot the forces, which are easier to understand
+    v_sigmas = np.array([sigmas, - grad_sigmas]).T
+    v_zeds = np.array([zeds, - grad_zeds]).T
+    v_radial = np.array([rhos, - grad_r]).T
+    if axes is None:
+        ax_zs, ax_zr, ax_rs =  plot_ortho_proj(eptm, ax=None,
+                                               vfilt=eptm.is_local_vert,
+                                               efilt=eptm.is_local_edge,
+                                               **kwargs)
+    else:
+        ax_zs, ax_zr, ax_rs = axes
+    for s, z, r in zip(v_sigmas, v_zeds, v_radial):
+        ax_zs.arrow(z[0], s[0], z[1], s[1], width=0.1,
+                    ec='red', fc='red', alpha=0.5)
+        ax_zr.arrow(z[0], r[0], z[1], r[1], width=0.1,
+                    ec='red', fc='red', alpha=0.5)
+        ax_rs.arrow(r[0], s[0], r[1], s[1], width=0.1,
+                    ec='red', fc='red', alpha=0.5)
+        
+    plt.draw()
+    return axes
+
 
 @filters.active
 def plot_active(epithelium, ax=None):
@@ -60,7 +96,7 @@ def sz_scatter(eptm, pmap, ax, log=False,
         bin_inf = bins[cumhist > clip][0]     
         bin_sup = bins[cumhist < 100 - clip][-1]
         n_data = n_data.clip(bin_inf, bin_sup)
-    n_data /= n_data.max()
+    n_data /= np.float(n_data.max())
     if log: 
         n_data = np.log(1 + n_data)
         
@@ -71,8 +107,126 @@ def sz_scatter(eptm, pmap, ax, log=False,
                cmap=plt.cm.jet, **kwargs)
     eptm.graph.set_vertex_filter(None)
 
+
+def plot_ortho_proj(epithelium, ax=None, vfilt=None, efilt=None, **kwargs):
+    if ax is None:
+        fig, ax = plt.subplots(1,1)
+    plot_cells_zs(epithelium, ax=ax,
+                  vfilt=vfilt, efilt=efilt, **kwargs)
+
+    divider = make_axes_locatable(ax)
     
-def plot_cells_sz(epithelium, ax=None, text=True,
+    ax_zr = divider.append_axes("top", 1.2, pad=0.1, sharex=ax)
+    ax_rs = divider.append_axes("right", 1.2, pad=0.1, sharey=ax)
+    
+    plot_cells_zr(epithelium, ax=ax_zr,
+                  vfilt=vfilt, efilt=efilt)
+    plot_cells_rs(epithelium, ax=ax_rs,
+                  vfilt=vfilt, efilt=efilt)
+    plt.setp(ax_zr.get_xticklabels() + ax_rs.get_yticklabels(),
+             visible=False)
+    plt.draw()
+    return ax, ax_zr, ax_rs
+
+    
+def plot_cells_zr(epithelium, ax=None, 
+                  vfilt=None, efilt=None):
+    if ax is None:
+        fig, ax = plt.subplots(1,1)
+    epithelium.graph.set_vertex_filter(vfilt)
+    rhos = epithelium.rhos.copy()
+    zeds = epithelium.zeds.copy()
+    for cell in epithelium.cells :
+        ax.plot(zeds[cell],
+                rhos[cell], 'bo', alpha=0.3)
+    basal_rho = np.ones_like(zeds.fa) * epithelium.params['rho_lumen']
+    #ax.plot(zeds.fa, basal_rho, 'k-')
+    epithelium.graph.set_vertex_filter(None)
+    plot_edges_zr(epithelium, efilt, ax=ax)
+    ax.set_ylabel('Radius', fontsize='large')
+    return ax
+
+def plot_cells_rs(epithelium, ax=None, 
+                  vfilt=None, efilt=None):
+    if ax is None:
+        fig, ax = plt.subplots(1,1)
+    epithelium.graph.set_vertex_filter(vfilt)
+    sigmas = epithelium.sigmas.copy()
+    rhos = epithelium.rhos.copy()
+    for cell in epithelium.cells :
+        ax.plot(rhos[cell],
+                sigmas[cell], 'bo', alpha=0.3)
+    basal_rho = np.ones_like(sigmas.fa) * epithelium.params['rho_lumen']
+    #ax.plot(basal_rho, sigmas.fa, 'k-')
+
+    epithelium.graph.set_vertex_filter(None)
+    plot_edges_rs(epithelium, efilt, ax=ax)
+    ax.set_xlabel('Radius', fontsize='large')
+    return ax
+
+def plot_edges_rs(epithelium, efilt=None,
+                  ax=None, **kwargs):
+    edge_width = epithelium.junctions.line_tensions.copy()
+    rhos = []
+    sigmas = []
+    if ax is None:
+        fig, ax = plt.subplots(1,1)
+    epithelium.graph.set_edge_filter(efilt)
+    epithelium.graph.set_vertex_filter(None)
+    edge_width.fa = 2. * (epithelium.junctions.line_tensions.fa
+                          / epithelium.junctions.line_tensions.fa.mean())**0.5
+    for edge in epithelium.junctions:
+        if edge is None:
+            print "invalid edge %s" %str(edge)
+            continue
+        rhos = (epithelium.rhos[edge.source()],
+                  epithelium.rhos[edge.target()])
+        sigmas = (epithelium.sigmas[edge.source()],
+                epithelium.sigmas[edge.target()])
+        ax.plot(rhos, sigmas,
+                'g-', lw=edge_width[edge],
+                alpha=0.4, **kwargs)
+    ax.set_aspect('equal')
+    epithelium.graph.set_edge_filter(None)
+
+def plot_edges_zr(epithelium, efilt=None,
+                  ax=None, **kwargs):
+    edge_width = epithelium.junctions.line_tensions.copy()
+    rhos = []
+    zeds = []
+    if ax is None:
+        fig, ax = plt.subplots(1,1)
+    epithelium.graph.set_edge_filter(efilt)
+    epithelium.graph.set_vertex_filter(None)
+    edge_width.fa = 2. * (epithelium.junctions.line_tensions.fa
+                          / epithelium.junctions.line_tensions.fa.mean())**0.5
+    for edge in epithelium.junctions:
+        if edge is None:
+            print "invalid edge %s" %str(edge)
+            continue
+        rhos = (epithelium.rhos[edge.source()],
+                  epithelium.rhos[edge.target()])
+        zeds = (epithelium.zeds[edge.source()],
+                epithelium.zeds[edge.target()])
+        ax.plot(zeds, rhos,
+                'g-', lw=edge_width[edge],
+                alpha=0.4, **kwargs)
+    ax.set_aspect('equal')
+    epithelium.graph.set_edge_filter(None)
+
+
+    
+    
+def plot_cells_sz(*args, **kwargs):
+    print('''
+          `plot_cells_sz` is deprecated, use
+          `plot_cells_zs` instead, or even better
+          `plot_ortho_proj`
+          ''')
+    return plot_cells_zs(*args, **kwargs)
+    
+
+def plot_cells_zs(epithelium, ax=None, text=True,
                   vfilt=None, efilt=None,
                   c_text=True, j_text=False):
     if ax is None:
@@ -92,14 +246,14 @@ def plot_cells_sz(epithelium, ax=None, text=True,
                 sigmas[cell], 'bo', alpha=0.3)
     epithelium.graph.set_vertex_filter(None)
     epithelium.graph.set_edge_filter(efilt)
-    plot_edges_sz(epithelium, efilt, ax=ax, text=j_text)
+    plot_edges_zs(epithelium, efilt, ax=ax, text=j_text)
     epithelium.graph.set_edge_filter(None)
     ax.set_xlabel('Proximo distal', fontsize='large')
     ax.set_ylabel('Around the leg', fontsize='large')
     plt.draw()
     return ax
-
-def plot_edges_sz(epithelium, efilt=None,
+    
+def plot_edges_zs(epithelium, efilt=None,
                   text=False, ax=None,
                   ls='g-', **kwargs):
     edge_width = epithelium.junctions.line_tensions.copy()

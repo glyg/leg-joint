@@ -20,7 +20,7 @@
     <unit>um</unit>
     <description>lumen radius</description>
   </param>
-  <param max="100." min="0.1" name="cell_volume" step="0.1" value="60.">
+  <param max="200." min="0.1" name="cell_volume" step="0.1" value="80.">
     <unit>um3</unit>
     <description>cell volume</description>
   </param>
@@ -56,7 +56,7 @@
     <unit>adim</unit>
     <description>Apical-basal tension</description>
   </param>
-  <param max="1." min="0." name="vol_elasticity" step="0.001" value="10.">
+  <param max="1." min="0." name="vol_elasticity" step="0.001" value="1.">
     <unit>adim</unit>
     <description>Volume elasticity</description>
   </param>

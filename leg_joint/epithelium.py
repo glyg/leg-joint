@@ -117,7 +117,7 @@ class Epithelium(EpitheliumFilters,
         rho_lumen = self.params['rho_lumen']
         for cell in self.cells:
             self._one_cell_geom(cell)
-        self.thetas.fa = self.sigmas.fa / self.rhos.fa
+        #self.thetas.fa = self.sigmas.fa / self.rhos.fa
         self.cells.vols.fa = self.cells.areas.fa * (self.rhos.fa - rho_lumen)
             
     def _one_cell_geom(self, cell):
@@ -147,9 +147,6 @@ class Epithelium(EpitheliumFilters,
             ctoj1 = self.graph.edge(cell, j_edge.target())
             area += np.abs(self.dsigmas[ctoj0] * self.dzeds[ctoj1]
                            - self.dsigmas[ctoj1] * self.dzeds[ctoj0])/2.
-            self.zeds[cell] += self.zeds[j_edge.target()]
-            self.rhos[cell] += self.rhos[j_edge.target()]
-
         self.cells.areas[cell] = area
         self.cells.perimeters[cell] = perimeter
 
@@ -180,6 +177,8 @@ class Epithelium(EpitheliumFilters,
     def set_new_rhos(self, rhos):
         self.rhos.fa = rhos
         self.sigmas.fa = self.thetas.fa * rhos
+        
+
         
     def reset_topology(self):
         self.junctions.update_adjacent()
@@ -272,8 +271,10 @@ class Epithelium(EpitheliumFilters,
         ctoj_0b = self.graph.edge(cell0, j_vertb)
         if ctoj_0b is not None:
             if self.__verbose__:
-                print ('''Warning: previous cell %s 
-                        to junction vertex %s edge is re-created.'''
+                print ('''
+                       Warning: previous cell %s 
+                       to junction vertex %s edge is re-created.
+                       '''
                        % (str(cell0), str(j_vertb)))
             self.graph.remove_edge(ctoj_0b)
         ctoj_0b = self.graph.add_edge(cell0, j_vertb)
@@ -284,9 +285,12 @@ class Epithelium(EpitheliumFilters,
         if cell1 is not None:
             ctoj_1a = self.graph.edge(cell1, j_verta)
             if ctoj_1a is not None:
-                # print ("Warning: previous cell %s "
-                #        "to junction vertex %s edge is re-created."
-                #        ) % (str(cell1), str(j_verta))
+                if self.__verbose__ :
+                    print('''
+                          Warning: previous cell %s 
+                          to junction vertex %s edge is re-created.
+                          '''
+                          % (str(cell1), str(j_verta)))
                 self.graph.remove_edge(ctoj_1a)
             ctoj_1a = self.graph.add_edge(cell1, j_verta)
             self.is_junction_edge[ctoj_1a] = 0
@@ -295,9 +299,12 @@ class Epithelium(EpitheliumFilters,
 
             ctoj_1b = self.graph.edge(cell1, j_vertb)
             if ctoj_1b is not None:
-                # print ("Warning: previous cell %s "
-                #        "to junction vertex %s edge is re-created."
-                #        ) % (str(cell1), str(j_vertb))
+                if self.__verbose__ :
+                    print('''
+                          Warning: previous cell %s 
+                          to junction vertex %s edge is re-created.
+                          '''
+                          % (str(cell1), str(j_vertb)))
                 self.graph.remove_edge(ctoj_1b)
             ctoj_1b = self.graph.add_edge(cell1, j_vertb)
             self.is_junction_edge[ctoj_1b] = 0

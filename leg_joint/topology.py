@@ -54,7 +54,7 @@ def type1_transition(eptm, elements, verbose=False):
         * two junction vertices (a and b)
         * or a single edge (between a and b)
     """
-
+    #### Parsing arguments
     # Cells
     if len(elements) == 2 and eptm.is_cell_vert[elements[0]]:
         cell1 = elements[0]
@@ -94,6 +94,8 @@ def type1_transition(eptm, elements, verbose=False):
             return
     else:
         raise ValueError("Invalid argument %s" % str(elements))
+    #### Done parsing arguments
+
     try:
         vecinos_a = [jv for jv in eptm.ordered_neighbours(j_verta)
                      if not eptm.is_cell_vert[jv]]
@@ -102,8 +104,15 @@ def type1_transition(eptm, elements, verbose=False):
         j_vertf, j_vertc = [jv for jv in vecinos_a if jv != j_vertb]
         j_verte, j_vertd = [jv for jv in vecinos_b if jv != j_verta]
     except ValueError:
-        print "Valid only for 3-way junctions"
-        return
+        print('''
+              Valid only for 3-way junctions
+              For type 1 transition between cells
+              %s and %s
+              ''' %(str(cell1), str(cell3)))
+        eptm.set_local_mask(cell1)
+        eptm.set_local_mask(cell3)
+        return None
+
     j_edgeac = eptm.any_edge(j_verta, j_vertc)
     j_edgebe = eptm.any_edge(j_vertb, j_verte)
     if j_edgebe is None or j_edgeac is None:
@@ -130,7 +139,7 @@ def type1_transition(eptm, elements, verbose=False):
     modified_cells = [cell1, cell2, cell3, cell4]
     modified_jverts = [j_verta, j_vertb, j_vertc,
                        j_vertd, j_verte, j_vertf]
-    if verbose : 
+    if eptm.__verbose__ : 
         for cell, i in zip(modified_cells, [1, 2, 3, 4]):
             print 'cell %i: %s' %(i, str(cell))
         for jv, i in zip(modified_jverts, 'abcdef'):
@@ -188,6 +197,9 @@ def cell_division(eptm, mother_cell,
 
     a0 = eptm.params['prefered_area']
     eptm.cells.prefered_area[mother_cell] = a0
+    rl = eptm.params['rho_lumen']
+    v0 = a0 * (eptm.rhos[mother_cell] - rl)
+    eptm.cells.prefered_vol[mother_cell] = v0    
     daughter_cell = eptm.new_vertex(mother_cell)
     eptm.is_cell_vert[daughter_cell] = 1
     eptm.cells.ages[mother_cell] += 1
@@ -408,11 +420,11 @@ def resolve_small_edges(eptm, threshold=5e-2, vfilt=None, efilt=None):
         print 'Type 1 transition'
         energy0 = eptm.calc_energy()
         backup_graph = eptm.graph.copy()
-        modified_cells, modified_jverts = type1_transition(eptm,
-                                                           (cell0, cell1))
-        pos0, pos1 = eptm.find_energy_min()
-        energy1 = eptm.calc_energy()
-        if energy0 < energy1:
-            print 'Undo transition!'
-            eptm.graph = backup_graph
-    eptm.graph.set_edge_filter(None)
+        modified = type1_transition(eptm, (cell0, cell1))
+        if modified is not None:
+            pos0, pos1 = eptm.find_energy_min()
+            energy1 = eptm.calc_energy()
+            if energy0 < energy1:
+                print 'Undo transition!'
+                eptm.graph = backup_graph
+        eptm.graph.set_edge_filter(None)

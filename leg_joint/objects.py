@@ -424,9 +424,9 @@ class Cells():
         perimeters.a[:] = 6 * self.params['lambda_0']
         self.eptm.graph.vertex_properties["perimeters"]\
             = perimeters
-        vol0 = area0 * (rho0 - rho_lumen)
+        cell_volume = self.params['cell_volume']
         vols = self.eptm.graph.new_vertex_property('float')
-        vols.a[:] = vol0
+        vols.a[:] = cell_volume
         self.eptm.graph.vertex_properties["vols"] = vols
         
     @property
@@ -449,10 +449,9 @@ class Cells():
         self.eptm.graph.vertex_properties["prefered_area"]\
             = prefered_area
 
-        rho_lumen = self.params['rho_lumen']
-        rho0 = self.params['rho0']
+        cell_volume = self.params['cell_volume']
         prefered_vol = self.eptm.graph.new_vertex_property('float')
-        prefered_vol.a = (rho0 - rho_lumen ) * prefered_area0
+        prefered_vol.a[:] = cell_volume
         self.eptm.graph.vertex_properties['prefered_vol']\
             = prefered_vol
         

@@ -60,6 +60,7 @@ class Dynamics(object):
         """ Computes the apical energy on the filtered epithelium """
         cells_term, denominator = self.calc_cells_energy()
         junction_term = self.calc_junctions_energy()
+        
         total_energy = cells_term + junction_term
         return total_energy / denominator
 
@@ -96,7 +97,9 @@ class Dynamics(object):
     def update_gradient(self):
         self.update_cells_grad()
         self.update_junctions_grad()
+        
 
+        
     def update_junctions_grad(self):
         # Junction edges
         if self.__verbose__ :
@@ -141,47 +144,43 @@ class Dynamics(object):
                                    self.cells.prefered_area.fa )
         self.contractile_grad.fa =  self.cells.contractilities.fa \
                                     * self.cells.perimeters.fa
-        self.volume_grad.fa = self.cells.vol_elasticities.fa \
-                              * (self.cells.vols.fa
-                                 - self.cells.prefered_vol.fa)
-        
+       
     @filters.active
     def radial_grad_array(self):
 
-        rho_lumen = self.params['rho_lumen']
-        rho0 = self.params['rho0']
-        rho_lumen = self.params['rho_lumen']
-        rho0 = self.params['rho0']
-        area0 = self.params['prefered_area']
-        num_cells = self.graph.num_vertices() #elastic_term.size
-        prefered_vol0 = area0 * (rho0 - rho_lumen)
-        norm_factor = num_cells * prefered_vol0 * prefered_vol0
+        prefered_area0 =  self.params['prefered_area']
+        elasticity0 = self.params['elasticity']
+        norm_factor = prefered_area0 * elasticity0
         gradient = np.zeros(self.graph.num_vertices())
-
         if self.__verbose__ : print 'Gradient shape: %s' % gradient.shape
         gradient = self.grad_radial.fa / norm_factor
         return gradient
 
+    @filters.cells_in
     def calc_radial_energy(self):
-        rho_lumen = self.params['rho_lumen']
-        rho0 = self.params['rho0']
-        area0 = self.params['prefered_area']
         num_cells = self.graph.num_vertices() #elastic_term.size
-        prefered_vol0 = area0 * (rho0 - rho_lumen)
-        norm_factor = num_cells * prefered_vol0 * prefered_vol0**2
-        radial_tension_energy = self.junctions.radial_tensions.fa \
-                                * self.rhos.fa
-        radial_tension_energy *= self.is_cell_vert.fa * self.is_alive.fa
+        prefered_area0 =  self.params['prefered_area']
+        elasticity0 = self.params['elasticity']
+        denominator = num_cells * elasticity0 * prefered_area0**2
 
         volume_energy = self.cells.vol_elasticities.fa \
                         * (self.cells.vols.fa - self.cells.prefered_vol.fa)**2
-        total_energy = radial_tension_energy.sum() + volume_energy.sum()
-        return total_energy / norm_factor
-        
+        return volume_energy.sum() / denominator
 
-    @filters.ctoj_in
     def update_radial_grad(self):
-        self.grad_radial.fa = self.junctions.radial_tensions.fa
+        self.update_radial_cell_grad()
+        self.update_radial_junctions_grad()
+
+        
+    @filters.cells_in
+    def update_radial_cell_grad(self):
+        self.volume_grad.fa = self.cells.vol_elasticities.fa \
+                              * (self.cells.vols.fa
+                                 - self.cells.prefered_vol.fa)
+     
+    @filters.ctoj_in
+    def update_radial_junctions_grad(self):
+        self.grad_radial.fa[:] = 0 #self.junctions.radial_tensions.fa
         if self.__verbose__:
             print('''
                   Updating radial gradient
@@ -222,10 +221,9 @@ class Dynamics(object):
         self.set_vertex_state([(self.is_cell_vert, False),
                                (self.is_alive, False)])
         area = self.cells.areas.fa.mean()
-        vol = self.cells.vols.fa.mean()
+        height = self.cells.prefered_vol.fa.mean() / area
+        rho_avg = self.rhos.fa.mean()
         self.set_vertex_state()
-        height = vol/area
-        rho_avg = self.rhos.a.mean()
         self.params['rho_lumen'] = rho_avg - height
         
     def isotropic_grad(self, delta, gamma, lbda):

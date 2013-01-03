@@ -20,23 +20,25 @@ def before_after(func):
         import leg_joint as lj
         fig, axes = plt.subplots(1,2, figsize=(12,4),
                                  sharex=True, sharey=True)
-        lj.plot_cells_sz(eptm, axes[0], c_text=False, 
-                              vfilt=eptm.is_local_vert,
-                              efilt=eptm.is_local_edge)
-        lj.plot_gradients(eptm, axes[0])
+        subaxes = lj.plot_ortho_proj(eptm, axes[0], c_text=False, 
+                                     vfilt=eptm.is_local_vert,
+                                     efilt=eptm.is_local_edge)
+        lj.plot_ortho_gradients(eptm, subaxes)
         foutput = func(eptm, *args, **kwargs)
         eptm.update_gradient()
-        lj.plot_cells_sz(eptm, axes[1], c_text=False,
-                              vfilt=eptm.is_local_vert,
-                              efilt=eptm.is_local_edge)
-        lj.plot_gradients(eptm, axes[1])
+        subaxes = lj.plot_ortho_proj(eptm, axes[1], c_text=False,
+                                     vfilt=eptm.is_local_vert,
+                                     efilt=eptm.is_local_edge)
+        lj.plot_ortho_gradients(eptm, subaxes)
         return foutput
     return new_func
 
 @before_after
 def local_optimum(eptm, **kwargs):
-    # eptm.update_gradient()
+    eptm.update_gradient()
+    eptm.update_radial_grad()
     pos0, pos1 = eptm.find_energy_min(**kwargs)
+    eptm.update_radial_grad()
     return pos0, pos1
 
 
