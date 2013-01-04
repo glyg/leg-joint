@@ -21,8 +21,8 @@ def plot_gradients(eptm, ax=None, scale=1., **kwargs):
     sigmas = eptm.sigmas.fa
     zeds = eptm.zeds.fa
     eptm.graph.set_vertex_filter(eptm.is_local_vert)
-    grad_sigmas = grad[::2] * scale
-    grad_zeds = grad[1::2] * scale
+    grad_sigmas = grad[::3] * scale
+    grad_zeds = grad[1::3] * scale
     # We plot the forces, which is easier to understand
     v_sigmas = np.array([sigmas, - grad_sigmas]).T
     v_zeds = np.array([zeds, - grad_zeds]).T
@@ -40,18 +40,18 @@ def plot_gradients(eptm, ax=None, scale=1., **kwargs):
 @filters.local
 def plot_ortho_gradients(eptm, axes=None,
                          scale=1., **kwargs):
-    grad_sz = eptm.gradient_array()
-    grad_r = eptm.radial_grad_array()
+    grad_szr = eptm.gradient_array()
     eptm.graph.set_vertex_filter(eptm.is_active_vert)
     sigmas = eptm.sigmas.fa
     zeds = eptm.zeds.fa
     rhos = eptm.rhos.fa
-    grad_sigmas = grad_sz[::2] * scale
-    grad_zeds = grad_sz[1::2] * scale
+    grad_sigmas = grad_szr[::3] * scale
+    grad_zeds = grad_szr[1::3] * scale
+    grad_rhos = grad_szr[2::3] * scale
     # We plot the forces, which are easier to understand
     v_sigmas = np.array([sigmas, - grad_sigmas]).T
     v_zeds = np.array([zeds, - grad_zeds]).T
-    v_radial = np.array([rhos, - grad_r]).T
+    v_radial = np.array([rhos, - grad_rhos]).T
     if axes is None:
         ax_zs, ax_zr, ax_rs =  plot_ortho_proj(eptm, ax=None,
                                                vfilt=eptm.is_local_vert,
@@ -233,9 +233,9 @@ def plot_cells_zs(epithelium, ax=None, text=True,
         fig, ax = plt.subplots(1,1)
     epithelium.graph.set_vertex_filter(vfilt)
     # We project the shape on the average cylinder
-    mean_rho = epithelium.rhos.fa.mean()
+    # mean_rho = epithelium.rhos.fa.mean()
     sigmas = epithelium.sigmas.copy()
-    sigmas.fa = epithelium.thetas.fa * mean_rho
+    #sigmas.fa = epithelium.thetas.fa * mean_rho
     zeds = epithelium.zeds.copy()
     for cell in epithelium.cells :
         if text and c_text:

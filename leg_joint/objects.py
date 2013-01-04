@@ -424,9 +424,9 @@ class Cells():
         perimeters.a[:] = 6 * self.params['lambda_0']
         self.eptm.graph.vertex_properties["perimeters"]\
             = perimeters
-        cell_volume = self.params['cell_volume']
+        vol0 = area0 * (rho0 - rho_lumen)
         vols = self.eptm.graph.new_vertex_property('float')
-        vols.a[:] = cell_volume
+        vols.a[:] = vol0
         self.eptm.graph.vertex_properties["vols"] = vols
         
     @property

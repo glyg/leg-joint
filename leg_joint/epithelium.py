@@ -5,7 +5,7 @@ import os
 
 import graph_tool.all as gt
 import numpy as np
-from scipy import optimize, weave
+from scipy import weave
 
 
 from .objects import  AbstractRTZGraph, Cells, ApicalJunctions
@@ -84,7 +84,6 @@ class Epithelium(EpitheliumFilters,
         self.update_geometry()
         if self.__verbose__: print 'Update gradient'
         self.update_gradient()
-        self.update_radial_grad()
         
     def __str__(self):
         num_cells = self.is_cell_vert.a.sum()
@@ -104,7 +103,7 @@ class Epithelium(EpitheliumFilters,
     def update_apical_geom(self):
         print 'Deprecated, use `update_geometry` instead'
         return self.update_geometry()
-        
+    
     def update_geometry(self):
         # Edges
         if self.__verbose__: print ('Geometry update on %i edges'
@@ -117,7 +116,7 @@ class Epithelium(EpitheliumFilters,
         rho_lumen = self.params['rho_lumen']
         for cell in self.cells:
             self._one_cell_geom(cell)
-        #self.thetas.fa = self.sigmas.fa / self.rhos.fa
+        self.thetas.fa = self.sigmas.fa / self.rhos.fa
         self.cells.vols.fa = self.cells.areas.fa * (self.rhos.fa - rho_lumen)
             
     def _one_cell_geom(self, cell):
@@ -145,18 +144,39 @@ class Epithelium(EpitheliumFilters,
             perimeter += self.edge_lengths[j_edge]
             ctoj0 = self.graph.edge(cell, j_edge.source())
             ctoj1 = self.graph.edge(cell, j_edge.target())
+            # dcurv0 = np.array([self.dsigmas[ctoj0],
+            #                    self.dzeds[ctoj0],
+            #                    self.drhos[ctoj0]])
+            # dcurv1 = np.array([self.dsigmas[ctoj1],
+            #                    self.dzeds[ctoj1],
+            #                    self.drhos[ctoj1]])
+            # area += np.abs(np.dot(dcurv0, dcurv1))
             area += np.abs(self.dsigmas[ctoj0] * self.dzeds[ctoj1]
                            - self.dsigmas[ctoj1] * self.dzeds[ctoj0])/2.
         self.cells.areas[cell] = area
         self.cells.perimeters[cell] = perimeter
-
+        
+    def set_new_pos(self, new_szr_pos):
+        self.set_junction_pos(new_szr_pos)
+        for cell in self.cells:
+            self.set_cell_pos(cell)
+        self.thetas.fa = self.sigmas.fa / self.rhos.fa
+        
+    @filters.active
+    def set_junction_pos(self, new_szr_pos):
+        new_szr_pos = new_szr_pos.flatten()
+        assert len(new_szr_pos) / 3 == self.graph.num_vertices()
+        self.sigmas.fa = new_szr_pos[::3]
+        self.zeds.fa = new_szr_pos[1::3]
+        self.rhos.fa = new_szr_pos[2::3]
+    
+    def set_cell_pos(self, cell):
         ##  Update cell position 
         j_rsz = np.array([[self.rhos[jv], self.sigmas[jv], self.zeds[jv]]
                           for jv in cell.out_neighbours()])
         ### set z and rho
         self.zeds[cell] = j_rsz[:,2].mean()
         self.rhos[cell] = j_rsz[:,0].mean()
-        
         ### set periodic sigma
         raw_dsigma = j_rsz[:,1] - self.sigmas[cell]
         period = tau * self.rhos[cell] 
@@ -165,14 +185,6 @@ class Epithelium(EpitheliumFilters,
         pbc_sigma[raw_dsigma > period/2] -= period
         self.sigmas[cell] = pbc_sigma.mean()
         
-    @filters.active
-    def set_new_pos(self, new_sz_pos):
-        new_sz_pos = new_sz_pos.flatten()
-        assert len(new_sz_pos) / 2 == self.graph.num_vertices()
-        self.sigmas.fa = new_sz_pos[::2]
-        self.zeds.fa = new_sz_pos[1::2]
-        self.thetas.fa = self.sigmas.fa / self.rhos.fa
-
     @filters.active
     def set_new_rhos(self, rhos):
         self.rhos.fa = rhos
@@ -185,7 +197,6 @@ class Epithelium(EpitheliumFilters,
         self.cells.update_junctions()
         self.update_geometry()
         self.update_gradient()
-        self.update_radial_grad()
         
     def outward_uvect(self, cell, j_edge):
         """
@@ -281,6 +292,7 @@ class Epithelium(EpitheliumFilters,
         self.is_junction_edge[ctoj_0b] = 0
         self.is_ctoj_edge[ctoj_0b] = 1
         self.is_new_edge[ctoj_0b] = 1
+        self.set_cell_pos(cell0)
 
         if cell1 is not None:
             ctoj_1a = self.graph.edge(cell1, j_verta)
@@ -310,6 +322,7 @@ class Epithelium(EpitheliumFilters,
             self.is_junction_edge[ctoj_1b] = 0
             self.is_ctoj_edge[ctoj_1b] = 1
             self.is_new_edge[ctoj_1b] = 1
+            self.set_cell_pos(cell1)
         return j_verta, j_vertb, cell0, cell1
 
     def remove_junction(self, j_verta, j_vertb, cell0, cell1):

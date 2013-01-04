@@ -18,6 +18,7 @@ def before_after(func):
     def new_func(eptm, *args, **kwargs):
         import matplotlib.pyplot as plt
         import leg_joint as lj
+        eptm.update_gradient()
         fig, axes = plt.subplots(1,2, figsize=(12,4),
                                  sharex=True, sharey=True)
         subaxes = lj.plot_ortho_proj(eptm, axes[0], c_text=False, 
@@ -35,10 +36,8 @@ def before_after(func):
 
 @before_after
 def local_optimum(eptm, **kwargs):
-    eptm.update_gradient()
-    eptm.update_radial_grad()
+    #eptm.update_gradient()
     pos0, pos1 = eptm.find_energy_min(**kwargs)
-    eptm.update_radial_grad()
     return pos0, pos1
 
 

@@ -198,7 +198,7 @@ def cell_division(eptm, mother_cell,
     a0 = eptm.params['prefered_area']
     eptm.cells.prefered_area[mother_cell] = a0
     rl = eptm.params['rho_lumen']
-    v0 = a0 * (eptm.rhos[mother_cell] - rl)
+    v0 = eptm.params['cell_volume']#a0 * (eptm.rhos[mother_cell] - rl)
     eptm.cells.prefered_vol[mother_cell] = v0    
     daughter_cell = eptm.new_vertex(mother_cell)
     eptm.is_cell_vert[daughter_cell] = 1
@@ -287,7 +287,6 @@ def cell_division(eptm, mother_cell,
     # Cytokinesis
     septum = eptm.add_junction(new_jvs[0], new_jvs[1],
                                mother_cell, daughter_cell)
-    
     eptm.set_local_mask(daughter_cell)
     eptm.set_vertex_state()
     eptm.set_edge_state()

@@ -33,14 +33,12 @@ def new_generation(eptm, growth_rate=1.8):
         eptm.cells.prefered_area[mother_cell] *= growth_rate
         eptm.update_geometry()
         eptm.update_gradient()
-        pos0, pos1 = eptm.find_energy_min(apical_tol=1e-4,
-                                          radial_tol=1e-5)
+        pos0, pos1 = eptm.find_energy_min(tol=1e-4)
         j = lj.cell_division(eptm, mother_cell, verbose=False)
         eptm.update_geometry()
         eptm.update_gradient()
         if j is not None:
-            pos0, pos1 = eptm.find_energy_min(apical_tol=1e-4,
-                                              radial_tol=1e-5)
+            pos0, pos1 = eptm.find_energy_min(tol=1e-4)
             now = datetime.now()
             eptm.graph.save("saved_graphs/xml/tmp/generation%s.xml"
                             % now.isoformat())
@@ -49,7 +47,7 @@ def new_generation(eptm, growth_rate=1.8):
             lj.draw(eptm, output2d=outfname2d,
                     output3d=outfname3d)
             eptm.isotropic_relax()
-            lj.resolve_small_edges(eptm, threshold=0.25)
+            #lj.resolve_small_edges(eptm, threshold=0.25)
         else:
             print 'division failed'
         num += 1

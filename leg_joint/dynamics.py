@@ -64,42 +64,61 @@ class Dynamics(object):
         total_energy = cells_term + junction_term
         return total_energy / denominator
 
+    @filters.cells_in
+    def calc_cells_energy(self):
+        # elastic_term = 0.5 * self.cells.elasticities.fa * (
+        #     self.cells.areas.fa - self.cells.prefered_area.fa)**2
+        contractile_term = 0.5 * self.cells.contractilities.fa * \
+                           self.cells.perimeters.fa**2
+        volume_term = 0.5 * self.cells.vol_elasticities.fa \
+                      * (self.cells.vols.fa - self.cells.prefered_vol.fa)**2
+        num_cells = self.graph.num_vertices() #elastic_term.size
+        prefered_area0 =  self.params['prefered_area']
+        elasticity0 = self.params['elasticity']
+        denominator = num_cells * elasticity0 * prefered_area0**2
+        cells_energy = contractile_term + volume_term# + elastic_term
+        return cells_energy.sum(), denominator
+
+    @filters.cells_in
+    def calc_volume_energy(self):
+        return volume_term.sum()
+
+        
     @filters.j_edges_in
     def calc_junctions_energy(self):
         junctions_energy = self.junctions.line_tensions.fa\
                            * self.edge_lengths.fa
         return junctions_energy.sum()
-
-    @filters.cells_in
-    def calc_cells_energy(self):
-        elastic_term = 0.5 * self.cells.elasticities.fa * (
-            self.cells.areas.fa - self.cells.prefered_area.fa)**2
-        contractile_term = 0.5 * self.cells.contractilities.fa * \
-                           self.cells.perimeters.fa**2
-        num_cells = self.graph.num_vertices() #elastic_term.size
-        prefered_area0 =  self.params['prefered_area']
-        elasticity0 = self.params['elasticity']
-        denominator = num_cells * elasticity0 * prefered_area0**2
-        cells_energy = elastic_term + contractile_term
-        return cells_energy.sum(), denominator
         
     @filters.active
     def gradient_array(self):
         prefered_area0 =  self.params['prefered_area']
         elasticity0 = self.params['elasticity']
         norm_factor = prefered_area0 * elasticity0
-        gradient = np.zeros(self.graph.num_vertices() * 2)
+        gradient = np.zeros(self.graph.num_vertices() * 3)
         if self.__verbose__ : print 'Gradient shape: %s' % gradient.shape
-        gradient[::2] = self.grad_sigma.fa / norm_factor
-        gradient[1::2] = self.grad_zed.fa / norm_factor
+        gradient[::3] = self.grad_sigma.fa / norm_factor
+        gradient[1::3] = self.grad_zed.fa / norm_factor
+        gradient[2::3] = self.grad_radial.fa / norm_factor
         return gradient
 
     def update_gradient(self):
         self.update_cells_grad()
         self.update_junctions_grad()
         
-
         
+    @filters.cells_in
+    def update_cells_grad(self):
+        # Cell vertices
+        self.elastic_grad.fa =  self.cells.elasticities.fa \
+                                * (self.cells.areas.fa -
+                                   self.cells.prefered_area.fa )
+        self.contractile_grad.fa =  self.cells.contractilities.fa \
+                                    * self.cells.perimeters.fa
+        self.volume_grad.fa = self.cells.vol_elasticities.fa \
+                              * (self.cells.vols.fa
+                                 - self.cells.prefered_vol.fa)
+
     def update_junctions_grad(self):
         # Junction edges
         if self.__verbose__ :
@@ -112,84 +131,33 @@ class Dynamics(object):
                 %i junctions vertices, %i junctions edges
                 and %i cell to junction edges'''
                 % (num_cells, num_jverts, num_edges, num_ctoj))
-        self.grad_sigma.fa = 0.
-        self.grad_zed.fa = 0.
-        for edge in self.junctions:
-            tension = self.junctions.line_tensions[edge]
-            j_src, j_trgt = edge.source(), edge.target()
-            u_sg = self.u_dsigmas[edge]
-            u_zg = self.u_dzeds[edge]
-            for cell in self.junctions.adjacent_cells[edge]:
-                perp_sigma, perp_zed =  self.outward_uvect(cell, edge)
-                el_grad = self.elastic_grad[cell]
-                ctr_grad = self.contractile_grad[cell]
-                self.grad_sigma[j_src] += el_grad * perp_sigma\
-                                          - ctr_grad * u_sg   
-                self.grad_sigma[j_trgt] += el_grad * perp_sigma\
-                                           + ctr_grad * u_sg
-                self.grad_zed[j_src] += el_grad * perp_zed\
-                                        - ctr_grad * u_zg
-                self.grad_zed[j_trgt] += el_grad * perp_zed\
-                                        + ctr_grad * u_zg
-            self.grad_sigma[j_src] += - tension * u_sg
-            self.grad_zed[j_src] += - tension * u_zg
-            self.grad_sigma[j_trgt] += tension * u_sg
-            self.grad_zed[j_trgt] += tension * u_zg
-
-    @filters.cells_in
-    def update_cells_grad(self):
-        # Cell vertices
-        self.elastic_grad.fa =  self.cells.elasticities.fa \
-                                * (self.cells.areas.fa -
-                                   self.cells.prefered_area.fa )
-        self.contractile_grad.fa =  self.cells.contractilities.fa \
-                                    * self.cells.perimeters.fa
-       
-    @filters.active
-    def radial_grad_array(self):
-
-        prefered_area0 =  self.params['prefered_area']
-        elasticity0 = self.params['elasticity']
-        norm_factor = prefered_area0 * elasticity0
-        gradient = np.zeros(self.graph.num_vertices())
-        if self.__verbose__ : print 'Gradient shape: %s' % gradient.shape
-        gradient = self.grad_radial.fa / norm_factor
-        return gradient
-
-    @filters.cells_in
-    def calc_radial_energy(self):
-        num_cells = self.graph.num_vertices() #elastic_term.size
-        prefered_area0 =  self.params['prefered_area']
-        elasticity0 = self.params['elasticity']
-        denominator = num_cells * elasticity0 * prefered_area0**2
-
-        volume_energy = self.cells.vol_elasticities.fa \
-                        * (self.cells.vols.fa - self.cells.prefered_vol.fa)**2
-        return volume_energy.sum() / denominator
-
-    def update_radial_grad(self):
-        self.update_radial_cell_grad()
-        self.update_radial_junctions_grad()
-
-        
-    @filters.cells_in
-    def update_radial_cell_grad(self):
-        self.volume_grad.fa = self.cells.vol_elasticities.fa \
-                              * (self.cells.vols.fa
-                                 - self.cells.prefered_vol.fa)
-     
-    @filters.ctoj_in
-    def update_radial_junctions_grad(self):
-        self.grad_radial.fa[:] = 0 #self.junctions.radial_tensions.fa
-        if self.__verbose__:
-            print('''
-                  Updating radial gradient
-                  for %i cell to junction edges
-                  ''' % self.graph.num_edges)
-        for e in self.graph.edges():
-            if not self.is_alive[e.source()]: continue
-            self.grad_radial[e.target()] += self.u_drhos[e] \
-                                            * self.volume_grad[e.source()]
+        self.grad_sigma.fa[:] = 0.
+        self.grad_zed.fa[:] = 0.
+        self.grad_radial.fa[:] = 0.
+        for jv in self.graph.vertices():
+            if self.is_cell_vert[jv]: continue
+            for edge in jv.all_edges():
+                if self.is_ctoj_edge[edge]:
+                    cell = edge.source()
+                    el_grad = self.elastic_grad[cell]
+                    vol_grad = self.volume_grad[cell]
+                    ctr_grad = self.contractile_grad[cell]
+                    self.grad_sigma[jv] += self.u_dsigmas[edge] * (el_grad
+                                                                   + ctr_grad)
+                    self.grad_zed[jv] += self.u_dzeds[edge] * (el_grad
+                                                                + ctr_grad)
+                    self.grad_radial[jv] += self.u_drhos[edge] * vol_grad
+                else:
+                    tension = self.junctions.line_tensions[edge]
+                    u_sg = self.u_dsigmas[edge]
+                    u_zg = self.u_dzeds[edge]
+                    if jv == edge.source():
+                        self.grad_sigma[jv] += -tension * u_sg
+                        self.grad_zed[jv] += -tension * u_zg
+                    else:
+                        self.grad_sigma[jv] += tension * u_sg
+                        self.grad_zed[jv] += tension * u_zg
+                        
             
     def isotropic_relax(self):
         
