@@ -71,8 +71,10 @@ class Epithelium(EpitheliumFilters,
             self.graph.purge_edges()
             self.set_vertex_state()
             self.set_edge_state()
-        self.cells.update_junctions()
-        self.junctions.update_adjacent()
+
+        self.diamonds = self.graph.new_edge_property('object')
+        self.cells.update_junctions() #Also registers the triangles
+        self.junctions.update_adjacent() #Also registers the diamonds
         # Dynamical components
         Dynamics.__init__(self)    
         Optimizers.__init__(self)
@@ -100,119 +102,92 @@ class Epithelium(EpitheliumFilters,
             str1.append('    * %s' % key)
         return '\n'.join(str1)
 
+    @property
+    def num_sides(self):
+        return self.graph.degree_property_map('out')
+        
     def update_apical_geom(self):
         print 'Deprecated, use `update_geometry` instead'
         return self.update_geometry()
     
     def update_geometry(self):
         # Edges
-        if self.__verbose__: print ('Geometry update on %i edges'
-                                    % self.graph.num_edges())
+        if self.__verbose__:
+            print ('Geometry update on %i edges'
+                   % self.graph.num_edges())
+        for cell in self.cells:
+            self.set_cell_pos(cell)
         self.update_deltas()
         self.update_edge_lengths()
         # Cells
         if self.__verbose__: print ('Cells geometry update on %i vertices'
                                     % self.graph.num_vertices())
-        rho_lumen = self.params['rho_lumen']
+        for j_edge in self.junctions:
+            self.diamonds[j_edge].update_geometry()
+
         for cell in self.cells:
             self._one_cell_geom(cell)
-        self.thetas.fa = self.sigmas.fa / self.rhos.fa
-        self.cells.vols.fa = self.cells.areas.fa * (self.rhos.fa - rho_lumen)
-            
+        rho_lumen = self.params['rho_lumen']
+        self.cells.vols.fa = self.cells.areas.fa * (self.rhos.fa
+                                                    - rho_lumen)
     def _one_cell_geom(self, cell):
         """
-        The area is approximated as the sum
-        of the areas of the triangles
-        formed by the cell position and each junction
         """
-        if not self.is_alive[cell]: return
-        area = 0.
-        perimeter = 0.
         j_edges = self.cells.junctions[cell]
-        if self.__verbose__:
-            print(''' Cell %s has %i junction edges'''
-                  % (cell, len(j_edges)))
-        if len(j_edges) < 3 and self.is_alive[cell]:
+        if len(j_edges) < 3:
+            if not self.is_alive[cell]:
+                return
             if self.__verbose__:
                 print('''Two edges ain't enough to compute
                       area for cell %s''' % cell)
             self.cells.areas[cell] = self.cells.prefered_area[cell]
+            self.cells.vols[cell] = self.cells.prefered_vol[cell]
             self.cells.perimeters[cell] = 0.
             self.is_alive[cell] = 0
-            return
-        for j_edge in j_edges:
-            perimeter += self.edge_lengths[j_edge]
-            ctoj0 = self.graph.edge(cell, j_edge.source())
-            ctoj1 = self.graph.edge(cell, j_edge.target())
-            # dcurv0 = np.array([self.dsigmas[ctoj0],
-            #                    self.dzeds[ctoj0],
-            #                    self.drhos[ctoj0]])
-            # dcurv1 = np.array([self.dsigmas[ctoj1],
-            #                    self.dzeds[ctoj1],
-            #                    self.drhos[ctoj1]])
-            # area += np.abs(np.dot(dcurv0, dcurv1))
-            area += np.abs(self.dsigmas[ctoj0] * self.dzeds[ctoj1]
-                           - self.dsigmas[ctoj1] * self.dzeds[ctoj0])/2.
-        self.cells.areas[cell] = area
-        self.cells.perimeters[cell] = perimeter
+        else:
+            self.cells.areas[cell] = 0.
+            self.cells.perimeters[cell] = 0.
+            for j_edge in j_edges:
+                tr = self.diamonds[j_edge].triangles[cell]
+                self.cells.areas[cell] += tr.area * tr.sign
+                self.cells.perimeters[cell] += tr.length
+            
         
-    def set_new_pos(self, new_szr_pos):
-        self.set_junction_pos(new_szr_pos)
-        for cell in self.cells:
-            self.set_cell_pos(cell)
-        self.thetas.fa = self.sigmas.fa / self.rhos.fa
+    def set_new_pos(self, new_rtz_pos):
+        self.set_junction_pos(new_rtz_pos)
+        
         
     @filters.active
-    def set_junction_pos(self, new_szr_pos):
-        new_szr_pos = new_szr_pos.flatten()
-        assert len(new_szr_pos) / 3 == self.graph.num_vertices()
-        self.sigmas.fa = new_szr_pos[::3]
-        self.zeds.fa = new_szr_pos[1::3]
-        self.rhos.fa = new_szr_pos[2::3]
+    def set_junction_pos(self, new_rtz_pos):
+        new_rtz_pos = new_rtz_pos.flatten()
+        assert len(new_rtz_pos) / 3 == self.graph.num_vertices()
+        self.rhos.fa = new_rtz_pos[::3]
+        thetas = new_rtz_pos[1::3] / self.mean_rho
+        thetas = thetas % tau
+        self.thetas.fa = thetas
+        self.zeds.fa = new_rtz_pos[2::3]
+        self.sigmas.fa = self.thetas.fa * self.rhos.fa
     
     def set_cell_pos(self, cell):
         ##  Update cell position 
-        j_rsz = np.array([[self.rhos[jv], self.sigmas[jv], self.zeds[jv]]
+        j_rtz = np.array([[self.rhos[jv], self.thetas[jv], self.zeds[jv]]
                           for jv in cell.out_neighbours()])
         ### set z and rho
-        self.zeds[cell] = j_rsz[:,2].mean()
-        self.rhos[cell] = j_rsz[:,0].mean()
-        ### set periodic sigma
-        raw_dsigma = j_rsz[:,1] - self.sigmas[cell]
-        period = tau * self.rhos[cell] 
-        pbc_sigma = j_rsz[:,1]
-        pbc_sigma[raw_dsigma <= -period/2] += period
-        pbc_sigma[raw_dsigma > period/2] -= period
-        self.sigmas[cell] = pbc_sigma.mean()
-        
-    @filters.active
-    def set_new_rhos(self, rhos):
-        self.rhos.fa = rhos
-        self.sigmas.fa = self.thetas.fa * rhos
-        
-
+        self.rhos[cell] = j_rtz[:,0].mean()
+        self.zeds[cell] = j_rtz[:,2].mean()
+        ### set periodic theta
+        raw_dtheta = j_rtz[:,1] - self.thetas[cell]
+        pbc_theta = j_rtz[:,1]
+        pbc_theta[raw_dtheta <= -tau/2] += tau
+        pbc_theta[raw_dtheta > tau/2] -= tau
+        self.thetas[cell] = pbc_theta.mean()
+        self.sigmas[cell] = self.thetas[cell] * self.rhos[cell]
         
     def reset_topology(self):
-        self.junctions.update_adjacent()
         self.cells.update_junctions()
+        self.junctions.update_adjacent()
         self.update_geometry()
         self.update_gradient()
-        
-    def outward_uvect(self, cell, j_edge):
-        """
-        Returns the (sigma, zed) coordinates of the unitary vector
-        perpendicular to the junction edge `j_edge` and pointing
-        outward the cell `cell`
-        """
-        edge_usigma = self.u_dsigmas[j_edge]
-        edge_uzed = self.u_dzeds[j_edge]
-        ctoj = self.graph.edge(cell, j_edge.source())
-        cj_sigma = self.u_dsigmas[ctoj]
-        cj_zed = self.u_dzeds[ctoj]
-        cross_prod = cj_sigma * edge_uzed - edge_usigma * cj_zed
-        if cross_prod < 0:
-            return -edge_uzed, edge_usigma
-        return edge_uzed, -edge_usigma
 
     def check_phase_space(self, gamma, lbda):
         # See the energies.pynb notebook for the derivation of this:

@@ -43,8 +43,8 @@ def type1_transition(eptm, elements, verbose=False):
       b           \/          \   /
     1 | 3  ---->  ab  ----> 1  a-b  3  
       a           /\          /   \    
-     / \         f  c        f  4  c 
-    f 4 c                     
+     / \         c  f        c  4  f 
+    c 4 f                     
 
     Paramters
     =========
@@ -115,8 +115,16 @@ def type1_transition(eptm, elements, verbose=False):
 
     j_edgeac = eptm.any_edge(j_verta, j_vertc)
     j_edgebe = eptm.any_edge(j_vertb, j_verte)
-    if j_edgebe is None or j_edgeac is None:
+    if None in (j_edgebe, j_edgeac):
         raise ValueError("Invalid geometry")
+
+
+    # #### come back to the documented name convention
+    # if eptm.zeds[cell1] < eptm.zeds[cell3]:
+    #     #switch 1 and 3
+    #     cell3, cell1 = cell1, cell3
+    
+        
     if not cell1 in eptm.junctions.adjacent_cells[j_edgeac]:
         #Switch f and c
         j_vertc, j_vertf = j_vertf, j_vertc 
@@ -154,33 +162,46 @@ def type1_transition(eptm, elements, verbose=False):
 
     sigma_a = eptm.sigmas[j_verta]
     sigma_b = eptm.sigmas[j_vertb]
+    theta_a = eptm.thetas[j_verta]
+    theta_b = eptm.thetas[j_vertb]
+
     zed_a = eptm.zeds[j_verta]
     zed_b = eptm.zeds[j_vertb]
-    rhos_a = eptm.rhos[j_verta]
-    rhos_b = eptm.rhos[j_vertb]
+    rho_a = eptm.rhos[j_verta]
+    rho_b = eptm.rhos[j_vertb]
     period = rhos_a * 2 * np.pi
-    delta_s = np.abs(sigma_b - sigma_a)
-    if delta_s > period / 2:
-        delta_s -= period / 2
-        center_sigma = (sigma_a + period + sigma_b) / 2
+    delta_t = theta_b - theta_a
+    if delta_t >  np.pi:
+        delta_t -= 2 * np.pi
+        sigma_a += 2 * np.pi * rho_a
+        print 'flip'
+        flip = -1
+    elif delta_t < -np.pi:
+        delta_t += 2 * np.pi
+        sigma_b += 2 * np.pi * rho_a
+        print 'flip'
+        flip = -1
     else:
-        center_sigma = (sigma_a + sigma_b)/2.
+        flip = 1
+
+    center_sigma = (sigma_a + sigma_b) / 2
+    delta_s = delta_t * rho_a
     center_zed = (zed_a + zed_b)/2.
         
     delta_z = np.abs(zed_b - zed_a)
     if eptm.sigmas[cell1] < eptm.sigmas[cell3]:
-        eptm.sigmas[j_verta] = center_sigma + delta_z/2.
-        eptm.sigmas[j_vertb] = center_sigma - delta_z/2.
+        eptm.sigmas[j_verta] = center_sigma + flip * delta_z/2.
+        eptm.sigmas[j_vertb] = center_sigma - flip * delta_z/2.
     else:
-        eptm.sigmas[j_vertb] = center_sigma + delta_z/2.
-        eptm.sigmas[j_verta] = center_sigma - delta_z/2.
+        eptm.sigmas[j_vertb] = center_sigma + flip * delta_z/2.
+        eptm.sigmas[j_verta] = center_sigma - flip * delta_z/2.
     if eptm.zeds[cell1] < eptm.zeds[cell3]:
         eptm.zeds[j_verta] = center_zed + delta_s/2.
         eptm.zeds[j_vertb] = center_zed - delta_s/2.
     else:
         eptm.zeds[j_vertb] = center_zed + delta_s/2.
         eptm.zeds[j_verta] = center_zed - delta_s/2.
-
+        
     eptm.set_local_mask(cell1)
     eptm.set_local_mask(cell3)
     eptm.reset_topology()
@@ -247,12 +268,16 @@ def cell_division(eptm, mother_cell,
             adj_cell = cell1 if cell0 == mother_cell else cell0
             new_jv = eptm.new_vertex(j_src)
             new_jvs.append(new_jv)
-            sigma_n = - ((sigma_src * zed_trgt
-                          - zed_src * sigma_trgt)
-                         / (zed_src - zed_trgt
-                            + (sigma_trgt - sigma_src
-                           )/ np.tan(phi_division)))
-            zed_n = sigma_n / np.tan(phi_division)
+            # sigma_n = - ((sigma_src * zed_trgt
+            #               - zed_src * sigma_trgt)
+            #              / (zed_src - zed_trgt
+            #                 + (sigma_trgt - sigma_src
+            #                )/ np.tan(phi_division)))
+            # zed_n = sigma_n / np.tan(phi_division)
+            ## The midle of the segment is closer to the final optimum
+            sigma_n = (sigma_src + sigma_trgt) / 2.
+            zed_n = (zed_src + zed_trgt) / 2.
+            
             eptm.rhos[new_jv] = (eptm.rhos[j_src] +
                                  eptm.rhos[j_trgt]) / 2.
             eptm.zeds[new_jv] = zed_n + eptm.zeds[mother_cell]

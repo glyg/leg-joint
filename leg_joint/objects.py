@@ -256,19 +256,26 @@ class AbstractRTZGraph(object):
         edge_src_rhos = self.edge_src_rhos.fa
         edge_trgt_rhos = self.edge_trgt_rhos.fa
         
-        dsigmas = gt.edge_difference(self.graph, self.sigmas).fa
         dthetas = gt.edge_difference(self.graph, self.thetas).fa
+        dsigmas = gt.edge_difference(self.graph, self.sigmas).fa
 
         # Periodic boundary conditions
-        lower_than = [dsigmas < - np.pi * edge_src_rhos]
+        self.at_boundary.fa[:] = 0
+        at_boundary = self.at_boundary.fa
+
+        lower_than = [dthetas < -tau/2.]
         dthetas[lower_than] += tau
         dsigmas[lower_than] += tau * edge_src_rhos[lower_than]
-
-        higher_than = [dsigmas > np.pi * edge_trgt_rhos]
+        at_boundary[lower_than] = 1
+        
+        higher_than = [dthetas > tau/2.]
         dthetas[higher_than] -= tau
         dsigmas[higher_than] -= tau * edge_trgt_rhos[higher_than]
+        at_boundary[higher_than] = 1
+
         self.dthetas.fa = dthetas
         self.dsigmas.fa = dsigmas
+        self.at_boundary.fa = at_boundary
         
     def update_edge_lengths(self):
         edge_lengths = np.sqrt(self.dzeds.fa**2
@@ -276,8 +283,7 @@ class AbstractRTZGraph(object):
                                + self.dsigmas.fa**2)
         cutoff = self.params["pos_cutoff"]
         edge_lengths = edge_lengths.clip(cutoff, edge_lengths.max())
-        self.u_drhos.fa = np.cos(np.arctan2(self.drhos.fa,
-                                            edge_lengths))
+        self.u_drhos.fa = self.drhos.fa / edge_lengths
         self.u_dsigmas.fa = self.dsigmas.fa / edge_lengths
         self.u_dzeds.fa = self.dzeds.fa / edge_lengths
         self.edge_lengths.fa = edge_lengths
@@ -323,7 +329,7 @@ class AbstractRTZGraph(object):
 
     def ordered_neighbours(self, vertex):
         """
-        in the (\sigma, z) coordinate system with it's origin
+        in the (sigma, zed) coordinate system with it's origin
         at the vertex position, sort the neighbours counter-clockwise
         """
         phis_out = [np.arctan2(self.dsigmas[edge],
@@ -341,36 +347,51 @@ class AbstractRTZGraph(object):
         indexes = np.argsort(phis)
         vecinos = vecinos.take(indexes)
         return vecinos
-    
-    def sigmaz_draw(self, output='sigmaz_graph.pdf', **kwargs):
-        """
-        Draws the graph with `gt.graph_draw`.
-        """
-        output = os.path.join('drawings', output)
-        sz_pos = self.sz_pos()
-        pmap = gt.graph_draw(self.graph, sz_pos,
-                             output=output, **kwargs)
-        del pmap
-        print 'graph view saved to %s' %output
-    
-    def sfdp_draw(self, output="lattice_3d.pdf", **kwargs):
-        output = os.path.join('drawings', output)
-        sfdp_pos = gt.graph_draw(self.graph,
-                                 pos=gt.sfdp_layout(self.graph,
-                                                    cooling_step=0.95,
-                                                    epsilon=1e-3,
-                                                    multilevel=True),
-                                 output_size=(300,300),
-                                 output=output)
-        print 'graph view saved to %s' %output
-        return sfdp_pos
+
+
+
+class Triangle(object):
+
+    def __init__(self, eptm, cell, j_edge):
+        self.eptm = eptm
+        self.cell  = cell
+        self.j_edge = j_edge
+        self.ctoj_edges = [eptm.graph.edge(self.cell, j_edge.source()),
+                           eptm.graph.edge(self.cell, j_edge.target())]
+
+    def update_geometry(self):
+        ctoj0, ctoj1 = self.ctoj_edges
+        self.area = (self.eptm.dsigmas[ctoj0] * self.eptm.dzeds[ctoj1]
+                     - self.eptm.dsigmas[ctoj1] * self.eptm.dzeds[ctoj0])
+        self.sign = np.sign(self.area)
+        self.height = self.eptm.rhos[self.cell]
+        self.length = self.eptm.edge_lengths[self.j_edge]
         
-    def add_position_noise(self, noise_amplitude):
-        self.sigmas.fa += normal(0, noise_amplitude,
-                                 self.sigmas.fa.size)
-        self.zeds.fa += normal(0, noise_amplitude,
-                               self.rhos.fa.size)
-    
+        
+class Diamond(object):
+
+    def __init__(self, eptm, j_edge):
+        self.j_edge = j_edge
+        j_verta, j_vertb = j_edge.source(), j_edge.target()
+        self.j_verts = j_verta, j_vertb
+        adj_cells = eptm.junctions.adjacent_cells[j_edge]
+        self.triangles = {}
+        num_adj = len(adj_cells)
+        if num_adj  == 2:
+            cell0, cell1 = adj_cells
+            self.triangles[cell0] = Triangle(eptm, cell0, j_edge)
+            self.triangles[cell1] = Triangle(eptm, cell1, j_edge)
+            self.cells = cell0, cell1
+        elif num_adj == 1:
+            cell0 = self.eptm.junctions.adjacent_cells[j_edge]
+            self.triangles[cell0] = Triangle(eptm, cell0, j_edge)
+            self.cells = cell0
+
+    def update_geometry(self):
+        for tr in self.triangles.values():
+            tr.update_geometry()
+
+
 class Cells():
     '''
     
@@ -380,6 +401,7 @@ class Cells():
         self.__verbose__ = self.eptm.__verbose__
         self.params = eptm.params
         self.junctions = self.eptm.graph.new_vertex_property('object')
+        self.triangles = self.eptm.graph.new_vertex_property('object')
         if self.eptm.new :
             n_sigmas, n_zeds = (self.eptm.params['n_sigmas'],
                                 self.eptm.params['n_zeds'])
@@ -538,15 +560,16 @@ class Cells():
     def update_junctions(self):
         for cell in self:
             self.junctions[cell] = self.get_cell_junctions(cell)
-        
+            
     def get_cell_junctions(self, cell):
         jvs = [jv for jv in cell.out_neighbours()]
         j_edges = []
         for jv0 in jvs:
             for jv1 in jvs:
                 if jv1 == jv0 : continue
-                e = self.eptm.graph.edge(jv0, jv1)
-                if e is not None: j_edges.append(e)
+                j_edge = self.eptm.graph.edge(jv0, jv1)
+                if j_edge is not None:
+                    j_edges.append(j_edge)
         return j_edges
         
 class ApicalJunctions():
@@ -591,7 +614,23 @@ class ApicalJunctions():
     @property
     def radial_tensions(self):
         return self.eptm.graph.vertex_properties["radial_tensions"]
-        
+
+    def update_adjacent(self):
+        for j_edge in self:
+            self.adjacent_cells[j_edge] = self.get_adjacent_cells(j_edge)
+            self.eptm.diamonds[j_edge] = Diamond(self.eptm, j_edge)
+
+    @filters.no_filter
+    def get_adjacent_cells(self, j_edge):
+        jv0 = j_edge.source()
+        jv1 = j_edge.target()
+        cells_a = [cell for cell in jv0.in_neighbours()
+                   if self.eptm.is_cell_vert[cell]]
+        cells_b = [cell for cell in jv1.in_neighbours()
+                   if self.eptm.is_cell_vert[cell]]
+        common_cells = [cell for cell in cells_a if cell in cells_b]
+        return common_cells
+                
     def _compute_voronoi(self):
         n_dropped = 0
         eptm = self.eptm
@@ -690,20 +729,8 @@ class ApicalJunctions():
                 dropped += 1
         return new_edges, dropped
 
-    def update_adjacent(self):
-        for j_edge in self:
-            self.adjacent_cells[j_edge] =  self.get_adjacent_cells(j_edge)
 
-    @filters.no_filter
-    def get_adjacent_cells(self, j_edge):
-        jv0 = j_edge.source()
-        jv1 = j_edge.target()
-        cells_a = [cell for cell in jv0.in_neighbours()
-                   if self.eptm.is_cell_vert[cell]]
-        cells_b = [cell for cell in jv1.in_neighbours()
-                   if self.eptm.is_cell_vert[cell]]
-        common_cells = [cell for cell in cells_a if cell in cells_b]
-        return common_cells
+            
 
         
 def c_circumcircle(sz0, sz1, sz2, cutoff):

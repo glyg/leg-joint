@@ -33,12 +33,12 @@ def new_generation(eptm, growth_rate=1.8):
         eptm.cells.prefered_area[mother_cell] *= growth_rate
         eptm.update_geometry()
         eptm.update_gradient()
-        pos0, pos1 = eptm.find_energy_min(tol=1e-4)
+        pos0, pos1 = eptm.find_energy_min(tol=1e-4, approx_grad=1)
         j = lj.cell_division(eptm, mother_cell, verbose=False)
         eptm.update_geometry()
         eptm.update_gradient()
         if j is not None:
-            pos0, pos1 = eptm.find_energy_min(tol=1e-4)
+            pos0, pos1 = eptm.find_energy_min(tol=1e-4, approx_grad=1)
             now = datetime.now()
             eptm.graph.save("saved_graphs/xml/tmp/generation%s.xml"
                             % now.isoformat())

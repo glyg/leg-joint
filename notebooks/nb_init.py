@@ -9,10 +9,11 @@ curdir = os.path.abspath(os.path.curdir)
 #print os.path.dirname(curdir)
 sys.path.append(os.path.dirname(curdir))
 
-import leg_joint as lj
 import graph_tool.all as gt
 import matplotlib.pyplot as plt
-    
+import leg_joint as lj
+
+
 
 def before_after(func):
     def new_func(eptm, *args, **kwargs):
@@ -24,13 +25,13 @@ def before_after(func):
         subaxes = lj.plot_ortho_proj(eptm, axes[0], c_text=False, 
                                      vfilt=eptm.is_local_vert,
                                      efilt=eptm.is_local_edge)
-        lj.plot_ortho_gradients(eptm, subaxes)
+        lj.plot_ortho_gradients(eptm, subaxes, scale=1.)
         foutput = func(eptm, *args, **kwargs)
         eptm.update_gradient()
         subaxes = lj.plot_ortho_proj(eptm, axes[1], c_text=False,
                                      vfilt=eptm.is_local_vert,
                                      efilt=eptm.is_local_edge)
-        lj.plot_ortho_gradients(eptm, subaxes)
+        lj.plot_ortho_gradients(eptm, subaxes, scale=1.)
         return foutput
     return new_func
 
