@@ -11,113 +11,37 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 import graph_tool.all as gt
 
-import filters
+from . import  filters
+from .optimizers import precondition, approx_grad
+from .utils import to_xy, to_rhotheta
 
 FLOAT = np.dtype('float32')
 
 fig, axes =  plt.subplots(2,2)
-@filters.local
-def show_grad_amps(eptm, ax, coordinate):
 
-    ax.set_title('Gradient amplitudes')
-    ax.set_xlabel()
-    show_cells_amps(coordinate, ax)
-    
-    
-@filters.cells_in
-def show_cells_amps(eptm, coordinate, ax):
-    ax.plot(coordinate,
-            eptm.volume_grad_apical.fa,
-            'go', label='Volume grad apical')
-    ax.plot(coordinate,
-            eptm.volume_grad_apical.fa,
-            'ro', label='Volume grad radial')
-    ax.plot(coordinate,
-            eptm.contractile_grad.fa,
-            c='orange', ls='o', label='Contractile grad')
-
-
-@filters.cells_in
-def show_grad_geometry(eptm, ax, coordinate):
-    ax.set_title('Geometrical data')
-    ax.plot(coordinate, eptm.cells.vols.fa,
-            'ro', label='cells volumes')
-    # ax.plot(coordinate, eptm.cells.prefered_vol.fa, 'rs',
-    #         label='cells prefered volumes')
-    ax.plot(coordinate, eptm.cells.perimeters.fa,
-            'go', label='cells perimeters')
-    ax.legend()
-
-
-@filters.active
-def show_grad_diff(grad, approx_grad, grad_diff, ax):
-    ax.set_title('Gradient versus grad diff')
-    ax.plot(grad_diff[0, :], grad[0, :],
-            'ro', label='rho computed', alpha=0.5)
-    ax.plot(grad_diff[0, :], grad[1, :],
-            'go', label='theta computed', alpha=0.5)
-    ax.plot(grad_diff[0, :], grad[2, :],
-            'bo', label='zed computed', alpha=0.5)
-
-    ax.plot(grad_diff[0, :], approx_grad[0, :],
-            'rs', label='rho approx', alpha=0.5)
-    ax.plot(grad_diff[0, :], approx_grad[1, :],
-            'gs', label='theta approx', alpha=0.5)
-    ax.plot(grad_diff[0, :], approx_grad[2, :],
-            'bs', label='zed approx', alpha=0.5)
-
-
-@filters.local
-def plot_gradients(eptm, ax=None, scale=0.1, approx=1,  **kwargs):
-    if approx == 1:
-        grad = eptm.approx_grad()
-        ec = fc = 'green'
-    else:
-        grad = eptm.gradient_array()
-        ec = fc = 'red'
-
-    eptm.graph.set_vertex_filter(eptm.is_active_vert)
-    sigmas = eptm.sigmas.fa
-    zeds = eptm.zeds.fa
-    eptm.graph.set_vertex_filter(eptm.is_local_vert)
-    grad_sigmas = grad[::3] * scale
-    grad_zeds = grad[1::3] * scale
-    # We plot the forces, which is easier to understand
-    v_sigmas = np.array([sigmas, - grad_sigmas]).T
-    v_zeds = np.array([zeds, - grad_zeds]).T
-    if ax is None:
-        ax =  plot_cells_zs(eptm, ax=None,
-                            vfilt=eptm.is_local_vert,
-                            efilt=eptm.is_local_edge, **kwargs)
-    for s, z in zip(v_sigmas, v_zeds):
-        ax.arrow(z[0], s[0], z[1], s[1], width=0.1,
-                 ec=ec, fc=fc, alpha=0.5)
-    plt.draw()
-    return ax
-
-
-@filters.local
 def plot_ortho_gradients(eptm, axes=None,
                          scale=0.1, approx=0, **kwargs):
     if approx == 1:
-        grad_szr = eptm.approx_grad()
-        ec = fc = 'green'
+        grad_xyz = approx_grad(eptm)
+        ec = fc = 'blue'
     else:
-        grad_szr = eptm.gradient_array()
+        grad_xyz = eptm.gradient_array()
         ec = fc = 'red'
-    eptm.graph.set_vertex_filter(eptm.is_active_vert)
-    rhos = eptm.rhos.fa
-    sigmas = eptm.sigmas.fa
-    zeds = eptm.zeds.fa
-    grad_rhos = grad_szr[::3] * scale
-    grad_sigmas = grad_szr[1::3] * scale
-    grad_zeds = grad_szr[2::3] * scale
+    pos0, bounds = precondition(eptm)
+    rho_avg = eptm.rhos.a.mean()
+    rhos, thetas  = to_rhotheta(pos0[::3], pos0[1::3])
+    sigmas = thetas * rhos
+    zeds = pos0[2::3]
+    grad_rhos = (np.cos(thetas) * grad_xyz[::3]
+                 + np.sin(thetas) * grad_xyz[1::3]) * scale
+    grad_sigmas = (- np.sin(thetas) * grad_xyz[::3] +
+                   np.cos(thetas) * grad_xyz[1::3]) * scale
+    grad_zeds = grad_xyz[2::3] * scale
     # We plot the forces, which are easier to understand
     v_sigmas = np.array([sigmas, - grad_sigmas]).T
     v_zeds = np.array([zeds, - grad_zeds]).T
     v_radial = np.array([rhos, - grad_rhos]).T
     if axes is None:
-        
         ax_zs, ax_zr, ax_rs =  plot_ortho_proj(eptm, ax=None,
                                                vfilt=eptm.is_local_vert,
                                                efilt=eptm.is_local_edge,
@@ -182,8 +106,8 @@ def plot_ortho_proj(epithelium, ax=None, vfilt=None, efilt=None, **kwargs):
 
     divider = make_axes_locatable(ax)
     
-    ax_zr = divider.append_axes("top", 1.2, pad=0.1, sharex=ax)
-    ax_rs = divider.append_axes("right", 1.2, pad=0.1, sharey=ax)
+    ax_zr = divider.append_axes("top", 2., pad=0.1, sharex=ax)
+    ax_rs = divider.append_axes("right", 2., pad=0.1, sharey=ax)
     
     plot_cells_zr(epithelium, ax=ax_zr,
                   vfilt=vfilt, efilt=efilt)
@@ -347,9 +271,6 @@ def plot_edges_zs(epithelium, efilt=None,
             ax.text(epithelium.zeds[edge.source()],
                     epithelium.sigmas[edge.source()],
                     str(edge.source()))
-            ax.text(epithelium.zeds[edge.target()],
-                    epithelium.sigmas[edge.target()],
-                    str(edge.target()))
     ax.set_aspect('equal')
     epithelium.graph.set_edge_filter(None)
 

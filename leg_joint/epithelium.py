@@ -11,9 +11,10 @@ from scipy import weave
 from .objects import  AbstractRTZGraph, Cells, ApicalJunctions
 from .xml_handler import ParamTree
 from .dynamics import Dynamics
-from .optimizers import Optimizers
+#from .optimizers import Optimizers
 
-import filters
+from . import filters
+from .utils import to_xy, to_rhotheta
 
 EpitheliumFilters = filters.EpitheliumFilters
 
@@ -25,15 +26,18 @@ PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
 tau = 2. * np.pi
 
 
+
 class Epithelium(EpitheliumFilters,
                  AbstractRTZGraph,
-                 Dynamics,
-                 Optimizers):
+                 Dynamics):
     """
     The ::class::`Epithelium` is the container for all the simulation.
     
     """
-    def __init__(self, graphXMLfile=None, paramtree=None, paramfile=PARAMFILE):
+    def __init__(self, graphXMLfile=None,
+                 paramtree=None,
+                 paramfile=PARAMFILE,
+                 graph=None, verbose=False):
         """
         
         """
@@ -45,44 +49,56 @@ class Epithelium(EpitheliumFilters,
         self.params = self.paramtree.absolute_dic
 
         # Graph instanciation
-        if graphXMLfile is None:
+        if graph is None and graphXMLfile is None:
+            print 'Created new graph'
             self.graph = gt.Graph(directed=True)
             self.new = True
-        else:
+        elif graphXMLfile is not None :
             self.graph = gt.load_graph(graphXMLfile)
             self.new = False
             self.xmlfname = graphXMLfile
+        elif graph is not None:
+            self.graph = graph
+            self.new = False
 
-        self.__verbose__ = False
+        self.__verbose__ = verbose
         EpitheliumFilters.__init__(self)
         # All the geometrical properties are packed here
         AbstractRTZGraph.__init__(self)
-        # Cells and Junctions subgraphs initialisation
-        print 'Initial cells'
+        self.diamonds = self.graph.new_edge_property('object')
+
+        # Cells and Junctions initialisation
+        if self.__verbose__:
+            print 'Initial cells'
         self.cells = Cells(self)
-        print 'Initial junctions'
+        if self.__verbose__:
+            print 'Initial junctions'
         self.junctions = ApicalJunctions(self)
         if self.new:
             self.is_alive.a = 1
             # Remove cell to cell edges after graph construction
             efilt = self.is_ctoj_edge.copy()
             efilt.a += self.is_junction_edge.a
+            if self.__verbose__ == True:
+                total_edges = self.graph.num_edges()
+                good_edges = efilt.a.sum()
+                print 'removing %i cell to cell edges ' % (total_edges - good_edges)
             self.graph.set_edge_filter(efilt)
             self.graph.purge_edges()
             self.set_vertex_state()
             self.set_edge_state()
-
-        self.diamonds = self.graph.new_edge_property('object')
+        
         self.cells.update_junctions() #Also registers the triangles
         self.junctions.update_adjacent() #Also registers the diamonds
+
         # Dynamical components
-        Dynamics.__init__(self)    
-        Optimizers.__init__(self)
-        if self.__verbose__: print 'isotropic relaxation'
-        self.isotropic_relax()
-        if self.__verbose__: print 'Periodic boundary'
-        self.periodic_boundary_condition()
-        if self.__verbose__: print 'Update apical'
+        Dynamics.__init__(self)
+        if self.new:
+            if self.__verbose__: print 'Isotropic relaxation'
+            self.isotropic_relax()
+            if self.__verbose__: print 'Periodic boundary'
+            self.periodic_boundary_condition()
+        if self.__verbose__: print 'Update geometry'
         self.update_geometry()
         if self.__verbose__: print 'Update gradient'
         self.update_gradient()
@@ -105,23 +121,21 @@ class Epithelium(EpitheliumFilters,
     @property
     def num_sides(self):
         return self.graph.degree_property_map('out')
-        
-    def update_apical_geom(self):
-        print 'Deprecated, use `update_geometry` instead'
-        return self.update_geometry()
-    
+
     def update_geometry(self):
-        # Edges
-        if self.__verbose__:
-            print ('Geometry update on %i edges'
-                   % self.graph.num_edges())
+
+        self.update_rhotheta()
+        # Cells
+        if self.__verbose__: print ('Cells geometry update on %i vertices'
+                                    % self.graph.num_vertices())
         for cell in self.cells:
             self.set_cell_pos(cell)
         self.update_deltas()
         self.update_edge_lengths()
-        # Cells
-        if self.__verbose__: print ('Cells geometry update on %i vertices'
-                                    % self.graph.num_vertices())
+        # Edges
+        if self.__verbose__:
+            print ('Geometry update on %i edges'
+                   % self.graph.num_edges())
         for j_edge in self.junctions:
             self.diamonds[j_edge].update_geometry()
 
@@ -140,7 +154,6 @@ class Epithelium(EpitheliumFilters,
             if self.__verbose__:
                 print('''Two edges ain't enough to compute
                       area for cell %s''' % cell)
-            self.cells.areas[cell] = self.cells.prefered_area[cell]
             self.cells.vols[cell] = self.cells.prefered_vol[cell]
             self.cells.perimeters[cell] = 0.
             self.is_alive[cell] = 0
@@ -149,39 +162,37 @@ class Epithelium(EpitheliumFilters,
             self.cells.perimeters[cell] = 0.
             for j_edge in j_edges:
                 tr = self.diamonds[j_edge].triangles[cell]
-                self.cells.areas[cell] += tr.area * tr.sign
+                self.cells.areas[cell] += tr.area
                 self.cells.perimeters[cell] += tr.length
             
         
-    def set_new_pos(self, new_rtz_pos):
-        self.set_junction_pos(new_rtz_pos)
-        
+    def set_new_pos(self, new_xyz_pos):
+        self.set_junction_pos(new_xyz_pos)
         
     @filters.active
-    def set_junction_pos(self, new_rtz_pos):
-        new_rtz_pos = new_rtz_pos.flatten()
-        assert len(new_rtz_pos) / 3 == self.graph.num_vertices()
-        self.rhos.fa = new_rtz_pos[::3]
-        thetas = new_rtz_pos[1::3] / self.mean_rho
-        thetas = thetas % tau
-        self.thetas.fa = thetas
-        self.zeds.fa = new_rtz_pos[2::3]
-        self.sigmas.fa = self.thetas.fa * self.rhos.fa
+    def set_junction_pos(self, new_xyz_pos):
+        new_xyz_pos = new_xyz_pos.flatten()
+        assert len(new_xyz_pos) / 3 == self.graph.num_vertices()
+        self.ixs.fa = new_xyz_pos[::3]
+        self.wys.fa = new_xyz_pos[1::3]
+        self.zeds.fa = new_xyz_pos[2::3]
     
     def set_cell_pos(self, cell):
-        ##  Update cell position 
         j_rtz = np.array([[self.rhos[jv], self.thetas[jv], self.zeds[jv]]
                           for jv in cell.out_neighbours()])
-        ### set z and rho
-        self.rhos[cell] = j_rtz[:,0].mean()
-        self.zeds[cell] = j_rtz[:,2].mean()
-        ### set periodic theta
+        if len(j_rtz) < 3:
+            return
+        self.zeds[cell] = j_rtz[:, 2].mean()
+        self.rhos[cell] = j_rtz[:, 0].mean()
+        # ### set periodic theta
         raw_dtheta = j_rtz[:,1] - self.thetas[cell]
         pbc_theta = j_rtz[:,1]
-        pbc_theta[raw_dtheta <= -tau/2] += tau
-        pbc_theta[raw_dtheta > tau/2] -= tau
+        pbc_theta[raw_dtheta <= - np.pi] += 2 * np.pi
+        pbc_theta[raw_dtheta >= np.pi] -= 2 * np.pi
         self.thetas[cell] = pbc_theta.mean()
         self.sigmas[cell] = self.thetas[cell] * self.rhos[cell]
+        self.ixs[cell], self.wys[cell] = to_xy(self.rhos[cell],
+                                               self.thetas[cell])
         
     def reset_topology(self):
         self.cells.update_junctions()

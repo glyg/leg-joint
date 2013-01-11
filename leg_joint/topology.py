@@ -160,6 +160,8 @@ def type1_transition(eptm, elements, verbose=False):
     eptm.add_junction(j_verta, j_verte, cell2, cell3)
     eptm.add_junction(j_vertb, j_vertc, cell1, cell4)
 
+    eptm.update_rhotheta()
+    eptm.update_dsigmas()
     sigma_a = eptm.sigmas[j_verta]
     sigma_b = eptm.sigmas[j_vertb]
     theta_a = eptm.thetas[j_verta]
@@ -204,6 +206,7 @@ def type1_transition(eptm, elements, verbose=False):
         
     eptm.set_local_mask(cell1)
     eptm.set_local_mask(cell3)
+    eptm.update_xy()
     eptm.reset_topology()
     return modified_cells, modified_jverts
 
@@ -215,11 +218,11 @@ def cell_division(eptm, mother_cell,
     tau = 2 * np.pi
     if phi_division is None:
         phi_division = np.random.random() * tau
-
+    eptm.update_rhotheta()
+    eptm.update_dsigmas()
     a0 = eptm.params['prefered_area']
-    eptm.cells.prefered_area[mother_cell] = a0
-    rl = eptm.params['rho_lumen']
-    v0 = eptm.params['cell_volume']#a0 * (eptm.rhos[mother_cell] - rl)
+    h = eptm.params['prefered_height']
+    v0 = a0 * (eptm.rhos[mother_cell] - eptm.params['rho_lumen'])
     eptm.cells.prefered_vol[mother_cell] = v0    
     daughter_cell = eptm.new_vertex(mother_cell)
     eptm.is_cell_vert[daughter_cell] = 1
@@ -301,9 +304,9 @@ def cell_division(eptm, mother_cell,
                 new_junctions.append((new_jv, j_trgt,
                                       adj_cell, daughter_cell))
     if not len(new_jvs) == 2:
-        print 'problem'
+        print('Problem in the division of cell %s'
+              % str(mother_cell))
         eptm.is_alive[daughter_cell] = 0
-        print new_jvs
         return
     for (j_src, j_trgt, cell0, cell1) in junction_trash:
         eptm.remove_junction(j_src, j_trgt, cell0, cell1)
@@ -315,6 +318,8 @@ def cell_division(eptm, mother_cell,
     eptm.set_local_mask(daughter_cell)
     eptm.set_vertex_state()
     eptm.set_edge_state()
+    eptm.update_xy()
+
     eptm.reset_topology()
     if eptm.__verbose__: print 'Division completed'
     return septum

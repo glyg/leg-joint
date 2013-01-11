@@ -38,7 +38,7 @@ def before_after(func):
 @before_after
 def local_optimum(eptm, **kwargs):
     #eptm.update_gradient()
-    pos0, pos1 = eptm.find_energy_min(**kwargs)
+    pos0, pos1 = lj.find_energy_min(eptm, **kwargs)
     return pos0, pos1
 
 

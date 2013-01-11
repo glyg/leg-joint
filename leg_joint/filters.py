@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+from graph_tool import Graph, GraphView
 
 #####  Decorators
 def local(meth):
@@ -16,6 +16,9 @@ def local(meth):
         self.graph.set_edge_filter(prev_estate, prev_inverted_e)
         return out
     return new_function
+
+
+    
 
 def active(meth):
     def new_function(self, *args, **kwargs):

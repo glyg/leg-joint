@@ -29,11 +29,11 @@ the ::class:`Cells`: and ::class:`ApicalJunctions` are derived.
 
 import os
 import numpy as np
-from numpy.random import normal
+
 import graph_tool.all as gt
 from scipy import weave
-from filters import EpitheliumFilters
-import filters
+from .filters import EpitheliumFilters
+from .utils import to_xy, to_rhotheta
 
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
@@ -105,9 +105,20 @@ class AbstractRTZGraph(object):
         self.graph.vertex_properties["zeds"] = zeds_p
         sigmas_p = self.graph.new_vertex_property('float')
         self.graph.vertex_properties["sigmas"] = sigmas_p
+        ixs_p = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["ixs"] = ixs_p
+        wys_p = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["wys"] = wys_p
+        
     @property
     def rhos(self):
         return self.graph.vertex_properties["rhos"]
+    @property
+    def ixs(self):
+        return self.graph.vertex_properties["ixs"]
+    @property
+    def wys(self):
+        return self.graph.vertex_properties["wys"]
     @property
     def thetas(self):
         return self.graph.vertex_properties["thetas"]
@@ -129,6 +140,10 @@ class AbstractRTZGraph(object):
         self.graph.edge_properties["dzeds"] = dzeds
         drhos = self.graph.new_edge_property('float')
         self.graph.edge_properties["drhos"] = drhos
+        dixs = self.graph.new_edge_property('float')
+        self.graph.edge_properties["dixs"] = dixs
+        dwys = self.graph.new_edge_property('float')
+        self.graph.edge_properties["dwys"] = dwys
 
         # Edge lengths
         edge_lengths = self.graph.new_edge_property('float')
@@ -141,6 +156,10 @@ class AbstractRTZGraph(object):
         self.graph.edge_properties["u_dzeds"] = u_dzeds
         u_drhos = self.graph.new_edge_property('float')
         self.graph.edge_properties["u_drhos"] = u_drhos
+        u_dixs = self.graph.new_edge_property('float')
+        self.graph.edge_properties["u_dixs"] = u_dixs
+        u_dwys = self.graph.new_edge_property('float')
+        self.graph.edge_properties["u_dwys"] = u_dwys
         
     @property
     def dthetas(self):
@@ -155,8 +174,21 @@ class AbstractRTZGraph(object):
     def dsigmas(self):
         return self.graph.edge_properties["dsigmas"]
     @property
+    def dixs(self):
+        return self.graph.edge_properties["dixs"]
+    @property
+    def dwys(self):
+        return self.graph.edge_properties["dwys"]
+
+    @property
     def u_drhos(self):
         return self.graph.edge_properties["u_drhos"]        
+    @property
+    def u_dixs(self):
+        return self.graph.edge_properties["u_dixs"]        
+    @property
+    def u_dwys(self):
+        return self.graph.edge_properties["u_dwys"]        
     @property
     def u_dsigmas(self):
         return self.graph.edge_properties["u_dsigmas"]
@@ -168,15 +200,20 @@ class AbstractRTZGraph(object):
         return self.graph.edge_properties["edge_lengths"]
 
     def scale(self, scaling_factor):
-        self.rhos.a *= scaling_factor
-        self.sigmas.a *= scaling_factor
+        self.ixs.a *= scaling_factor
+        self.wys.a *= scaling_factor
         self.zeds.a *= scaling_factor
-        self.thetas.a = self.sigmas.a / self.rhos.a
-    
+        self.update_rhotheta()
+
     def rotate(self, angle):
-        self.thetas.a += angle
-        self.sigmas.a += angle * self.rhos.a
-        self.periodic_boundary_condition()
+        self.update_rhotheta()
+        buf_theta = self.thetas.a + np.pi
+        buf_theta += angle
+        buf_theta = (buf_theta % (2 * np.pi)) - np.pi
+        self.thetas.a = buf_theta
+        self.sigmas.a = self.thetas.a * self.rhos.a
+        self.update_xy()
+        #self.periodic_boundary_condition()
 
     def closest_vert(self, sigma, zed):
         dist = np.hypot(self.sigmas.fa - sigma,
@@ -196,17 +233,13 @@ class AbstractRTZGraph(object):
         to the vertices positions along the sigma axis,
         with their curent value for rho.
         '''
-        # We don't use filtered arrays here, (the `.fa` attribute) because
-        # partial assignement won't work
-        tau = 2 * np.pi
-        rhos = self.rhos.a
-        # Higher than the period points are shifted back
-        higher = [self.sigmas.a  > tau * rhos]
-        self.sigmas.a[higher] -= tau * rhos[higher]
-        # Lower than zeros points are shifted up
-        lower = [self.sigmas.a  < 0]
-        self.sigmas.a[lower] += tau * rhos[lower]
-        self.thetas.a = self.sigmas.a / rhos
+        #self.update_rhotheta()
+        buf_theta = self.thetas.a + np.pi
+        buf_theta = (buf_theta % (2 * np.pi)) - np.pi
+        self.thetas.a = buf_theta
+        self.sigmas.a = self.thetas.a * self.rhos.a
+        self.update_xy()
+
         
     def any_edge(self, v0, v1):
         '''
@@ -242,51 +275,72 @@ class AbstractRTZGraph(object):
         zeds = self.graph.vertex_properties["zeds"].copy()
         sigmazs = [sigmas, zeds]
         return gt.group_vector_property(sigmazs, value_type='float')
-    
-    def update_deltas(self):
+
+    def update_rhotheta(self):
+        self.rhos.a, self.thetas.a = to_rhotheta(self.ixs.a, self.wys.a)
+        self.sigmas.a = self.rhos.a * self.thetas.a
+
+    def update_xy(self):
+        self.ixs.a, self.wys.a = to_xy(self.rhos.a, self.thetas.a)
+
+    def edge_difference(self, vprop, eprop=None):
+        vtype = vprop.value_type()
+        if eprop == None:
+            eprop = self.graph.new_edge_property(vtype)
+        for e in self.graph.edges():
+            eprop[e] = vprop[e.target()] - vprop[e.source()]
+        return eprop
         
-        ## Those can be directly set
-        self.dzeds.fa = gt.edge_difference(self.graph, self.zeds).fa
-        self.drhos.fa = gt.edge_difference(self.graph, self.rhos).fa
+    def update_deltas(self):
+        dzeds = self.edge_difference(self.zeds)
+        dixs = self.edge_difference(self.ixs)
+        dwys = self.edge_difference(self.wys)
+
+        self.dzeds.a = dzeds.a
+        self.dixs.a = dixs.a
+        self.dwys.a = dwys.a
+
+    def update_dsigmas(self):
+    
+        drhos = self.edge_difference(self.rhos)
+        self.drhos.a = drhos.a
 
         for e in self.graph.edges():
             self.edge_src_rhos[e] = self.rhos[e.source()]
             self.edge_trgt_rhos[e] = self.rhos[e.target()]
 
-        edge_src_rhos = self.edge_src_rhos.fa
-        edge_trgt_rhos = self.edge_trgt_rhos.fa
+        edge_src_rhos = self.edge_src_rhos.a
+        edge_trgt_rhos = self.edge_trgt_rhos.a
         
-        dthetas = gt.edge_difference(self.graph, self.thetas).fa
-        dsigmas = gt.edge_difference(self.graph, self.sigmas).fa
+        dthetas = self.edge_difference(self.thetas)
+        dsigmas = self.edge_difference(self.sigmas)
 
         # Periodic boundary conditions
-        self.at_boundary.fa[:] = 0
-        at_boundary = self.at_boundary.fa
+        self.at_boundary.a[:] = 0
+        at_boundary = self.at_boundary.a
 
-        lower_than = [dthetas < -tau/2.]
-        dthetas[lower_than] += tau
-        dsigmas[lower_than] += tau * edge_src_rhos[lower_than]
+        lower_than = [dthetas.a < -tau/2.]
+        dthetas.a[lower_than] += tau
+        dsigmas.a[lower_than] += tau * edge_src_rhos[lower_than]
         at_boundary[lower_than] = 1
         
-        higher_than = [dthetas > tau/2.]
-        dthetas[higher_than] -= tau
-        dsigmas[higher_than] -= tau * edge_trgt_rhos[higher_than]
+        higher_than = [dthetas.a > tau/2.]
+        dthetas.a[higher_than] -= tau
+        dsigmas.a[higher_than] -= tau * edge_trgt_rhos[higher_than]
         at_boundary[higher_than] = 1
 
-        self.dthetas.fa = dthetas
-        self.dsigmas.fa = dsigmas
-        self.at_boundary.fa = at_boundary
+        self.dthetas.a = dthetas.a
+        self.dsigmas.a = dsigmas.a
+        self.at_boundary.a = at_boundary
         
     def update_edge_lengths(self):
-        edge_lengths = np.sqrt(self.dzeds.fa**2
-                               + self.drhos.fa**2
-                               + self.dsigmas.fa**2)
-        cutoff = self.params["pos_cutoff"]
-        edge_lengths = edge_lengths.clip(cutoff, edge_lengths.max())
-        self.u_drhos.fa = self.drhos.fa / edge_lengths
-        self.u_dsigmas.fa = self.dsigmas.fa / edge_lengths
-        self.u_dzeds.fa = self.dzeds.fa / edge_lengths
-        self.edge_lengths.fa = edge_lengths
+        edge_lengths = np.sqrt(self.dixs.a**2
+                               + self.dwys.a**2
+                               + self.dzeds.a**2)
+        self.u_dixs.a = self.dixs.a / edge_lengths
+        self.u_dwys.a = self.dwys.a / edge_lengths
+        self.u_dzeds.a = self.dzeds.a / edge_lengths
+        self.edge_lengths.a = edge_lengths
         
     def out_delta_sz(self, vertex0, vertex1 ):
         edge01 = self.graph.edge(vertex0, vertex1)
@@ -296,7 +350,7 @@ class AbstractRTZGraph(object):
         if edge10 is not None:
             return [-self.dsigmas[edge10], -self.dzeds[edge10]]
         return
-
+        
     def rtz_record_array(self):
         rtz_dtype = [('rho', np.float32),
                      ('theta', np.float32),
@@ -361,20 +415,27 @@ class Triangle(object):
 
     def update_geometry(self):
         ctoj0, ctoj1 = self.ctoj_edges
-        self.area = (self.eptm.dsigmas[ctoj0] * self.eptm.dzeds[ctoj1]
-                     - self.eptm.dsigmas[ctoj1] * self.eptm.dzeds[ctoj0])
-        self.sign = np.sign(self.area)
-        self.height = self.eptm.rhos[self.cell]
+        self.deltas = np.array([[self.eptm.dixs[ctoj0], 
+                                 self.eptm.dwys[ctoj0], 
+                                 self.eptm.dzeds[ctoj0]],
+                                [self.eptm.dixs[ctoj1], 
+                                 self.eptm.dwys[ctoj1], 
+                                 self.eptm.dzeds[ctoj1]]])
+        
+        self.cross = np.cross(self.deltas[0, :], self.deltas[1, :])
+        self.area = np.linalg.norm(self.cross)
+        self.height = (np.hypot(self.eptm.ixs[self.cell],
+                                self.eptm.wys[self.cell])
+                       - self.eptm.params['rho_lumen'])
         self.length = self.eptm.edge_lengths[self.j_edge]
         
         
 class Diamond(object):
 
-    def __init__(self, eptm, j_edge):
+    def __init__(self, eptm, j_edge, adj_cells):
         self.j_edge = j_edge
         j_verta, j_vertb = j_edge.source(), j_edge.target()
         self.j_verts = j_verta, j_vertb
-        adj_cells = eptm.junctions.adjacent_cells[j_edge]
         self.triangles = {}
         num_adj = len(adj_cells)
         if num_adj  == 2:
@@ -383,7 +444,7 @@ class Diamond(object):
             self.triangles[cell1] = Triangle(eptm, cell1, j_edge)
             self.cells = cell0, cell1
         elif num_adj == 1:
-            cell0 = self.eptm.junctions.adjacent_cells[j_edge]
+            cell0 = adj_cells[0]
             self.triangles[cell0] = Triangle(eptm, cell0, j_edge)
             self.cells = cell0
 
@@ -401,7 +462,7 @@ class Cells():
         self.__verbose__ = self.eptm.__verbose__
         self.params = eptm.params
         self.junctions = self.eptm.graph.new_vertex_property('object')
-        self.triangles = self.eptm.graph.new_vertex_property('object')
+        #self.triangles = self.eptm.graph.new_vertex_property('object')
         if self.eptm.new :
             n_sigmas, n_zeds = (self.eptm.params['n_sigmas'],
                                 self.eptm.params['n_zeds'])
@@ -416,12 +477,15 @@ class Cells():
             self.eptm.zeds.a = zeds
             self.eptm.sigmas.a = sigmas
             self.eptm.thetas.a = sigmas/rhos
+            self.eptm.update_xy()
+
+            self.eptm.periodic_boundary_condition()
             self.eptm.is_cell_vert.a[:] = 1
             self._init_cell_gometry()
             self._init_cell_params()
             self.eptm.update_deltas()
             self.eptm.update_edge_lengths()
-            self.eptm.periodic_boundary_condition()
+            self.eptm.update_dsigmas()
         
 
     def __iter__(self):
@@ -436,9 +500,9 @@ class Cells():
         Creates the `areas`, `vols` and `perimeters` properties 
         '''
         area0 = self.params['prefered_area']
-        rho_lumen = self.params['rho_lumen']
-        rho0 = self.params['rho0']
+        height0 = self.params['prefered_height']
         areas = self.eptm.graph.new_vertex_property('float')
+        
         areas.a[:] = area0
         self.eptm.graph.vertex_properties["areas"] = areas
 
@@ -446,7 +510,7 @@ class Cells():
         perimeters.a[:] = 6 * self.params['lambda_0']
         self.eptm.graph.vertex_properties["perimeters"]\
             = perimeters
-        vol0 = area0 * (rho0 - rho_lumen)
+        vol0 = area0 * height0
         vols = self.eptm.graph.new_vertex_property('float')
         vols.a[:] = vol0
         self.eptm.graph.vertex_properties["vols"] = vols
@@ -465,29 +529,18 @@ class Cells():
         '''
         Creates the parameter dependant propery maps
         '''
-        prefered_area0 =  self.params['prefered_area']
-        prefered_area = self.eptm.graph.new_vertex_property('float')
-        prefered_area.a[:] = prefered_area0
-        self.eptm.graph.vertex_properties["prefered_area"]\
-            = prefered_area
-
-        cell_volume = self.params['cell_volume']
-        prefered_vol = self.eptm.graph.new_vertex_property('float')
-        prefered_vol.a[:] = cell_volume
-        self.eptm.graph.vertex_properties['prefered_vol']\
-            = prefered_vol
+        area0 = self.params['prefered_area']
+        height0 = self.params['prefered_height']
+        vol0 = area0 * height0
+        vols = self.eptm.graph.new_vertex_property('float')
+        vols.a[:] = vol0
+        self.eptm.graph.vertex_properties["prefered_vol"] = vols
         
         contractility0 = self.params['contractility']        
         contractilities =self.eptm.graph.new_vertex_property('float')
         contractilities.a[:] = contractility0
         self.eptm.graph.vertex_properties["contractilities"]\
             = contractilities
-
-        elasticity0 = self.params['elasticity']        
-        elasticities =self.eptm.graph.new_vertex_property('float')
-        elasticities.a[:] = elasticity0
-        self.eptm.graph.vertex_properties["elasticities"]\
-            = elasticities
 
         vol_elasticity0 = self.params['vol_elasticity']
         vol_elasticities =self.eptm.graph.new_vertex_property('float')
@@ -514,16 +567,15 @@ class Cells():
     def vol_elasticities(self):
         return self.eptm.graph.vertex_properties["vol_elasticities"]
     @property
-    def prefered_area(self):
-        return self.eptm.graph.vertex_properties["prefered_area"]
-    @property
     def prefered_vol(self):
         return self.eptm.graph.vertex_properties["prefered_vol"]
         
     def _generate_rsz(self, n_sigmas=5, n_zeds=20):
 
         lambda_0 = self.eptm.params['lambda_0']
+        height0 = self.eptm.params['prefered_height']
         rho_c = (n_sigmas - 1) * lambda_0 / (2 * np.pi)
+        self.eptm.params['rho_lumen'] = rho_c - height0
         delta_sigma = 2 * np.pi * rho_c / n_sigmas
         delta_z = delta_sigma * np.sqrt(3)/2.
         
@@ -542,8 +594,8 @@ class Cells():
         zeds -= zeds.max() / 2
         return rhos, sigmas.T.flatten(), zeds.T.flatten()
 
-    def _generate_graph(self, rtz):
-        rhos, sigmas, zeds = rtz
+    def _generate_graph(self, rsz):
+        rhos, sigmas, zeds = rsz
         sigmazs = np.array([sigmas, zeds]).T
 
         radius = self.eptm.params['lambda_0'] * 1.1
@@ -584,7 +636,9 @@ class ApicalJunctions():
         if self.eptm.new :
             self._compute_voronoi()
             self._init_junction_params()
-
+        else:
+            self.update_adjacent()
+            
     def __iter__(self):
 
         # for edge in gt.find_edge(self.eptm.graph,
@@ -617,10 +671,11 @@ class ApicalJunctions():
 
     def update_adjacent(self):
         for j_edge in self:
-            self.adjacent_cells[j_edge] = self.get_adjacent_cells(j_edge)
-            self.eptm.diamonds[j_edge] = Diamond(self.eptm, j_edge)
+            adj_cells = self.get_adjacent_cells(j_edge)
+            self.adjacent_cells[j_edge] = adj_cells
+            self.eptm.diamonds[j_edge] = Diamond(self.eptm,
+                                                 j_edge, adj_cells)
 
-    @filters.no_filter
     def get_adjacent_cells(self, j_edge):
         jv0 = j_edge.source()
         jv1 = j_edge.target()
@@ -643,6 +698,8 @@ class ApicalJunctions():
         print "%i triangles were dropped" % n_dropped
         # Cell to junction graph
         n_jdropped = 0
+        eptm.update_xy()
+        eptm.update_dsigmas()
         eptm.update_deltas()
         eptm.update_edge_lengths()
         self.visited_cells = []
@@ -701,7 +758,6 @@ class ApicalJunctions():
             new_ctoj_edges.extend([(cell, j_vertex),
                                    (vecino0, j_vertex),
                                    (vecino1, j_vertex)])
-
         for (cell, jv) in new_ctoj_edges:
             eptm.new_ctoj_edge(cell, jv)
         return new_jvs, new_ctoj_edges, n_dropped
@@ -729,8 +785,6 @@ class ApicalJunctions():
                 dropped += 1
         return new_edges, dropped
 
-
-            
 
         
 def c_circumcircle(sz0, sz1, sz2, cutoff):

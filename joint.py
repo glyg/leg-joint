@@ -30,15 +30,15 @@ def new_generation(eptm, growth_rate=1.8):
     for mother_cell in cells:
         eptm.set_local_mask(None)
         eptm.set_local_mask(mother_cell)
-        eptm.cells.prefered_area[mother_cell] *= growth_rate
+        eptm.cells.prefered_vol[mother_cell] *= growth_rate
         eptm.update_geometry()
         eptm.update_gradient()
-        pos0, pos1 = eptm.find_energy_min(tol=1e-4, approx_grad=1)
+        pos0, pos1 = lj.find_energy_min(eptm, tol=1e-4, approx_grad=0)
         j = lj.cell_division(eptm, mother_cell, verbose=False)
         eptm.update_geometry()
         eptm.update_gradient()
         if j is not None:
-            pos0, pos1 = eptm.find_energy_min(tol=1e-4, approx_grad=1)
+            pos0, pos1 = lj.find_energy_min(eptm, tol=1e-4, approx_grad=0)
             now = datetime.now()
             eptm.graph.save("saved_graphs/xml/tmp/generation%s.xml"
                             % now.isoformat())
@@ -60,10 +60,11 @@ def new_generation(eptm, growth_rate=1.8):
     eptm.params['n_zeds'] *= 2
     eptm.params['n_sigmas'] *= 2
     eptm.graph.save("saved_graphs/xml/generation%s.xml" % now.isoformat())
-    
 
+    
 if __name__ == '__main__':
-    eptm = lj.Epithelium(paramfile='default/params.xml')
+    eptm = lj.Epithelium(graphXMLfile='saved_graphs/xml/initial_graph.xml',
+                         paramfile='default/params.xml')
     for n in range(4):
         new_generation(eptm)
     # z_min = eptm.zeds.fa.min()
