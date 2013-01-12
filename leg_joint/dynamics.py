@@ -171,9 +171,11 @@ class Dynamics(object):
         self.grad_wy[jv1] += tension * u_yg
         self.grad_zed[jv1] += tension * u_zg
         dmnd = self.diamonds[j_edge]
+        rij_vect = np.array([self.dixs[j_edge],
+                             self.dwys[j_edge],
+                             self.dzeds[j_edge]])
         for triangle in dmnd.triangles.values():
             # K_alpha DeltaV h_alpha /A_ija
-            
             v_grad_a = self.volume_grad_apical[triangle.cell] / triangle.area
             
             grad_vect0 = v_grad_a * np.cross(triangle.deltas[1, :],
@@ -182,13 +184,30 @@ class Dynamics(object):
             self.grad_wy[jv0] += grad_vect0[1]
             self.grad_zed[jv0] += grad_vect0[2]
 
+            grad_cellpos0 = self.grad_cellpos(triangle.cell, jv0)
+            self.grad_ix[jv0] -= np.dot(triangle.cross,
+                                        np.cross(grad_cellpos0[0], rij_vect))
+            self.grad_wy[jv0] -= np.dot(triangle.cross,
+                                        np.cross(grad_cellpos0[1], rij_vect))
+            self.grad_zed[jv0] -= np.dot(triangle.cross,
+                                         np.cross(grad_cellpos0[2], rij_vect))
+            
             grad_vect1 = v_grad_a * np.cross(triangle.deltas[0, :],
                                              triangle.cross)
             self.grad_ix[jv1] -= grad_vect1[0]
             self.grad_wy[jv1] -= grad_vect1[1]
             self.grad_zed[jv1] -= grad_vect1[2]
 
+            grad_cellpos1 = self.grad_cellpos(triangle.cell, jv1)
+            self.grad_ix[jv1] += np.dot(triangle.cross,
+                                        np.cross(grad_cellpos1[0], rij_vect))
+            self.grad_wy[jv1] += np.dot(triangle.cross,
+                                        np.cross(grad_cellpos1[1], rij_vect))
+            self.grad_zed[jv1] += np.dot(triangle.cross,
+                                         np.cross(grad_cellpos1[2], rij_vect))
 
+
+            
             ctr_grad = self.contractile_grad[triangle.cell]
             self.grad_ix[jv0] -= ctr_grad * u_xg
             self.grad_wy[jv0] -= ctr_grad * u_yg
@@ -198,6 +217,26 @@ class Dynamics(object):
             self.grad_wy[jv1] += ctr_grad * u_yg
             self.grad_zed[jv1] += ctr_grad * u_zg
                         
+    def grad_cellpos(self, cell, j_vect):
+
+        xi = self.ixs[j_vect]
+        yi = self.wys[j_vect]
+        zi = self.zeds[j_vect]
+        theta = self.thetas[cell]
+        cos = np.cos(theta)
+        sin = np.sin(theta)
+        nv = np.float(self.num_sides[cell])
+        norm = 1 / ( nv * self.rhos[j_vect])
+        
+        d_cellpos_dx = norm * np.array([xi * cos + yi * sin,
+                                        xi * sin - yi * cos, 0])
+        d_cellpos_dy = norm * np.array([yi * cos - xi * sin,
+                                        yi * sin + xi * cos, 0])
+        d_cellpos_dz = np.array([0, 0, 1.]) / nv
+        return d_cellpos_dx, d_cellpos_dy, d_cellpos_dz
+        
+        
+
     def isotropic_relax(self):
         
         gamma = self.paramtree.relative_dic['contractility']

@@ -428,6 +428,9 @@ class Triangle(object):
                                 self.eptm.wys[self.cell])
                        - self.eptm.params['rho_lumen'])
         self.length = self.eptm.edge_lengths[self.j_edge]
+
+
+
         
         
 class Diamond(object):
