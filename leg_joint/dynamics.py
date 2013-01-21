@@ -175,38 +175,52 @@ class Dynamics(object):
                              self.dwys[j_edge],
                              self.dzeds[j_edge]])
         for triangle in dmnd.triangles.values():
+            
+            # grad_vect0 = v_grad_a * np.cross(triangle.deltas[1, :],
+            #                                  triangle.cross)
+            # self.grad_ix[jv0] += grad_vect0[0]
+            # self.grad_wy[jv0] += grad_vect0[1]
+            # self.grad_zed[jv0] += grad_vect0[2]
+
+            # grad_cellpos0 = self.grad_cellpos(triangle.cell, jv0)
+            # self.grad_ix[jv0] -= np.dot(triangle.cross,
+            #                             np.cross(grad_cellpos0[0], rij_vect))
+            # self.grad_wy[jv0] -= np.dot(triangle.cross,
+            #                             np.cross(grad_cellpos0[1], rij_vect))
+            # self.grad_zed[jv0] -= np.dot(triangle.cross,
+            #                              np.cross(grad_cellpos0[2], rij_vect))
+            
+            # grad_vect1 = v_grad_a * np.cross(triangle.deltas[0, :],
+            #                                  triangle.cross)
+            # self.grad_ix[jv1] -= grad_vect1[0]
+            # self.grad_wy[jv1] -= grad_vect1[1]
+            # self.grad_zed[jv1] -= grad_vect1[2]
+
+            # grad_cellpos1 = self.grad_cellpos(triangle.cell, jv1)
+            # self.grad_ix[jv1] += np.dot(triangle.cross,
+            #                             np.cross(grad_cellpos1[0], rij_vect))
+            # self.grad_wy[jv1] += np.dot(triangle.cross,
+            #                             np.cross(grad_cellpos1[1], rij_vect))
+            # self.grad_zed[jv1] += np.dot(triangle.cross,
+            #                              np.cross(grad_cellpos1[2], rij_vect))
+
+
             # K_alpha DeltaV h_alpha /A_ija
             v_grad_a = self.volume_grad_apical[triangle.cell] / triangle.area
-            
-            grad_vect0 = v_grad_a * np.cross(triangle.deltas[1, :],
-                                             triangle.cross)
-            self.grad_ix[jv0] += grad_vect0[0]
-            self.grad_wy[jv0] += grad_vect0[1]
-            self.grad_zed[jv0] += grad_vect0[2]
+            nv_a = self.num_sides[triangle.cell]
+            r_a0, r_a1 = triangle.deltas
+            area_grad0 = np.cross(triangle.cross,
+                                  ((1 - 1./nv_a) * rij_vect) + r_a0)
 
-            grad_cellpos0 = self.grad_cellpos(triangle.cell, jv0)
-            self.grad_ix[jv0] -= np.dot(triangle.cross,
-                                        np.cross(grad_cellpos0[0], rij_vect))
-            self.grad_wy[jv0] -= np.dot(triangle.cross,
-                                        np.cross(grad_cellpos0[1], rij_vect))
-            self.grad_zed[jv0] -= np.dot(triangle.cross,
-                                         np.cross(grad_cellpos0[2], rij_vect))
-            
-            grad_vect1 = v_grad_a * np.cross(triangle.deltas[0, :],
-                                             triangle.cross)
-            self.grad_ix[jv1] -= grad_vect1[0]
-            self.grad_wy[jv1] -= grad_vect1[1]
-            self.grad_zed[jv1] -= grad_vect1[2]
+            self.grad_ix[jv0] += area_grad0[0]
+            self.grad_wy[jv0] += area_grad0[1]
+            self.grad_zed[jv0] += area_grad0[2]
 
-            grad_cellpos1 = self.grad_cellpos(triangle.cell, jv1)
-            self.grad_ix[jv1] += np.dot(triangle.cross,
-                                        np.cross(grad_cellpos1[0], rij_vect))
-            self.grad_wy[jv1] += np.dot(triangle.cross,
-                                        np.cross(grad_cellpos1[1], rij_vect))
-            self.grad_zed[jv1] += np.dot(triangle.cross,
-                                         np.cross(grad_cellpos1[2], rij_vect))
-
-
+            area_grad1 = np.cross(triangle.cross,
+                                  ((1 - 1./nv_a) * rij_vect - r_a1))
+            self.grad_ix[jv1] += area_grad1[0]
+            self.grad_wy[jv1] += area_grad1[1]
+            self.grad_zed[jv1] += area_grad1[2]
             
             ctr_grad = self.contractile_grad[triangle.cell]
             self.grad_ix[jv0] -= ctr_grad * u_xg

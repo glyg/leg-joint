@@ -15,6 +15,7 @@ def to_rhotheta(x, y):
     return rho, theta
 
 
+    
 def compute_distribution(prop_u, prop_v, bins, smth=0):
     
     hist_uv, bins_u, bins_v = np.histogram2d(prop_u,

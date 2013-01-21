@@ -11,7 +11,7 @@ from scipy import weave
 from .objects import  AbstractRTZGraph, Cells, ApicalJunctions
 from .xml_handler import ParamTree
 from .dynamics import Dynamics
-#from .optimizers import Optimizers
+
 
 from . import filters
 from .utils import to_xy, to_rhotheta
@@ -32,13 +32,60 @@ class Epithelium(EpitheliumFilters,
                  Dynamics):
     """
     The ::class::`Epithelium` is the container for all the simulation.
+    It inherits attributes form the following classes:
+    * ::class::`EpitheliumFilters`, providing utilities to create and
+    filter the graph edges and vertices.
+    * ::class::`AbstractRTZGraph` containing the geometrical aspects of
+    the simulation in 3D space (e.g. coordinate systems)
+    * ::class::`Dynamics` containing the dynamical aspects, i.e. the
+    functions to compute the energy and the gradients.
+
+    Please refer to those classes documentations for more details.
+
+    Main class attributes:
+    ======================
+
+    graph: a graph_tool ::class::`gt.Graph` instance
+        The epithelium graph is oriented and contains two types of
+        vertices:
+        * the cell centers, with their properties contained in a
+          class::Cells: instance
+        * the apical junctions vertices
+        Each cell is linked to each of its vertices by a graph edge, oriented
+        from the cell to the junction vertices.
+        The apical junctions are formed by oriented edges from one junction
+        vertex to the other
+
+    params: a dictionnary of the parameters.
     
+
     """
     def __init__(self, graphXMLfile=None,
                  paramtree=None,
                  paramfile=PARAMFILE,
                  graph=None, verbose=False):
         """
+        Parameters:
+        ==========
+
+        graphXMLfile: file name or file instance, optional.
+            It should point to an `xml` (or `xml.gz`) file as output by
+            a graph_tool ::calss:Graph: `save` attribute from a previous
+            simulation. If it is not provided, a nex graph will be created
+
+        paramtree: an instance of the ::class:ParamTree:, optional
+           the corresponding class is defined in
+           the `xml_handler` module. If not provided, paramters
+           will be read from the `paramfile` argument
+
+        paramfile: an xml file, defaults to `default/params.xml`
+           paramfile contains the paramters values for the simulation.
+
+        graph: a graph_tool ::class:Graph instance
+
+        verbose: bool, optional
+           if `True`, the simulation will output -possibly lots of-
+           information on the successive operations.
         
         """
         # Parametrisation
@@ -178,21 +225,24 @@ class Epithelium(EpitheliumFilters,
         self.zeds.fa = new_xyz_pos[2::3]
     
     def set_cell_pos(self, cell):
-        j_rtz = np.array([[self.rhos[jv], self.thetas[jv], self.zeds[jv]]
+        j_xyz = np.array([[self.ixs[jv], self.wys[jv], self.zeds[jv]]
                           for jv in cell.out_neighbours()])
-        if len(j_rtz) < 3:
-            return
-        self.zeds[cell] = j_rtz[:, 2].mean()
-        self.rhos[cell] = j_rtz[:, 0].mean()
-        # ### set periodic theta
-        raw_dtheta = j_rtz[:,1] - self.thetas[cell]
-        pbc_theta = j_rtz[:,1]
-        pbc_theta[raw_dtheta <= - np.pi] += 2 * np.pi
-        pbc_theta[raw_dtheta >= np.pi] -= 2 * np.pi
-        self.thetas[cell] = pbc_theta.mean()
-        self.sigmas[cell] = self.thetas[cell] * self.rhos[cell]
-        self.ixs[cell], self.wys[cell] = to_xy(self.rhos[cell],
-                                               self.thetas[cell])
+        self.ixs[cell], self.wys[cell], self.zeds[cell] = j_xyz.mean(axis=0)
+        # j_rtz = np.array([[self.rhos[jv], self.thetas[jv], self.zeds[jv]]
+        #                   for jv in cell.out_neighbours()])
+        # if len(j_rtz) < 3:
+        #     return
+        # self.zeds[cell] = j_rtz[:, 2].mean()
+        # self.rhos[cell] = j_rtz[:, 0].mean()
+        # # ### set periodic theta
+        # raw_dtheta = j_rtz[:,1] - self.thetas[cell]
+        # pbc_theta = j_rtz[:,1]
+        # pbc_theta[raw_dtheta <= - np.pi] += 2 * np.pi
+        # pbc_theta[raw_dtheta >= np.pi] -= 2 * np.pi
+        # self.thetas[cell] = pbc_theta.mean()
+        # self.sigmas[cell] = self.thetas[cell] * self.rhos[cell]
+        # self.ixs[cell], self.wys[cell] = to_xy(self.rhos[cell],
+        #                                        self.thetas[cell])
         
     def reset_topology(self):
         self.cells.update_junctions()

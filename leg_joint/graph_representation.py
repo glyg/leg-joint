@@ -30,7 +30,7 @@ def plot_ortho_gradients(eptm, axes=None,
     pos0, bounds = precondition(eptm)
     rho_avg = eptm.rhos.a.mean()
     rhos, thetas  = to_rhotheta(pos0[::3], pos0[1::3])
-    sigmas = thetas * rhos
+    sigmas = thetas * rho_avg
     zeds = pos0[2::3]
     grad_rhos = (np.cos(thetas) * grad_xyz[::3]
                  + np.sin(thetas) * grad_xyz[1::3]) * scale
@@ -62,13 +62,13 @@ def plot_ortho_gradients(eptm, axes=None,
 
 
 @filters.active
-def plot_active(epithelium, ax=None):
-    sigmas = epithelium.sigmas.fa
-    zeds = epithelium.zeds.fa
+def plot_active(eptm, ax=None):
+    sigmas = eptm.proj_sigma().fa
+    zeds = eptm.zeds.fa
     if ax is None:
-        ax =  plot_cells_sz(epithelium, ax=None,
-                            vfilt=epithelium.is_local_vert,
-                            efilt=epithelium.is_local_edge)
+        ax =  plot_cells_sz(eptm, ax=None,
+                            vfilt=eptm.is_local_vert,
+                            efilt=eptm.is_local_edge)
     ax.plot(zeds, sigmas, 'ro', alpha=0.5, ms=8)
     plt.draw()
     return ax
@@ -90,18 +90,16 @@ def sz_scatter(eptm, pmap, ax, log=False,
     if log: 
         n_data = np.log(1 + n_data)
         
-    proj_sigma = eptm.sigmas.copy()
-    mean_rho = eptm.rhos.fa.mean()
-    proj_sigma.fa = eptm.thetas.fa * mean_rho
-    ax.scatter(eptm.zeds.fa, eptm.sigmas.fa, c=n_data,
+    proj_sigma = eptm.proj_sigma()
+    ax.scatter(eptm.zeds.fa, proj_sigma.fa, c=n_data,
                cmap=plt.cm.jet, **kwargs)
     eptm.graph.set_vertex_filter(None)
 
 
-def plot_ortho_proj(epithelium, ax=None, vfilt=None, efilt=None, **kwargs):
+def plot_ortho_proj(eptm, ax=None, vfilt=None, efilt=None, **kwargs):
     if ax is None:
         fig, ax = plt.subplots(1,1)
-    plot_cells_zs(epithelium, ax=ax,
+    plot_cells_zs(eptm, ax=ax,
                   vfilt=vfilt, efilt=efilt, **kwargs)
 
     divider = make_axes_locatable(ax)
@@ -109,9 +107,9 @@ def plot_ortho_proj(epithelium, ax=None, vfilt=None, efilt=None, **kwargs):
     ax_zr = divider.append_axes("top", 2., pad=0.1, sharex=ax)
     ax_rs = divider.append_axes("right", 2., pad=0.1, sharey=ax)
     
-    plot_cells_zr(epithelium, ax=ax_zr,
+    plot_cells_zr(eptm, ax=ax_zr,
                   vfilt=vfilt, efilt=efilt)
-    plot_cells_rs(epithelium, ax=ax_rs,
+    plot_cells_rs(eptm, ax=ax_rs,
                   vfilt=vfilt, efilt=efilt)
     plt.setp(ax_zr.get_xticklabels() + ax_rs.get_yticklabels(),
              visible=False)
@@ -119,90 +117,89 @@ def plot_ortho_proj(epithelium, ax=None, vfilt=None, efilt=None, **kwargs):
     return ax, ax_zr, ax_rs
 
     
-def plot_cells_zr(epithelium, ax=None, 
+def plot_cells_zr(eptm, ax=None, 
                   vfilt=None, efilt=None):
     if ax is None:
         fig, ax = plt.subplots(1,1)
-    epithelium.graph.set_vertex_filter(vfilt)
-    rhos = epithelium.rhos.copy()
-    zeds = epithelium.zeds.copy()
-    for cell in epithelium.cells :
+    eptm.graph.set_vertex_filter(vfilt)
+    rhos = eptm.rhos.copy()
+    zeds = eptm.zeds.copy()
+    for cell in eptm.cells :
         ax.plot(zeds[cell],
                 rhos[cell], 'bo', alpha=0.3)
-    basal_rho = np.ones_like(zeds.fa) * epithelium.params['rho_lumen']
+    basal_rho = np.ones_like(zeds.fa) * eptm.params['rho_lumen']
     #ax.plot(zeds.fa, basal_rho, 'k-')
-    epithelium.graph.set_vertex_filter(None)
-    plot_edges_zr(epithelium, efilt, ax=ax)
+    eptm.graph.set_vertex_filter(None)
+    plot_edges_zr(eptm, efilt, ax=ax)
     ax.set_ylabel('Radius', fontsize='large')
     return ax
 
-def plot_cells_rs(epithelium, ax=None, 
+def plot_cells_rs(eptm, ax=None, 
                   vfilt=None, efilt=None):
     if ax is None:
         fig, ax = plt.subplots(1,1)
-    epithelium.graph.set_vertex_filter(vfilt)
-    sigmas = epithelium.sigmas.copy()
-    rhos = epithelium.rhos.copy()
-    for cell in epithelium.cells :
+    eptm.graph.set_vertex_filter(vfilt)
+    sigmas = eptm.proj_sigma()
+    rhos = eptm.rhos.copy()
+    for cell in eptm.cells :
         ax.plot(rhos[cell],
                 sigmas[cell], 'bo', alpha=0.3)
-    basal_rho = np.ones_like(sigmas.fa) * epithelium.params['rho_lumen']
+    basal_rho = np.ones_like(sigmas.fa) * eptm.params['rho_lumen']
     #ax.plot(basal_rho, sigmas.fa, 'k-')
 
-    epithelium.graph.set_vertex_filter(None)
-    plot_edges_rs(epithelium, efilt, ax=ax)
+    eptm.graph.set_vertex_filter(None)
+    plot_edges_rs(eptm, efilt, ax=ax)
     ax.set_xlabel('Radius', fontsize='large')
     return ax
 
-def plot_edges_rs(epithelium, efilt=None,
+def plot_edges_rs(eptm, efilt=None,
                   ax=None, **kwargs):
-    edge_width = epithelium.junctions.line_tensions.copy()
-    rhos = []
-    sigmas = []
+    edge_width = eptm.junctions.line_tensions.copy()
     if ax is None:
         fig, ax = plt.subplots(1,1)
-    epithelium.graph.set_edge_filter(efilt)
-    epithelium.graph.set_vertex_filter(None)
-    edge_width.fa = 2. * (epithelium.junctions.line_tensions.fa
-                          / epithelium.junctions.line_tensions.fa.mean())**0.5
-    for edge in epithelium.junctions:
+    eptm.graph.set_edge_filter(efilt)
+    eptm.graph.set_vertex_filter(None)
+    edge_width.fa = 2. * (eptm.junctions.line_tensions.fa
+                          / eptm.junctions.line_tensions.fa.mean())**0.5
+    proj_sigmas = eptm.proj_sigma()
+    for edge in eptm.junctions:
         if edge is None:
             print "invalid edge %s" %str(edge)
             continue
-        rhos = (epithelium.rhos[edge.source()],
-                  epithelium.rhos[edge.target()])
-        sigmas = (epithelium.sigmas[edge.source()],
-                epithelium.sigmas[edge.target()])
+        rhos = (eptm.rhos[edge.source()],
+                  eptm.rhos[edge.target()])
+        sigmas = (proj_sigmas[edge.source()],
+                  proj_sigmas[edge.target()])
         ax.plot(rhos, sigmas,
                 'g-', lw=edge_width[edge],
                 alpha=0.4, **kwargs)
     ax.set_aspect('equal')
-    epithelium.graph.set_edge_filter(None)
+    eptm.graph.set_edge_filter(None)
 
-def plot_edges_zr(epithelium, efilt=None,
+def plot_edges_zr(eptm, efilt=None,
                   ax=None, **kwargs):
-    edge_width = epithelium.junctions.line_tensions.copy()
+    edge_width = eptm.junctions.line_tensions.copy()
     rhos = []
     zeds = []
     if ax is None:
         fig, ax = plt.subplots(1,1)
-    epithelium.graph.set_edge_filter(efilt)
-    epithelium.graph.set_vertex_filter(None)
-    edge_width.fa = 2. * (epithelium.junctions.line_tensions.fa
-                          / epithelium.junctions.line_tensions.fa.mean())**0.5
-    for edge in epithelium.junctions:
+    eptm.graph.set_edge_filter(efilt)
+    eptm.graph.set_vertex_filter(None)
+    edge_width.fa = 2. * (eptm.junctions.line_tensions.fa
+                          / eptm.junctions.line_tensions.fa.mean())**0.5
+    for edge in eptm.junctions:
         if edge is None:
             print "invalid edge %s" %str(edge)
             continue
-        rhos = (epithelium.rhos[edge.source()],
-                  epithelium.rhos[edge.target()])
-        zeds = (epithelium.zeds[edge.source()],
-                epithelium.zeds[edge.target()])
+        rhos = (eptm.rhos[edge.source()],
+                  eptm.rhos[edge.target()])
+        zeds = (eptm.zeds[edge.source()],
+                eptm.zeds[edge.target()])
         ax.plot(zeds, rhos,
                 'g-', lw=edge_width[edge],
                 alpha=0.4, **kwargs)
     ax.set_aspect('equal')
-    epithelium.graph.set_edge_filter(None)
+    eptm.graph.set_edge_filter(None)
 
 
     
@@ -216,63 +213,64 @@ def plot_cells_sz(*args, **kwargs):
     return plot_cells_zs(*args, **kwargs)
     
 
-def plot_cells_zs(epithelium, ax=None, text=True,
+def plot_cells_zs(eptm, ax=None, text=True,
                   vfilt=None, efilt=None,
                   c_text=True, j_text=False):
     if ax is None:
         fig, ax = plt.subplots(1,1)
-    epithelium.graph.set_vertex_filter(vfilt)
-    # We project the shape on the average cylinder
-    # mean_rho = epithelium.rhos.fa.mean()
-    sigmas = epithelium.sigmas.copy()
-    #sigmas.fa = epithelium.thetas.fa * mean_rho
-    zeds = epithelium.zeds.copy()
-    for cell in epithelium.cells :
+    eptm.graph.set_vertex_filter(vfilt)
+    # We project the shape on the average *
+    mean_rho = eptm.rhos.fa.mean()
+    sigmas = eptm.proj_sigma()
+    #sigmas.fa = eptm.thetas.fa * mean_rho
+    zeds = eptm.zeds.copy()
+    for cell in eptm.cells :
         if text and c_text:
             ax.text(zeds[cell],
                     sigmas[cell],
                     str(cell))
         ax.plot(zeds[cell],
                 sigmas[cell], 'bo', alpha=0.3)
-    epithelium.graph.set_vertex_filter(None)
-    epithelium.graph.set_edge_filter(efilt)
-    plot_edges_zs(epithelium, efilt, ax=ax, text=j_text)
-    epithelium.graph.set_edge_filter(None)
+    eptm.graph.set_vertex_filter(None)
+    eptm.graph.set_edge_filter(efilt)
+    plot_edges_zs(eptm, efilt, ax=ax, text=j_text)
+    eptm.graph.set_edge_filter(None)
     ax.set_xlabel('Proximo distal', fontsize='large')
     ax.set_ylabel('Around the leg', fontsize='large')
     plt.draw()
     return ax
     
-def plot_edges_zs(epithelium, efilt=None,
+def plot_edges_zs(eptm, efilt=None,
                   text=False, ax=None,
                   ls='g-', **kwargs):
-    edge_width = epithelium.junctions.line_tensions.copy()
+    edge_width = eptm.junctions.line_tensions.copy()
     sigmas = []
     zeds = []
     if ax is None:
         fig, ax = plt.subplots(1,1)
-    epithelium.graph.set_edge_filter(efilt)
-    epithelium.graph.set_vertex_filter(None)
-    edge_width.fa = 2. * (epithelium.junctions.line_tensions.fa
-                          / epithelium.junctions.line_tensions.fa.mean())**0.5
-    for edge in epithelium.junctions:
+    eptm.graph.set_edge_filter(efilt)
+    eptm.graph.set_vertex_filter(None)
+    edge_width.fa = 2. * (eptm.junctions.line_tensions.fa
+                          / eptm.junctions.line_tensions.fa.mean())**0.5
+    proj_sigmas = eptm.proj_sigma()
+    for edge in eptm.junctions:
         if edge is None:
             print "invalid edge %s" %str(edge)
             continue
-        sigmas = (epithelium.sigmas[edge.source()],
-                  epithelium.sigmas[edge.target()])
-        zeds = (epithelium.zeds[edge.source()],
-                epithelium.zeds[edge.target()])
+        sigmas = (proj_sigmas[edge.source()],
+                  proj_sigmas[edge.target()])
+        zeds = (eptm.zeds[edge.source()],
+                eptm.zeds[edge.target()])
         ax.plot(zeds,
                 sigmas,
                 'g-', lw=edge_width[edge],
                 alpha=0.4, **kwargs)
         if text:
-            ax.text(epithelium.zeds[edge.source()],
-                    epithelium.sigmas[edge.source()],
+            ax.text(eptm.zeds[edge.source()],
+                    proj_sigmas[edge.source()],
                     str(edge.source()))
     ax.set_aspect('equal')
-    epithelium.graph.set_edge_filter(None)
+    eptm.graph.set_edge_filter(None)
 
 
 
@@ -386,9 +384,8 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
     edge_width.fa = 0.3
     eptm.graph.set_edge_filter(None)
 
-    rhos, sigmas, zeds = eptm.rhos, eptm.sigmas, eptm.zeds
-    thetas = sigmas.copy()
-    thetas.a = sigmas.a / rhos.a
+    eptm.update_rhotheta()
+    rhos, thetas, zeds = eptm.rhos, eptm.thetas, eptm.zeds
     
     pseudo_x = eptm.graph.new_vertex_property('float')
     pseudo_y = eptm.graph.new_vertex_property('float')
@@ -426,7 +423,7 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
                          output=output3d)
     if verbose: print 'saved tissue to %s' % output3d
     
-    sigma = eptm.sigmas
+    sigma = eptm.proj_sigma()
     zs = [zeds, sigma]
     zs_pos = gt.group_vector_property(zs, value_type='float')
     pmap2 = gt.graph_draw(eptm.graph, zs_pos,

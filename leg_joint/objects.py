@@ -1,29 +1,6 @@
 #!/usr/bin/env python -*- coding: utf-8 -*-
 
-"""This module provides the basic elements composing the leg epithelium.
-
-The architecture of the epithelium model consists in a graph containing
-two types of vertices: 
-
-* The cells themselves
-* The apical junctions vertices (It is
-constructed initially as the Voronoi diagramm associated with the
-cell centers triangulation, again in the ::math:(\rho, \sigma):
-plane.)
-
-and two types of edges:
-* The junction edges, structuring the apical surface of the
-epithelium
-* The cell to junction edges linking one cell to its
-neighbouring junction vertices.
-
-
-This graph implemented as a class wrapping a
-(`graph_tool`)[http://projects.skewed.de/graph-tool] object with the
-::math:(\rho, \theta, z): coordinate system. The geometrical features
-are defined in an abstract class named ::class:`AbstractRTZGraph`:,
-from which ::class:`Epithelium`: and for commodity
-the ::class:`Cells`: and ::class:`ApicalJunctions` are derived.
+"""
 
 """
 
@@ -44,26 +21,31 @@ class AbstractRTZGraph(object):
     '''
     Wrapper of a (`graph_tool`)[http://projects.skewed.de/graph-tool]
     object with the ::math:(\rho, \theta, z): coordinate system.
+
+
+    Properties
+    ===========
+    ixs, wys, rhos, thetas, zeds, sigmas: vertex PropertyMaps
+        of the vertices positions along the different axes.
+
+    dixs, dwys, dzeds, drhos, dthetas, dsigmas : edge PropertyMaps of the
+        edge components along the various axis. For exemple:
+        `self.dixs[edge] = self.ixs[edge.source()] - self.ixs[edge.target()]`
+    edge_lengths: edge PropertyMap giving the edge lengths
+
+    Methods:
+    ===========
+
+    rtz_group : Creates or updates two `GroupPropertyMap`,
+        `rtz_pos` and `sz_pos` containing the ::math:(\rho, \theta, z):
+        and ::math:(\sigma, z): positions of the vertices, respectively.
+
     '''
 
     def __init__(self):
         '''
         Create an `AbstractRTZGraph` object. This is not ment as
         a stand alone object, but should rather be sublcassed.
-
-        Properties
-        ===========
-        rhos, thetas, zeds, sigmas: vertex PropertyMaps
-            of the vertices positions along the different axes
-        
-        Methods:
-        ===========
-        rtz_group : Creates or updates two `GroupPropertyMap`,
-            `rtz_pos` and `sz_pos` containing the ::math:(\rho, \theta, z):
-            and ::math:(\sigma, z): positions of the vertices, respectively.
-        
-        
-        
         '''
         self.graph.set_directed(True) #So each edge is a defined vector
         self.current_angle = 0
@@ -80,6 +62,7 @@ class AbstractRTZGraph(object):
             
     def _init_edge_bool_props(self):
         '''
+        Creates the edge boolean PropertyMaps
         '''
         at_boundary = self.graph.new_edge_property('bool')
         at_boundary.a[:] = 0
@@ -96,6 +79,8 @@ class AbstractRTZGraph(object):
         return self.graph.edge_properties["is_new_edge"]
         
     def _init_vertex_geometry(self):
+        '''Creates the vertices geometric property maps
+        '''
         # Position in the rho theta zed space
         rhos_p = self.graph.new_vertex_property('float')
         self.graph.vertex_properties["rhos"] = rhos_p
@@ -130,7 +115,8 @@ class AbstractRTZGraph(object):
         return self.graph.vertex_properties["sigmas"]
         
     def _init_edge_geometry(self):
-        
+        '''Creates the edge geometric property maps
+        '''
         # deltas 
         dthetas = self.graph.new_edge_property('float')
         self.graph.edge_properties["dthetas"] = dthetas
@@ -200,12 +186,21 @@ class AbstractRTZGraph(object):
         return self.graph.edge_properties["edge_lengths"]
 
     def scale(self, scaling_factor):
+        '''Multiply all the distances by a factor `scaling_factor`
+
+        Parameter
+        =========
+        scaling_factor: float
+        '''
         self.ixs.a *= scaling_factor
         self.wys.a *= scaling_factor
         self.zeds.a *= scaling_factor
         self.update_rhotheta()
 
     def rotate(self, angle):
+        '''Rotates the epithelium by an angle `angle` around
+        the ::math::z:: axis
+        '''
         self.update_rhotheta()
         buf_theta = self.thetas.a + np.pi
         buf_theta += angle
@@ -216,6 +211,9 @@ class AbstractRTZGraph(object):
         #self.periodic_boundary_condition()
 
     def closest_vert(self, sigma, zed):
+        '''Return the vertices closer to a position
+        `sigma`,`zed`
+        '''
         dist = np.hypot(self.sigmas.fa - sigma,
                         self.zeds.fa - zed)
         idx = np.argmin(dist)
@@ -233,7 +231,7 @@ class AbstractRTZGraph(object):
         to the vertices positions along the sigma axis,
         with their curent value for rho.
         '''
-        #self.update_rhotheta()
+        self.update_rhotheta()
         buf_theta = self.thetas.a + np.pi
         buf_theta = (buf_theta % (2 * np.pi)) - np.pi
         self.thetas.a = buf_theta
@@ -254,6 +252,16 @@ class AbstractRTZGraph(object):
         self.graph.set_edge_filter(efilt[0], efilt[1])
         return e
 
+    def proj_sigma(self):
+        ''' return an array of the positions projected on the
+        cylinder with average rho radius
+        '''
+        self.update_rhotheta()
+        rho_mean = self.rhos.a.mean()
+        sigmas = self.thetas.copy()
+        sigmas.a = self.thetas.a * rho_mean
+        return sigmas 
+        
     # For clarity reason, those are not properties and return copies
     def rtz_pos(self):
         """
@@ -277,13 +285,21 @@ class AbstractRTZGraph(object):
         return gt.group_vector_property(sigmazs, value_type='float')
 
     def update_rhotheta(self):
+        '''Computes the values of the `rhos`, `thetas` and `sigmas` property
+        maps, from the current values of the `ixs` and `xys` property maps
+        '''
         self.rhos.a, self.thetas.a = to_rhotheta(self.ixs.a, self.wys.a)
         self.sigmas.a = self.rhos.a * self.thetas.a
 
     def update_xy(self):
+        '''Computes the values of the `ixs` and `xys` property
+        maps, from the current values of the `rhos` and `thetas` property maps
+        '''
+
         self.ixs.a, self.wys.a = to_xy(self.rhos.a, self.thetas.a)
 
     def edge_difference(self, vprop, eprop=None):
+        
         vtype = vprop.value_type()
         if eprop == None:
             eprop = self.graph.new_edge_property(vtype)
@@ -292,6 +308,7 @@ class AbstractRTZGraph(object):
         return eprop
         
     def update_deltas(self):
+        ''' Updates the edge coordinates from their vertices posittions'''
         dzeds = self.edge_difference(self.zeds)
         dixs = self.edge_difference(self.ixs)
         dwys = self.edge_difference(self.wys)
