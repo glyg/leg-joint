@@ -129,13 +129,14 @@ class Epithelium(EpitheliumFilters,
             if self.__verbose__ == True:
                 total_edges = self.graph.num_edges()
                 good_edges = efilt.a.sum()
-                print 'removing %i cell to cell edges ' % (total_edges - good_edges)
+                print 'removing %i cell to cell edges ' % (total_edges
+                                                           - good_edges)
             self.graph.set_edge_filter(efilt)
             self.graph.purge_edges()
             self.set_vertex_state()
             self.set_edge_state()
         
-        self.cells.update_junctions() #Also registers the triangles
+        self.cells.update_junctions()
         self.junctions.update_adjacent() #Also registers the diamonds
 
         # Dynamical components
@@ -165,10 +166,6 @@ class Epithelium(EpitheliumFilters,
             str1.append('    * %s' % key)
         return '\n'.join(str1)
 
-    @property
-    def num_sides(self):
-        return self.graph.degree_property_map('out')
-
     def update_geometry(self):
 
         self.update_rhotheta()
@@ -177,6 +174,7 @@ class Epithelium(EpitheliumFilters,
                                     % self.graph.num_vertices())
         for cell in self.cells:
             self.set_cell_pos(cell)
+        self.update_rhotheta()
         self.update_deltas()
         self.update_edge_lengths()
         # Edges
@@ -227,6 +225,8 @@ class Epithelium(EpitheliumFilters,
     def set_cell_pos(self, cell):
         j_xyz = np.array([[self.ixs[jv], self.wys[jv], self.zeds[jv]]
                           for jv in cell.out_neighbours()])
+        if len(j_xyz) < 3:
+            return
         self.ixs[cell], self.wys[cell], self.zeds[cell] = j_xyz.mean(axis=0)
         # j_rtz = np.array([[self.rhos[jv], self.thetas[jv], self.zeds[jv]]
         #                   for jv in cell.out_neighbours()])

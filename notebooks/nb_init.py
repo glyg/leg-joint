@@ -19,7 +19,7 @@ def before_after(func):
     def new_func(eptm, *args, **kwargs):
         import matplotlib.pyplot as plt
         import leg_joint as lj
-        eptm.update_gradient()
+        #eptm.update_gradient()
         fig, axes = plt.subplots(1,2, figsize=(12,4),
                                  sharex=True, sharey=True)
         subaxes = lj.plot_ortho_proj(eptm, axes[0], c_text=False, 
@@ -27,7 +27,7 @@ def before_after(func):
                                      efilt=eptm.is_local_edge)
         lj.plot_ortho_gradients(eptm, subaxes, scale=1.)
         foutput = func(eptm, *args, **kwargs)
-        eptm.update_gradient()
+        #eptm.update_gradient()
         subaxes = lj.plot_ortho_proj(eptm, axes[1], c_text=False,
                                      vfilt=eptm.is_local_vert,
                                      efilt=eptm.is_local_edge)

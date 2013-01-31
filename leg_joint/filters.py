@@ -16,8 +16,6 @@ def local(meth):
         self.graph.set_edge_filter(prev_estate, prev_inverted_e)
         return out
     return new_function
-
-
     
 
 def active(meth):
@@ -113,73 +111,56 @@ class EpitheliumFilters(object):
         if self.new:
             self._init_edge_filters()
             self._init_vertex_filters()
-
+        else:
+            self._get_edge_filters()
+            self._get_vertex_filters()
+            
     def _init_edge_filters(self):
-        is_junction_edge = self.graph.new_edge_property('bool')
-        is_junction_edge.a[:] = 0
+        self.is_junction_edge = self.graph.new_edge_property('bool')
+        self.is_junction_edge.a[:] = 0
         self.graph.edge_properties["is_junction_edge"
-                                   ] = is_junction_edge
+                                   ] = self.is_junction_edge
 
-        is_ctoj_edge = self.graph.new_edge_property('bool')
-        is_ctoj_edge.a[:] = 0
-        self.graph.edge_properties["is_ctoj_edge"] = is_ctoj_edge
-        is_local_edge = self.graph.new_edge_property('bool')
-        is_local_edge.a[:] = 0
-        self.graph.edge_properties["is_local_edge"] = is_local_edge
-        is_active_edge = self.graph.new_edge_property('bool')
-        is_active_edge.a[:] = 0
-        self.graph.edge_properties["is_active_edge"] = is_active_edge
+        self.is_ctoj_edge = self.graph.new_edge_property('bool')
+        self.is_ctoj_edge.a[:] = 0
+        self.graph.edge_properties["is_ctoj_edge"] = self.is_ctoj_edge
+        self.is_local_edge = self.graph.new_edge_property('bool')
+        self.is_local_edge.a[:] = 0
+        self.graph.edge_properties["is_local_edge"] = self.is_local_edge
+        self.is_active_edge = self.graph.new_edge_property('bool')
+        self.is_active_edge.a[:] = 0
+        self.graph.edge_properties["is_active_edge"] = self.is_active_edge
 
-    @property
-    def is_local_edge(self):
-        '''boolean edge property'''
-        return self.graph.edge_properties["is_local_edge"]
-
-    @property
-    def is_active_edge(self):
-        return self.graph.edge_properties["is_active_edge"]
-        
-    @property
-    def is_junction_edge(self):
-        '''boolean edge property '''
-        return self.graph.edge_properties["is_junction_edge"]
-        
-    @property
-    def is_ctoj_edge(self):
-        '''boolean edge property '''
-        return self.graph.edge_properties["is_ctoj_edge"]
+    def _get_edge_filters(self):
+        self.is_junction_edge = self.graph.edge_properties["is_junction_edge"]
+        self.is_ctoj_edge = self.graph.edge_properties["is_ctoj_edge"]
+        self.is_local_edge = self.graph.edge_properties["is_local_edge"]
+        self.is_active_edge = self.graph.edge_properties["is_active_edge"]
 
     def _init_vertex_filters(self):
         # Is a cell
-        is_cell_vert = self.graph.new_vertex_property('bool')
-        self.graph.vertex_properties["is_cell_vert"] = is_cell_vert
-        is_alive = self.graph.new_vertex_property('bool')
-        is_alive.a[:] = 1
-        self.graph.vertex_properties["is_alive"] = is_alive
+        self.is_cell_vert = self.graph.new_vertex_property('bool')
+        self.graph.vertex_properties["is_cell_vert"] = self.is_cell_vert
+        self.is_alive = self.graph.new_vertex_property('bool')
+        self.is_alive.a[:] = 1
+        self.graph.vertex_properties["is_alive"] = self.is_alive
         # Locality
-        is_local_vert = self.graph.new_vertex_property('bool')
-        is_local_vert.a[:] = 0
-        self.graph.vertex_properties["is_local_vert"] = is_local_vert
-        # Active verts can change
-        is_active_vert = self.graph.new_vertex_property('bool')
-        is_active_vert.a[:] = 0
-        self.graph.vertex_properties["is_active_vert"] = is_active_vert
+        self.is_local_vert = self.graph.new_vertex_property('bool')
+        self.is_local_vert.a[:] = 0
+        self.graph.vertex_properties["is_local_vert"] = self.is_local_vert
+        # Active verts can move
+        self.is_active_vert = self.graph.new_vertex_property('bool')
+        self.is_active_vert.a[:] = 0
+        self.graph.vertex_properties["is_active_vert"] = self.is_active_vert
 
-    @property
-    def is_alive(self):
-        return self.graph.vertex_properties["is_alive"]
-    @property
-    def is_local_vert(self):
-        return self.graph.vertex_properties["is_local_vert"]
-    @property
-    def is_local_vert(self):
-        return self.graph.vertex_properties["is_local_vert"]
-    @property
-    def is_active_vert(self):
-        return self.graph.vertex_properties["is_active_vert"]
-    @property
-    def is_cell_vert(self):
-        return self.graph.vertex_properties["is_cell_vert"]
+    def _get_vertex_filters(self):
+        # Is a cell
+        self.is_cell_vert = self.graph.vertex_properties["is_cell_vert"]
+        self.is_alive = self.graph.vertex_properties["is_alive"]
+        # Locality
+        self.is_local_vert = self.graph.vertex_properties["is_local_vert"]
+        # Active verts can move
+        self.is_active_vert = self.graph.vertex_properties["is_active_vert"]
 
     def new_ctoj_edge(self, cell, jv):
         if self.graph.edge(cell, jv) is None:

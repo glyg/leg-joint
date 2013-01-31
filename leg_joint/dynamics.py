@@ -15,30 +15,9 @@ class Dynamics(object):
     '''
     def __init__(self):
         if self.new:
-            # Gradients amplitudes
-            elastic_grad = self.graph.new_vertex_property('float')
-            self.graph.vertex_properties["elastic_grad"] = elastic_grad
-            contractile_grad = self.graph.new_vertex_property('float')
-            self.graph.vertex_properties["contractile_grad"] = contractile_grad
-            volume_grad = self.graph.new_vertex_property('float')
-            self.graph.vertex_properties["volume_grad"] = volume_grad
-            # Gradients along sigma, zed and rho
-            grad_sigma = self.graph.new_vertex_property('float')
-            self.graph.vertex_properties["grad_sigma"] = grad_sigma
-            grad_ix = self.graph.new_vertex_property('float')
-            self.graph.vertex_properties["grad_ix"] = grad_ix
-            grad_wy = self.graph.new_vertex_property('float')
-            self.graph.vertex_properties["grad_wy"] = grad_wy
-            grad_zed = self.graph.new_vertex_property('float')
-            self.graph.vertex_properties["grad_zed"] = grad_zed
-            grad_radial = self.graph.new_vertex_property('float')
-            self.graph.vertex_properties["grad_radial"] = grad_radial
-            volume_grad_radial = self.graph.new_vertex_property('float')
-            self.graph.vertex_properties["volume_grad_radial"]\
-                = volume_grad_radial
-            volume_grad_apical = self.graph.new_vertex_property('float')
-            self.graph.vertex_properties["volume_grad_apical"]\
-                = volume_grad_apical
+            self._init_gradients()
+        else:
+            self._get_gradients()
 
         vol_elasticity0 = self.params['vol_elasticity']
         prefered_area = self.params["prefered_area"]
@@ -46,46 +25,58 @@ class Dynamics(object):
         prefered_vol = prefered_area * height
         self.norm_factor = vol_elasticity0 * prefered_vol**2
 
+    def _init_gradients(self):
+        # Gradients amplitudes
+        self.elastic_grad = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["elastic_grad"] = self.elastic_grad
+        self.contractile_grad = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["contractile_grad"]\
+            = self.contractile_grad
+        self.volume_grad = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["volume_grad"] = self.volume_grad
+        # Gradients along sigma, zed and rho
+        self.grad_sigma = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["grad_sigma"] = self.grad_sigma
+        self.grad_ix = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["grad_ix"] = self.grad_ix
+        self.grad_wy = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["grad_wy"] = self.grad_wy
+        self.grad_zed = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["grad_zed"] = self.grad_zed
+        self.grad_radial = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["grad_radial"] = self.grad_radial
+        self.volume_grad_radial = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["volume_grad_radial"]\
+            = self.volume_grad_radial
+        self.volume_grad_apical = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["volume_grad_apical"]\
+            = self.volume_grad_apical
 
-
-            
-    @property
-    def grad_sigma(self):
-        return self.graph.vertex_properties["grad_sigma"]
-    @property
-    def grad_ix(self):
-        return self.graph.vertex_properties["grad_ix"]
-    @property
-    def grad_wy(self):
-        return self.graph.vertex_properties["grad_wy"]
-    @property
-    def grad_zed(self):
-        return self.graph.vertex_properties["grad_zed"]
-    @property
-    def grad_radial(self):
-        return self.graph.vertex_properties["grad_radial"]
-    @property
-    def elastic_grad(self):
-        return self.graph.vertex_properties["elastic_grad"]
-    @property
-    def contractile_grad(self):
-        return self.graph.vertex_properties["contractile_grad"]
-    @property
-    def volume_grad(self):
-        return self.graph.vertex_properties["volume_grad"]
-    @property
-    def volume_grad_radial(self):
-        return self.graph.vertex_properties["volume_grad_radial"]
-    @property
-    def volume_grad_apical(self):
-        return self.graph.vertex_properties["volume_grad_apical"]
-    
+    def _get_gradients(self):
+        # Gradients amplitudes
+        self.elastic_grad = self.graph.vertex_properties["elastic_grad"]
+        self.contractile_grad\
+            = self.graph.vertex_properties["contractile_grad"]
+        self.volume_grad = self.graph.vertex_properties["volume_grad"]
+        # Gradients along sigma, zed and rho
+        self.grad_sigma = self.graph.vertex_properties["grad_sigma"]
+        self.grad_ix = self.graph.vertex_properties["grad_ix"]
+        self.grad_wy = self.graph.vertex_properties["grad_wy"]
+        self.grad_zed = self.graph.vertex_properties["grad_zed"]
+        self.grad_radial = self.graph.vertex_properties["grad_radial"]
+        self.volume_grad_radial\
+            = self.graph.vertex_properties["volume_grad_radial"]
+        self.volume_grad_apical\
+            = self.graph.vertex_properties["volume_grad_apical"]
+        
     def calc_energy(self):
         """ Computes the apical energy on the filtered epithelium """
         cells_term = self.calc_cells_energy()
-        junction_term = self.calc_junctions_energy()
+        junction_term, radial_term = self.calc_junctions_energy()
         
-        total_energy = cells_term.sum() + junction_term.sum()
+        total_energy = (cells_term.sum()
+                        + junction_term.sum()
+                        + radial_term.sum())
         return total_energy / self.norm_factor
 
     @filters.cells_in
@@ -96,12 +87,16 @@ class Dynamics(object):
                       * (self.cells.vols.fa - self.cells.prefered_vol.fa)**2
         cells_energy = contractile_term + volume_term
         return cells_energy
+
+    
         
     @filters.j_edges_in
     def calc_junctions_energy(self):
         junctions_energy = self.junctions.line_tensions.fa\
                            * self.edge_lengths.fa
-        return junctions_energy
+        radial_energy = self.junctions.radial_tensions.fa\
+                        * (self.rhos.fa - self.params['rho_lumen'])
+        return junctions_energy, radial_energy
         
     @filters.active
     def gradient_array(self, gtol=1e-7):
@@ -117,7 +112,7 @@ class Dynamics(object):
         self.update_cells_grad()
         self.update_junctions_grad()
         
-    @filters.cells_in
+    #@filters.cells_in
     def update_cells_grad(self):
         # Cell vertices
         self.contractile_grad.fa =  self.cells.contractilities.fa \
@@ -140,19 +135,19 @@ class Dynamics(object):
                 %i junctions vertices, %i junctions edges
                 and %i cell to junction edges'''
                 % (num_cells, num_jverts, num_edges, num_ctoj))
-        #self.grad_sigma.a[:] = 0.
-        self.grad_ix.a[:] = 0.
-        self.grad_wy.a[:] = 0.
         self.grad_zed.a[:] = 0.
-        #self.grad_radial.a[:] = 0.
+        radial = self.junctions.radial_tensions.a
+        self.grad_ix.a = radial * self.ixs.a / self.rhos.a
+        self.grad_wy.a = radial * self.wys.a / self.rhos.a
         for j_edge in self.junctions:
             self.update_edge_grad(j_edge)
         for ctoj_edge in gt.find_edge(self.graph, self.is_ctoj_edge, True):
             cell, j_vert = ctoj_edge
             ix = self.ixs[j_vert]
             wy = self.wys[j_vert]
-            rho = np.hypot(ix, wy)
-            const = self.volume_grad_radial[cell] / (self.num_sides[cell] * rho)
+            rho = self.rhos[j_vert]
+            const = self.volume_grad_radial[cell] / (self.cells.num_sides[cell]
+                                                     * rho)
             self.grad_ix[j_vert] += const * ix
             self.grad_wy[j_vert] += const * wy
             
@@ -167,57 +162,31 @@ class Dynamics(object):
         self.grad_wy[jv0] -= tension * u_yg
         self.grad_zed[jv0] -= tension * u_zg
 
+        
         self.grad_ix[jv1] += tension * u_xg
         self.grad_wy[jv1] += tension * u_yg
         self.grad_zed[jv1] += tension * u_zg
+
         dmnd = self.diamonds[j_edge]
         rij_vect = np.array([self.dixs[j_edge],
                              self.dwys[j_edge],
                              self.dzeds[j_edge]])
         for triangle in dmnd.triangles.values():
-            
-            # grad_vect0 = v_grad_a * np.cross(triangle.deltas[1, :],
-            #                                  triangle.cross)
-            # self.grad_ix[jv0] += grad_vect0[0]
-            # self.grad_wy[jv0] += grad_vect0[1]
-            # self.grad_zed[jv0] += grad_vect0[2]
-
-            # grad_cellpos0 = self.grad_cellpos(triangle.cell, jv0)
-            # self.grad_ix[jv0] -= np.dot(triangle.cross,
-            #                             np.cross(grad_cellpos0[0], rij_vect))
-            # self.grad_wy[jv0] -= np.dot(triangle.cross,
-            #                             np.cross(grad_cellpos0[1], rij_vect))
-            # self.grad_zed[jv0] -= np.dot(triangle.cross,
-            #                              np.cross(grad_cellpos0[2], rij_vect))
-            
-            # grad_vect1 = v_grad_a * np.cross(triangle.deltas[0, :],
-            #                                  triangle.cross)
-            # self.grad_ix[jv1] -= grad_vect1[0]
-            # self.grad_wy[jv1] -= grad_vect1[1]
-            # self.grad_zed[jv1] -= grad_vect1[2]
-
-            # grad_cellpos1 = self.grad_cellpos(triangle.cell, jv1)
-            # self.grad_ix[jv1] += np.dot(triangle.cross,
-            #                             np.cross(grad_cellpos1[0], rij_vect))
-            # self.grad_wy[jv1] += np.dot(triangle.cross,
-            #                             np.cross(grad_cellpos1[1], rij_vect))
-            # self.grad_zed[jv1] += np.dot(triangle.cross,
-            #                              np.cross(grad_cellpos1[2], rij_vect))
-
-
             # K_alpha DeltaV h_alpha /A_ija
             v_grad_a = self.volume_grad_apical[triangle.cell] / triangle.area
-            nv_a = self.num_sides[triangle.cell]
+            nv_a = self.cells.num_sides[triangle.cell]
             r_a0, r_a1 = triangle.deltas
-            area_grad0 = np.cross(triangle.cross,
-                                  ((1 - 1./nv_a) * rij_vect) + r_a0)
+            area_grad0 = - v_grad_a * np.cross(triangle.cross,
+                                               ((1 - 1./nv_a)
+                                                * rij_vect) + r_a0)
 
             self.grad_ix[jv0] += area_grad0[0]
             self.grad_wy[jv0] += area_grad0[1]
             self.grad_zed[jv0] += area_grad0[2]
 
-            area_grad1 = np.cross(triangle.cross,
-                                  ((1 - 1./nv_a) * rij_vect - r_a1))
+            area_grad1 = - v_grad_a * np.cross(triangle.cross,
+                                               ((1 - 1./nv_a)
+                                                * rij_vect - r_a1))
             self.grad_ix[jv1] += area_grad1[0]
             self.grad_wy[jv1] += area_grad1[1]
             self.grad_zed[jv1] += area_grad1[2]
@@ -230,26 +199,6 @@ class Dynamics(object):
             self.grad_ix[jv1] += ctr_grad * u_xg
             self.grad_wy[jv1] += ctr_grad * u_yg
             self.grad_zed[jv1] += ctr_grad * u_zg
-                        
-    def grad_cellpos(self, cell, j_vect):
-
-        xi = self.ixs[j_vect]
-        yi = self.wys[j_vect]
-        zi = self.zeds[j_vect]
-        theta = self.thetas[cell]
-        cos = np.cos(theta)
-        sin = np.sin(theta)
-        nv = np.float(self.num_sides[cell])
-        norm = 1 / ( nv * self.rhos[j_vect])
-        
-        d_cellpos_dx = norm * np.array([xi * cos + yi * sin,
-                                        xi * sin - yi * cos, 0])
-        d_cellpos_dy = norm * np.array([yi * cos - xi * sin,
-                                        yi * sin + xi * cos, 0])
-        d_cellpos_dz = np.array([0, 0, 1.]) / nv
-        return d_cellpos_dx, d_cellpos_dy, d_cellpos_dz
-        
-        
 
     def isotropic_relax(self):
         
@@ -291,8 +240,6 @@ class Dynamics(object):
         else:
             print 'More than one scaling solution, which is strange'
             correction = good_roots.min()
-
-
         self.scale(correction)
         if self.__verbose__:
             print "Scaled all the distances by a factor %.3f" %correction

@@ -171,7 +171,7 @@ def type1_transition(eptm, elements, verbose=False):
     zed_b = eptm.zeds[j_vertb]
     rho_a = eptm.rhos[j_verta]
     rho_b = eptm.rhos[j_vertb]
-    period = rhos_a * 2 * np.pi
+    period = rho_a * 2 * np.pi
     delta_t = theta_b - theta_a
     if delta_t >  np.pi:
         delta_t -= 2 * np.pi

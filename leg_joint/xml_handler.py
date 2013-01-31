@@ -92,10 +92,13 @@ class ParamTree(object):
         self.absolute_dic['cell_volume'] = prefered_vol
         contractility = self.relative_dic["contractility"]
         line_tension = self.relative_dic["line_tension"]
+        radial_tension = self.relative_dic["radial_tension"]
         vol_elasticity = self.relative_dic["vol_elasticity"]
         
         self.absolute_dic["line_tension"] \
             = line_tension * vol_elasticity * prefered_vol**(3 / 2.)
+        self.absolute_dic["radial_tension"] \
+            = radial_tension * vol_elasticity * prefered_vol**(3 / 2.)
         self.absolute_dic["contractility"] \
             = contractility * vol_elasticity * prefered_vol
         

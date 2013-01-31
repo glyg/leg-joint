@@ -7,20 +7,14 @@ from scipy import optimize
 from . import filters
 from .utils import local_subgraph
 
-
-
+    
 @filters.active
 def precondition(eptm):
     eptm.update_rhotheta()
     pos0 = np.vstack([eptm.ixs.fa,
                       eptm.wys.fa,
                       eptm.zeds.fa]).T.flatten()
-
-    # max_rho = 2 * eptm.rhos.fa.mean()
-    # min_rho = 0#min(0, eptm.params['rho_lumen'])
     max_disp = 2 * eptm.edge_lengths.fa.mean()
-    # max_dtheta = np.pi / eptm.params['n_sigmas']
-
     if eptm.__verbose__ : print ('Initial postion  has shape %s'
                           % str(pos0.shape))
     if eptm.__verbose__ : print ('Max displacement amplitude  : %.3f'
@@ -30,10 +24,6 @@ def precondition(eptm):
                              ('max', np.float32)])
     if eptm.__verbose__: print ('bounds array has shape: %s'
                          % str(bounds.shape))
-
-    # r_bounds = np.array([(min_rho, max_rho),] * eptm.rhos.fa.size)
-    # t_bounds = np.vstack((eptm.thetas.fa - max_dtheta,
-    #                      eptm.thetas.fa + max_dtheta)).T * eptm.mean_rho
     x_bounds = np.vstack((eptm.ixs.fa - max_disp,
                          eptm.ixs.fa + max_disp)).T
     y_bounds = np.vstack((eptm.wys.fa - max_disp,
@@ -80,19 +70,18 @@ def find_energy_min(eptm, method='fmin_l_bfgs_b',
                                args=(eptm,),
                                callback=opt_callback)
     elif method=='fmin_ncg':
-        try:
-            output = optimize.fmin_ncg(opt_energy,
-                                       pos0.flatten(),
-                                       fprime=opt_gradient,
-                                       args=(eptm,),
-                                       avextol=tol,
-                                       retall=True,
-                                       maxiter=100,
-                                       callback=opt_callback)
-        except:
-            eptm.set_new_pos(pos0)
-            eptm.graph.set_vertex_filter(None)
-            output = 0
+        output = optimize.fmin_ncg(opt_energy,
+                                   pos0.flatten(),
+                                   fprime=opt_gradient,
+                                   args=(eptm,),
+                                   avextol=tol,
+                                   retall=True,
+                                   maxiter=100)# ,
+                                   # callback=opt_callback)
+        # except:
+        #     eptm.set_new_pos(pos0)
+        #     eptm.graph.set_vertex_filter(None)
+        #     output = 0
 
     elif method=='fmin_tnc':
         output = optimize.fmin_tnc(opt_energy,
@@ -123,7 +112,7 @@ def approx_grad(eptm):
     return grad
 
 @local_subgraph
-def check_local_grad(eptm, retall=True):
+def check_local_grad(eptm):
     pos0, bounds = precondition(eptm)
     if eptm.__verbose__: print "Checking gradient"
 
@@ -153,7 +142,7 @@ def opt_gradient(pos, eptm):
     computes the gradient over the filtered graph
     """
     # # position setting
-    eptm.set_new_pos(pos)
+    #eptm.set_new_pos(pos)
     eptm.update_geometry()
     eptm.update_gradient()
     gradient = eptm.gradient_array()
@@ -164,3 +153,17 @@ def opt_callback(pos, eptm):
     eptm.periodic_boundary_condition()
     eptm.update_geometry()
     eptm.update_gradient()
+
+
+def isotropic_optimum(eptm, tol):
+    
+    energy0 = eptm.calc_energy()
+    eptm.isotropic_relax()
+    energy1 = eptm.calc_energy()
+    criterium = np.abs(energy0 - energy1) / energy0 
+    while criterium > tol:
+        energy0 = energy1
+        eptm.isotropic_relax()
+        energy1 = eptm.calc_energy()
+        criterium = np.abs(energy0 - energy1) / energy0 
+        

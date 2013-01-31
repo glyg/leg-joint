@@ -53,7 +53,11 @@ class AbstractRTZGraph(object):
             self._init_edge_bool_props()
             self._init_vertex_geometry()            
             self._init_edge_geometry()
-
+        else:
+            self._get_edge_bool_props()
+            self._get_vertex_geometry()            
+            self._get_edge_geometry()
+            
         ## Properties that are not internalized
         ### edge properties from vertex properties
         self.edge_src_rhos = self.graph.new_edge_property('float')
@@ -64,127 +68,99 @@ class AbstractRTZGraph(object):
         '''
         Creates the edge boolean PropertyMaps
         '''
-        at_boundary = self.graph.new_edge_property('bool')
-        at_boundary.a[:] = 0
-        self.graph.edge_properties["at_boundary"] = at_boundary
-        is_new_edge = self.graph.new_edge_property('bool')
-        is_new_edge.a[:] = 1
-        self.graph.edge_properties["is_new_edge"] = is_new_edge
+        self.at_boundary = self.graph.new_edge_property('bool')
+        self.at_boundary.a[:] = 0
+        self.graph.edge_properties["at_boundary"] = self.at_boundary
+        self.is_new_edge = self.graph.new_edge_property('bool')
+        self.is_new_edge.a[:] = 1
+        self.graph.edge_properties["is_new_edge"] = self.is_new_edge
 
-    @property
-    def at_boundary(self):
-        return self.graph.edge_properties["at_boundary"]
-    @property
-    def is_new_edge(self):
-        return self.graph.edge_properties["is_new_edge"]
+    def _get_edge_bool_props(self):
+        self.at_boundary = self.graph.edge_properties["at_boundary"]
+        self.is_new_edge = self.graph.edge_properties["is_new_edge"]
         
     def _init_vertex_geometry(self):
         '''Creates the vertices geometric property maps
         '''
         # Position in the rho theta zed space
-        rhos_p = self.graph.new_vertex_property('float')
-        self.graph.vertex_properties["rhos"] = rhos_p
-        thetas_p = self.graph.new_vertex_property('float')
-        self.graph.vertex_properties["thetas"] = thetas_p
-        zeds_p = self.graph.new_vertex_property('float')
-        self.graph.vertex_properties["zeds"] = zeds_p
-        sigmas_p = self.graph.new_vertex_property('float')
-        self.graph.vertex_properties["sigmas"] = sigmas_p
-        ixs_p = self.graph.new_vertex_property('float')
-        self.graph.vertex_properties["ixs"] = ixs_p
-        wys_p = self.graph.new_vertex_property('float')
-        self.graph.vertex_properties["wys"] = wys_p
-        
-    @property
-    def rhos(self):
-        return self.graph.vertex_properties["rhos"]
-    @property
-    def ixs(self):
-        return self.graph.vertex_properties["ixs"]
-    @property
-    def wys(self):
-        return self.graph.vertex_properties["wys"]
-    @property
-    def thetas(self):
-        return self.graph.vertex_properties["thetas"]
-    @property
-    def zeds(self):
-        return self.graph.vertex_properties["zeds"]
-    @property
-    def sigmas(self):
-        return self.graph.vertex_properties["sigmas"]
+        self.rhos = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["rhos"] = self.rhos
+        self.thetas = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["thetas"] = self.thetas
+        self.zeds = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["zeds"] = self.zeds
+        self.sigmas = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["sigmas"] = self.sigmas
+        self.ixs = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["ixs"] = self.ixs
+        self.wys = self.graph.new_vertex_property('float')
+        self.graph.vertex_properties["wys"] = self.wys
+
+    def _get_vertex_geometry(self):
+        '''Creates the vertices geometric property maps
+        '''
+        # Position in the rho theta zed space
+        self.rhos = self.graph.vertex_properties["rhos"]
+        self.thetas = self.graph.vertex_properties["thetas"]
+        self.zeds = self.graph.vertex_properties["zeds"]
+        self.sigmas = self.graph.vertex_properties["sigmas"]
+        self.ixs = self.graph.vertex_properties["ixs"]
+        self.wys = self.graph.vertex_properties["wys"]
         
     def _init_edge_geometry(self):
         '''Creates the edge geometric property maps
         '''
         # deltas 
-        dthetas = self.graph.new_edge_property('float')
-        self.graph.edge_properties["dthetas"] = dthetas
-        dsigmas = self.graph.new_edge_property('float')
-        self.graph.edge_properties["dsigmas"] = dsigmas
-        dzeds = self.graph.new_edge_property('float')
-        self.graph.edge_properties["dzeds"] = dzeds
-        drhos = self.graph.new_edge_property('float')
-        self.graph.edge_properties["drhos"] = drhos
-        dixs = self.graph.new_edge_property('float')
-        self.graph.edge_properties["dixs"] = dixs
-        dwys = self.graph.new_edge_property('float')
-        self.graph.edge_properties["dwys"] = dwys
+        self.dthetas = self.graph.new_edge_property('float')
+        self.graph.edge_properties["dthetas"] = self.dthetas
+        self.dsigmas = self.graph.new_edge_property('float')
+        self.graph.edge_properties["dsigmas"] = self.dsigmas
+        self.dzeds = self.graph.new_edge_property('float')
+        self.graph.edge_properties["dzeds"] = self.dzeds
+        self.drhos = self.graph.new_edge_property('float')
+        self.graph.edge_properties["drhos"] = self.drhos
+        self.dixs = self.graph.new_edge_property('float')
+        self.graph.edge_properties["dixs"] = self.dixs
+        self.dwys = self.graph.new_edge_property('float')
+        self.graph.edge_properties["dwys"] = self.dwys
 
         # Edge lengths
-        edge_lengths = self.graph.new_edge_property('float')
-        self.graph.edge_properties["edge_lengths"] = edge_lengths
+        self.edge_lengths = self.graph.new_edge_property('float')
+        self.graph.edge_properties["edge_lengths"] = self.edge_lengths
 
         # unitary vectors 
-        u_dsigmas = self.graph.new_edge_property('float')
-        self.graph.edge_properties["u_dsigmas"] = u_dsigmas
-        u_dzeds = self.graph.new_edge_property('float')
-        self.graph.edge_properties["u_dzeds"] = u_dzeds
-        u_drhos = self.graph.new_edge_property('float')
-        self.graph.edge_properties["u_drhos"] = u_drhos
-        u_dixs = self.graph.new_edge_property('float')
-        self.graph.edge_properties["u_dixs"] = u_dixs
-        u_dwys = self.graph.new_edge_property('float')
-        self.graph.edge_properties["u_dwys"] = u_dwys
+        self.u_dsigmas = self.graph.new_edge_property('float')
+        self.graph.edge_properties["u_dsigmas"] = self.u_dsigmas
+        self.u_dzeds = self.graph.new_edge_property('float')
+        self.graph.edge_properties["u_dzeds"] = self.u_dzeds
+        self.u_drhos = self.graph.new_edge_property('float')
+        self.graph.edge_properties["u_drhos"] = self.u_drhos
+        self.u_dixs = self.graph.new_edge_property('float')
+        self.graph.edge_properties["u_dixs"] = self.u_dixs
+        self.u_dwys = self.graph.new_edge_property('float')
+        self.graph.edge_properties["u_dwys"] = self.u_dwys
+
+    def _get_edge_geometry(self):
+        '''Creates the edge geometric property maps
+        '''
+        # deltas 
+        self.dthetas = self.graph.edge_properties["dthetas"]
+        self.dsigmas = self.graph.edge_properties["dsigmas"]
+        self.dzeds = self.graph.edge_properties["dzeds"]
+        self.drhos = self.graph.edge_properties["drhos"]
+        self.dixs = self.graph.edge_properties["dixs"]
+        self.dwys = self.graph.edge_properties["dwys"]
+
+        # Edge lengths
+        self.edge_lengths = self.graph.edge_properties["edge_lengths"]
+        # unitary vectors 
+        self.u_dsigmas = self.graph.edge_properties["u_dsigmas"]
+        self.u_dzeds = self.graph.edge_properties["u_dzeds"]
+        self.u_drhos = self.graph.edge_properties["u_drhos"]
+        self.u_dixs = self.graph.edge_properties["u_dixs"]
+        self.u_dwys = self.graph.edge_properties["u_dwys"]
+
         
-    @property
-    def dthetas(self):
-        return self.graph.edge_properties["dthetas"]
-    @property
-    def dzeds(self):
-        return self.graph.edge_properties["dzeds"]
-    @property
-    def drhos(self):
-        return self.graph.edge_properties["drhos"]
-    @property
-    def dsigmas(self):
-        return self.graph.edge_properties["dsigmas"]
-    @property
-    def dixs(self):
-        return self.graph.edge_properties["dixs"]
-    @property
-    def dwys(self):
-        return self.graph.edge_properties["dwys"]
-
-    @property
-    def u_drhos(self):
-        return self.graph.edge_properties["u_drhos"]        
-    @property
-    def u_dixs(self):
-        return self.graph.edge_properties["u_dixs"]        
-    @property
-    def u_dwys(self):
-        return self.graph.edge_properties["u_dwys"]        
-    @property
-    def u_dsigmas(self):
-        return self.graph.edge_properties["u_dsigmas"]
-    @property
-    def u_dzeds(self):
-        return self.graph.edge_properties["u_dzeds"]        
-    @property
-    def edge_lengths(self):
-        return self.graph.edge_properties["edge_lengths"]
-
     def scale(self, scaling_factor):
         '''Multiply all the distances by a factor `scaling_factor`
 
@@ -244,12 +220,9 @@ class AbstractRTZGraph(object):
         Returns the edge between vertices v0 and v1 if it exists,
         whether it goes from v0 to v1 or from v1 to v0 and None otherwize
         '''
-        efilt = self.graph.get_edge_filter()
-        self.graph.set_edge_filter(None)
         e = self.graph.edge(v0, v1)
         if e is None:
             e = self.graph.edge(v1, v0)
-        self.graph.set_edge_filter(efilt[0], efilt[1])
         return e
 
     def proj_sigma(self):
@@ -313,9 +286,9 @@ class AbstractRTZGraph(object):
         dixs = self.edge_difference(self.ixs)
         dwys = self.edge_difference(self.wys)
 
-        self.dzeds.a = dzeds.a
-        self.dixs.a = dixs.a
-        self.dwys.a = dwys.a
+        self.dzeds.fa = dzeds.fa
+        self.dixs.fa = dixs.fa
+        self.dwys.fa = dwys.fa
 
     def update_dsigmas(self):
     
@@ -445,10 +418,6 @@ class Triangle(object):
                                 self.eptm.wys[self.cell])
                        - self.eptm.params['rho_lumen'])
         self.length = self.eptm.edge_lengths[self.j_edge]
-
-
-
-        
         
 class Diamond(object):
 
@@ -481,8 +450,7 @@ class Cells():
         self.eptm = eptm
         self.__verbose__ = self.eptm.__verbose__
         self.params = eptm.params
-        self.junctions = self.eptm.graph.new_vertex_property('object')
-        #self.triangles = self.eptm.graph.new_vertex_property('object')
+
         if self.eptm.new :
             n_sigmas, n_zeds = (self.eptm.params['n_sigmas'],
                                 self.eptm.params['n_zeds'])
@@ -501,11 +469,17 @@ class Cells():
 
             self.eptm.periodic_boundary_condition()
             self.eptm.is_cell_vert.a[:] = 1
-            self._init_cell_gometry()
+            self._init_cell_geometry()
             self._init_cell_params()
             self.eptm.update_deltas()
             self.eptm.update_edge_lengths()
             self.eptm.update_dsigmas()
+        else:
+            self._get_cell_geometry()
+            self._get_cell_params()
+
+        self.junctions = self.eptm.graph.new_vertex_property('object')
+        self.num_sides = self.eptm.graph.new_vertex_property('int')
         
 
     def __iter__(self):
@@ -515,35 +489,30 @@ class Cells():
             if self.eptm.is_cell_vert[vertex]:
                 yield vertex
 
-    def _init_cell_gometry(self):
+    def _init_cell_geometry(self):
         '''
         Creates the `areas`, `vols` and `perimeters` properties 
         '''
         area0 = self.params['prefered_area']
         height0 = self.params['prefered_height']
-        areas = self.eptm.graph.new_vertex_property('float')
+        self.areas = self.eptm.graph.new_vertex_property('float')
         
-        areas.a[:] = area0
-        self.eptm.graph.vertex_properties["areas"] = areas
+        self.areas.a[:] = area0
+        self.eptm.graph.vertex_properties["areas"] = self.areas
 
-        perimeters =self.eptm.graph.new_vertex_property('float')
-        perimeters.a[:] = 6 * self.params['lambda_0']
+        self.perimeters = self.eptm.graph.new_vertex_property('float')
+        self.perimeters.a[:] = 6 * self.params['lambda_0']
         self.eptm.graph.vertex_properties["perimeters"]\
-            = perimeters
+            = self.perimeters
         vol0 = area0 * height0
-        vols = self.eptm.graph.new_vertex_property('float')
-        vols.a[:] = vol0
-        self.eptm.graph.vertex_properties["vols"] = vols
-        
-    @property
-    def vols(self):
-        return self.eptm.graph.vertex_properties["vols"]
-    @property
-    def areas(self):
-        return self.eptm.graph.vertex_properties["areas"]
-    @property
-    def perimeters(self):
-        return self.eptm.graph.vertex_properties["perimeters"]
+        self.vols = self.eptm.graph.new_vertex_property('float')
+        self.vols.a[:] = vol0
+        self.eptm.graph.vertex_properties["vols"] = self.vols
+
+    def _get_cell_geometry(self):
+        self.areas = self.eptm.graph.vertex_properties["areas"]
+        self.perimeters = self.eptm.graph.vertex_properties["perimeters"]
+        self.vols = self.eptm.graph.vertex_properties["vols"]
         
     def _init_cell_params(self):
         '''
@@ -552,43 +521,35 @@ class Cells():
         area0 = self.params['prefered_area']
         height0 = self.params['prefered_height']
         vol0 = area0 * height0
-        vols = self.eptm.graph.new_vertex_property('float')
-        vols.a[:] = vol0
-        self.eptm.graph.vertex_properties["prefered_vol"] = vols
+        self.prefered_vol = self.eptm.graph.new_vertex_property('float')
+        self.prefered_vol.a[:] = vol0
+        self.eptm.graph.vertex_properties["prefered_vol"] = self.prefered_vol
         
         contractility0 = self.params['contractility']        
-        contractilities =self.eptm.graph.new_vertex_property('float')
-        contractilities.a[:] = contractility0
+        self.contractilities =self.eptm.graph.new_vertex_property('float')
+        self.contractilities.a[:] = contractility0
         self.eptm.graph.vertex_properties["contractilities"]\
-            = contractilities
+            = self.contractilities
 
         vol_elasticity0 = self.params['vol_elasticity']
-        vol_elasticities =self.eptm.graph.new_vertex_property('float')
-        vol_elasticities.a[:] = vol_elasticity0
+        self.vol_elasticities =self.eptm.graph.new_vertex_property('float')
+        self.vol_elasticities.a[:] = vol_elasticity0
         self.eptm.graph.vertex_properties["vol_elasticities"]\
-            = vol_elasticities
+            = self.vol_elasticities
 
-        ages = self.eptm.graph.new_vertex_property('int')
-        ages.a[:] = 0
+        self.ages = self.eptm.graph.new_vertex_property('int')
+        self.ages.a[:] = 0
         self.eptm.graph.vertex_properties["ages"]\
-            = ages
+            = self.ages
 
-    @property
-    def ages(self):
-        return self.eptm.graph.vertex_properties["ages"]
-        
-    @property
-    def contractilities(self):
-        return self.eptm.graph.vertex_properties["contractilities"]
-    @property
-    def elasticities(self):
-        return self.eptm.graph.vertex_properties["elasticities"]
-    @property
-    def vol_elasticities(self):
-        return self.eptm.graph.vertex_properties["vol_elasticities"]
-    @property
-    def prefered_vol(self):
-        return self.eptm.graph.vertex_properties["prefered_vol"]
+    def _get_cell_params(self):
+        self.prefered_vol = self.eptm.graph.vertex_properties["prefered_vol"]
+        self.contractilities\
+            = self.eptm.graph.vertex_properties["contractilities"]
+        self.vol_elasticities\
+            = self.eptm.graph.vertex_properties["vol_elasticities"]
+        self.ages = self.eptm.graph.vertex_properties["ages"]
+
         
     def _generate_rsz(self, n_sigmas=5, n_zeds=20):
 
@@ -630,6 +591,7 @@ class Cells():
         return graph
 
     def update_junctions(self):
+        self.num_sides.a = self.eptm.graph.degree_property_map('out').a
         for cell in self:
             self.junctions[cell] = self.get_cell_junctions(cell)
             
@@ -657,6 +619,7 @@ class ApicalJunctions():
             self._compute_voronoi()
             self._init_junction_params()
         else:
+            self._get_junction_params()
             self.update_adjacent()
             
     def __iter__(self):
@@ -671,23 +634,23 @@ class ApicalJunctions():
     def _init_junction_params(self):
                                  
         line_tension0 = self.eptm.params['line_tension']
-        line_tensions = self.eptm.graph.new_edge_property('float')
-        line_tensions.a[:] = line_tension0
-        self.eptm.graph.edge_properties["line_tensions"] = line_tensions
+        self.line_tensions = self.eptm.graph.new_edge_property('float')
+        self.line_tensions.a[:] = line_tension0
+        self.eptm.graph.edge_properties["line_tensions"] = self.line_tensions
 
         radial_tension0 = self.eptm.params['radial_tension']
-        radial_tensions = self.eptm.graph.new_vertex_property('float')
-        radial_tensions.a[:] = radial_tension0
+        self.radial_tensions = self.eptm.graph.new_vertex_property('float')
+        self.radial_tensions.a[:] = radial_tension0
         self.eptm.graph.vertex_properties["radial_tensions"]\
-                                 = radial_tensions
+                                 = self.radial_tensions
 
-    @property
-    def line_tensions(self):
-        return self.eptm.graph.edge_properties["line_tensions"]
 
-    @property
-    def radial_tensions(self):
-        return self.eptm.graph.vertex_properties["radial_tensions"]
+    def _get_junction_params(self):
+        self.line_tensions\
+            = self.eptm.graph.edge_properties["line_tensions"]
+        self.radial_tensions\
+            = self.eptm.graph.vertex_properties["radial_tensions"]
+        
 
     def update_adjacent(self):
         for j_edge in self:
