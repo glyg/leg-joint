@@ -10,7 +10,7 @@ def to_xy(rho, theta):
     return x, y
 
 def to_rhotheta(x, y):
-    rho = np.hypot(x,y)
+    rho = np.hypot(x, y)
     theta = np.arctan2(y, x)
     return rho, theta
 

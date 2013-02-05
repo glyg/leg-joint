@@ -166,29 +166,26 @@ class Epithelium(EpitheliumFilters,
             str1.append('    * %s' % key)
         return '\n'.join(str1)
 
+        
     def update_geometry(self):
-
-        self.update_rhotheta()
+        
         # Cells
         if self.__verbose__: print ('Cells geometry update on %i vertices'
                                     % self.graph.num_vertices())
-        for cell in self.cells:
-            self.set_cell_pos(cell)
+        self.update_cells_pos()
         self.update_rhotheta()
         self.update_deltas()
         self.update_edge_lengths()
+        # self.update_dsigmas()
         # Edges
         if self.__verbose__:
             print ('Geometry update on %i edges'
                    % self.graph.num_edges())
         for j_edge in self.junctions:
             self.diamonds[j_edge].update_geometry()
-
         for cell in self.cells:
             self._one_cell_geom(cell)
-        rho_lumen = self.params['rho_lumen']
-        self.cells.vols.fa = self.cells.areas.fa * (self.rhos.fa
-                                                    - rho_lumen)
+
     def _one_cell_geom(self, cell):
         """
         """
@@ -205,11 +202,12 @@ class Epithelium(EpitheliumFilters,
         else:
             self.cells.areas[cell] = 0.
             self.cells.perimeters[cell] = 0.
+            self.cells.vols[cell] = 0.
             for j_edge in j_edges:
                 tr = self.diamonds[j_edge].triangles[cell]
                 self.cells.areas[cell] += tr.area
                 self.cells.perimeters[cell] += tr.length
-            
+                self.cells.vols[cell] += tr.vol
         
     def set_new_pos(self, new_xyz_pos):
         self.set_junction_pos(new_xyz_pos)
@@ -221,6 +219,10 @@ class Epithelium(EpitheliumFilters,
         self.ixs.fa = new_xyz_pos[::3]
         self.wys.fa = new_xyz_pos[1::3]
         self.zeds.fa = new_xyz_pos[2::3]
+
+    def update_cells_pos(self):
+        for cell in self.cells:
+            self.set_cell_pos(cell)
     
     def set_cell_pos(self, cell):
         j_xyz = np.array([[self.ixs[jv], self.wys[jv], self.zeds[jv]]
@@ -228,28 +230,14 @@ class Epithelium(EpitheliumFilters,
         if len(j_xyz) < 3:
             return
         self.ixs[cell], self.wys[cell], self.zeds[cell] = j_xyz.mean(axis=0)
-        # j_rtz = np.array([[self.rhos[jv], self.thetas[jv], self.zeds[jv]]
-        #                   for jv in cell.out_neighbours()])
-        # if len(j_rtz) < 3:
-        #     return
-        # self.zeds[cell] = j_rtz[:, 2].mean()
-        # self.rhos[cell] = j_rtz[:, 0].mean()
-        # # ### set periodic theta
-        # raw_dtheta = j_rtz[:,1] - self.thetas[cell]
-        # pbc_theta = j_rtz[:,1]
-        # pbc_theta[raw_dtheta <= - np.pi] += 2 * np.pi
-        # pbc_theta[raw_dtheta >= np.pi] -= 2 * np.pi
-        # self.thetas[cell] = pbc_theta.mean()
-        # self.sigmas[cell] = self.thetas[cell] * self.rhos[cell]
-        # self.ixs[cell], self.wys[cell] = to_xy(self.rhos[cell],
-        #                                        self.thetas[cell])
         
     def reset_topology(self):
         self.cells.update_junctions()
         self.junctions.update_adjacent()
+        #self.update_cells_pos()
         self.update_geometry()
         self.update_gradient()
-
+        
     def check_phase_space(self, gamma, lbda):
         # See the energies.pynb notebook for the derivation of this:
         mu = 6 * np.sqrt(2. / (3 * np.sqrt(3)))
@@ -288,11 +276,9 @@ class Epithelium(EpitheliumFilters,
                        % (str(j_verta), str(j_vertb)))
             self.graph.remove_edge(j_edgeab)
         j_edgeab = self.graph.add_edge(j_verta, j_vertb)
-        self.is_junction_edge[j_edgeab] = 1
-        self.is_new_edge[j_edgeab] = 1
-        self.is_ctoj_edge[j_edgeab] = 0
-        line_tension0 = self.params['line_tension']
-        self.junctions.line_tensions[j_edgeab] = line_tension0
+        j_edge_old = self.cells.junctions[cell0][0]
+        for e_prop in self.graph.edge_properties.values():
+            e_prop[j_edgeab] = e_prop[j_edge_old]
         self.junctions.adjacent_cells[j_edgeab] = cell0, cell1
         if self.cells.junctions[cell0] is None:
             self.cells.junctions[cell0] = [j_edgeab,]
@@ -304,60 +290,38 @@ class Epithelium(EpitheliumFilters,
         else:
             self.cells.junctions[cell1].append(j_edgeab)
 
+        prev_ctojs = [ctoj for ctoj in cell0.out_edges()]
+        ctoj_old = prev_ctojs[0]
+
         ctoj_0a = self.graph.edge(cell0, j_verta)
         if ctoj_0a is not None:
-            # print ("Warning: previous cell %s "
-            #        "to junction vertex %s edge is re-created."
-            #        ) % (str(cell0), str(j_verta))
             self.graph.remove_edge(ctoj_0a)
         ctoj_0a = self.graph.add_edge(cell0, j_verta)
-        self.is_junction_edge[ctoj_0a] = 0
-        self.is_ctoj_edge[ctoj_0a] = 1
-        self.is_new_edge[ctoj_0a] = 1
-        
+
         ctoj_0b = self.graph.edge(cell0, j_vertb)
         if ctoj_0b is not None:
-            if self.__verbose__:
-                print ('''
-                       Warning: previous cell %s 
-                       to junction vertex %s edge is re-created.
-                       '''
-                       % (str(cell0), str(j_vertb)))
             self.graph.remove_edge(ctoj_0b)
         ctoj_0b = self.graph.add_edge(cell0, j_vertb)
-        self.is_junction_edge[ctoj_0b] = 0
-        self.is_ctoj_edge[ctoj_0b] = 1
-        self.is_new_edge[ctoj_0b] = 1
+            
+        for e_prop in self.graph.edge_properties.values():
+            e_prop[ctoj_0a] = e_prop[ctoj_old]
+            e_prop[ctoj_0b] = e_prop[ctoj_old]
         self.set_cell_pos(cell0)
 
         if cell1 is not None:
             ctoj_1a = self.graph.edge(cell1, j_verta)
             if ctoj_1a is not None:
-                if self.__verbose__ :
-                    print('''
-                          Warning: previous cell %s 
-                          to junction vertex %s edge is re-created.
-                          '''
-                          % (str(cell1), str(j_verta)))
                 self.graph.remove_edge(ctoj_1a)
             ctoj_1a = self.graph.add_edge(cell1, j_verta)
-            self.is_junction_edge[ctoj_1a] = 0
-            self.is_ctoj_edge[ctoj_1a] = 1
-            self.is_new_edge[ctoj_1a] = 1
 
             ctoj_1b = self.graph.edge(cell1, j_vertb)
             if ctoj_1b is not None:
-                if self.__verbose__ :
-                    print('''
-                          Warning: previous cell %s 
-                          to junction vertex %s edge is re-created.
-                          '''
-                          % (str(cell1), str(j_vertb)))
                 self.graph.remove_edge(ctoj_1b)
             ctoj_1b = self.graph.add_edge(cell1, j_vertb)
-            self.is_junction_edge[ctoj_1b] = 0
-            self.is_ctoj_edge[ctoj_1b] = 1
-            self.is_new_edge[ctoj_1b] = 1
+            for e_prop in self.graph.edge_properties.values():
+                e_prop[ctoj_1a] = e_prop[ctoj_old]
+                e_prop[ctoj_1b] = e_prop[ctoj_old]
+
             self.set_cell_pos(cell1)
         return j_verta, j_vertb, cell0, cell1
 

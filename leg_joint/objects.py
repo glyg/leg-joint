@@ -411,12 +411,16 @@ class Triangle(object):
                                 [self.eptm.dixs[ctoj1], 
                                  self.eptm.dwys[ctoj1], 
                                  self.eptm.dzeds[ctoj1]]])
-        
+        self.rij_vect = np.array([self.eptm.dixs[self.j_edge],
+                                  self.eptm.dwys[self.j_edge],
+                                  self.eptm.dzeds[self.j_edge]])
         self.cross = np.cross(self.deltas[0, :], self.deltas[1, :])
-        self.area = np.linalg.norm(self.cross)
-        self.height = (np.hypot(self.eptm.ixs[self.cell],
-                                self.eptm.wys[self.cell])
+        self.area = np.linalg.norm(self.cross) / 2.
+        self.u_cross = self.cross / (2. * self.area)
+        jv0, jv1 = self.j_edge
+        self.height = ((self.eptm.rhos[jv0] + self.eptm.rhos[jv1]) / 2.
                        - self.eptm.params['rho_lumen'])
+        self.vol = self.height * self.area
         self.length = self.eptm.edge_lengths[self.j_edge]
         
 class Diamond(object):
@@ -435,7 +439,7 @@ class Diamond(object):
         elif num_adj == 1:
             cell0 = adj_cells[0]
             self.triangles[cell0] = Triangle(eptm, cell0, j_edge)
-            self.cells = cell0
+            self.cells = cell0, None
 
     def update_geometry(self):
         for tr in self.triangles.values():

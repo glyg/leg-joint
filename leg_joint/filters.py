@@ -51,8 +51,9 @@ def cells_in(meth):
     def new_function(self, *args, **kwargs):
         prev_vstate, prev_inverted = self.graph.get_vertex_filter()
         if self.__verbose__ : print 'filter cells in'
-        self.set_vertex_state([(self.is_cell_vert, False),
-                               (self.is_alive, False)])
+        self.graph.set_vertex_filter(self.is_cell_vert)
+        # self.set_vertex_state([(self.is_cell_vert, False),
+        #                        (self.is_alive, False)])
         out = meth(self, *args, **kwargs)
         if self.__verbose__ : print 'restore from cells in'
         self.graph.set_vertex_filter(prev_vstate, prev_inverted)

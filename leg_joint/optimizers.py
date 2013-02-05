@@ -52,7 +52,7 @@ def find_energy_min(eptm, method='fmin_l_bfgs_b',
         output = optimize.fmin_l_bfgs_b(opt_energy,
                                         pos0.flatten(),
                                         fprime=opt_gradient,
-                                        approx_grad=approx_grad,
+                                        #approx_grad=approx_grad,
                                         bounds=bounds.flatten(),
                                         args=(eptm,),
                                         factr=1e8,
@@ -116,12 +116,13 @@ def check_local_grad(eptm):
     pos0, bounds = precondition(eptm)
     if eptm.__verbose__: print "Checking gradient"
 
-    chk_out = optimize.check_grad(opt_energy,
-                                  opt_gradient,
-                                  pos0.flatten(),
-                                  eptm)
-
-    return chk_out
+    # grad_err = np.linalg.norm(approx_grad(eptm)
+    #                           - eptm.gradient_array())
+    grad_err = optimize.check_grad(opt_energy,
+                                   opt_gradient,
+                                   pos0.flatten(),
+                                   eptm)
+    return grad_err
 
 ## For consistency, the first argument must be the postion
 def opt_energy(pos, eptm):
@@ -133,30 +134,26 @@ def opt_energy(pos, eptm):
     # Position setting
     eptm.set_new_pos(pos)
     eptm.update_geometry()
+    eptm.update_gradient()
     energy = eptm.calc_energy()
     return energy
 
 def opt_gradient(pos, eptm):
     """
-    After setting the rho, theta, zed position to pos,
-    computes the gradient over the filtered graph
     """
-    # # position setting
-    #eptm.set_new_pos(pos)
-    eptm.update_geometry()
-    eptm.update_gradient()
-    gradient = eptm.gradient_array()
-    return gradient
+    # eptm.set_new_pos(pos)
+    # eptm.update_geometry()
+    # eptm.update_gradient()
+    return eptm.gradient_array()
 
 def opt_callback(pos, eptm):
     """ Call back for the optimization """
-    eptm.periodic_boundary_condition()
-    eptm.update_geometry()
-    eptm.update_gradient()
-
+    eptm.reset_topology()
 
 def isotropic_optimum(eptm, tol):
-    
+    """ Recursively apply `isotropic_relax`, until
+    the total energy is stable (with relative tolerance `tol`)
+    """
     energy0 = eptm.calc_energy()
     eptm.isotropic_relax()
     energy1 = eptm.calc_energy()

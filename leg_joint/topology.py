@@ -215,6 +215,7 @@ def type1_transition(eptm, elements, verbose=False):
 def cell_division(eptm, mother_cell,
                   phi_division=None,
                   verbose=False):
+
     tau = 2 * np.pi
     if phi_division is None:
         phi_division = np.random.random() * tau
@@ -316,11 +317,13 @@ def cell_division(eptm, mother_cell,
     septum = eptm.add_junction(new_jvs[0], new_jvs[1],
                                mother_cell, daughter_cell)
     eptm.set_local_mask(daughter_cell)
+    eptm.update_xy()
+    eptm.graph.set_edge_filter(eptm.is_local_edge)
+    eptm.graph.set_vertex_filter(eptm.is_local_vert)
+    eptm.reset_topology()
     eptm.set_vertex_state()
     eptm.set_edge_state()
-    eptm.update_xy()
 
-    eptm.reset_topology()
     if eptm.__verbose__: print 'Division completed'
     return septum
 
@@ -417,7 +420,7 @@ def resolve_small_edges(eptm, threshold=5e-2, vfilt=None, efilt=None):
     eptm.graph.set_edge_filter(None)
     new_jvs = [eptm.type3_transition(cell, threshold)
                for cell in cells]
-    eptm.update_geometry()
+    eptm.reset_topology()
     # Type 1 transitions
     if efilt == None:
         efilt_je = eptm.is_junction_edge.copy()
