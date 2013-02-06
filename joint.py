@@ -26,27 +26,26 @@ def new_generation(eptm, growth_rate=1.8):
         mkdir('tmp')
     except OSError:
         pass
+    random.seed(3)
     random.shuffle(cells)
     for mother_cell in cells:
+        print('dividing cell %s' %str(mother_cell))
+        skip = False
         # No division 
         for je in eptm.cells.junctions[mother_cell]:
             cell0, cell1 = eptm.junctions.adjacent_cells[je]
             if not eptm.is_alive[cell0]:
                 print('skipping dead cell %s' % str(cell0))
-                continue
-            if and eptm.is_alive[cell1]:
+                skip = True
+            if not eptm.is_alive[cell1]:
                 print('skipping dead cell %s' % str(cell1))
-                continue
-
+                skip = True
+        if skip: continue
         eptm.set_local_mask(None)
         eptm.set_local_mask(mother_cell)
         eptm.cells.prefered_vol[mother_cell] *= growth_rate
-        eptm.update_geometry()
-        eptm.update_gradient()
         pos0, pos1 = lj.find_energy_min(eptm, tol=1e-3, approx_grad=0)
         j = lj.cell_division(eptm, mother_cell, verbose=False)
-        eptm.update_geometry()
-        eptm.update_gradient()
         if j is not None:
             pos0, pos1 = lj.find_energy_min(eptm, tol=1e-3, approx_grad=0)
             now = datetime.now()

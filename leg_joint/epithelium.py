@@ -148,8 +148,6 @@ class Epithelium(EpitheliumFilters,
             self.periodic_boundary_condition()
         if self.__verbose__: print 'Update geometry'
         self.update_geometry()
-        if self.__verbose__: print 'Update gradient'
-        self.update_gradient()
         
     def __str__(self):
         num_cells = self.is_cell_vert.a.sum()
@@ -234,9 +232,9 @@ class Epithelium(EpitheliumFilters,
     def reset_topology(self):
         self.cells.update_junctions()
         self.junctions.update_adjacent()
-        #self.update_cells_pos()
-        self.update_geometry()
-        self.update_gradient()
+        # #self.update_cells_pos()
+        # self.update_geometry()
+        # self.update_gradient()
         
     def check_phase_space(self, gamma, lbda):
         # See the energies.pynb notebook for the derivation of this:

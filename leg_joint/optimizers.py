@@ -60,7 +60,7 @@ def find_energy_min(eptm, method='fmin_l_bfgs_b',
                                         pgtol=tol,
                                         epsilon=1e-8,
                                         iprint=1,
-                                        maxfun=150,
+                                        maxfun=40,
                                         disp=None)
 
     elif method=='fmin':

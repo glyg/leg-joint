@@ -595,10 +595,11 @@ class Cells():
         return graph
 
     def update_junctions(self):
-        self.num_sides.a = self.eptm.graph.degree_property_map('out').a
         for cell in self:
             self.junctions[cell] = self.get_cell_junctions(cell)
-            
+            self.num_sides[cell]\
+                = self.eptm.graph.degree_property_map('out')[cell]
+
     def get_cell_junctions(self, cell):
         jvs = [jv for jv in cell.out_neighbours()]
         j_edges = []

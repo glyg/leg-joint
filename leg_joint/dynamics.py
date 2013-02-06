@@ -121,7 +121,7 @@ class Dynamics(object):
         self.update_cells_grad()
         self.update_junctions_grad()
         
-    @filters.cells_in
+    #@filters.cells_in
     def update_cells_grad(self):
         # Cell vertices
         self.contractile_grad.fa =  self.cells.contractilities.fa \
@@ -134,14 +134,19 @@ class Dynamics(object):
             self.calc_vol_grad_cell(cell)
 
     def calc_vol_grad_cell(self, cell):
-        vol_grad = 0
-        for j_edge in self.cells.junctions[cell]:
-            triangle = self.diamonds[j_edge].triangles[cell]
-            vol_grad += triangle.height * np.cross(triangle.u_cross,
-                                                   triangle.rij_vect) / 2.
-        vol_grad *= self.volume_grad_radial[cell] / self.cells.num_sides[cell]
+
+        vol_grad = [0, 0, 0]
+        if  self.is_alive[cell]:
+            for j_edge in self.cells.junctions[cell]:
+                triangle = self.diamonds[j_edge].triangles[cell]
+                vol_grad += triangle.height * np.cross(triangle.u_cross,
+                                                       triangle.rij_vect) / 2.
+            vol_grad *= self.volume_grad_radial[cell]\
+                        / self.cells.num_sides[cell]
         self.volume_grad_cell[cell] = vol_grad
 
+
+            
     def update_junctions_grad(self):
         # Junction edges
         if self.__verbose__ :

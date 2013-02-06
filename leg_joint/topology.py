@@ -318,11 +318,11 @@ def cell_division(eptm, mother_cell,
                                mother_cell, daughter_cell)
     eptm.set_local_mask(daughter_cell)
     eptm.update_xy()
-    eptm.graph.set_edge_filter(eptm.is_local_edge)
-    eptm.graph.set_vertex_filter(eptm.is_local_vert)
+    # eptm.graph.set_edge_filter(eptm.is_local_edge)
+    # eptm.graph.set_vertex_filter(eptm.is_local_vert)
     eptm.reset_topology()
-    eptm.set_vertex_state()
-    eptm.set_edge_state()
+    # eptm.graph.set_edge_filter(None)
+    # eptm.graph.set_vertex_filter(None)
 
     if eptm.__verbose__: print 'Division completed'
     return septum
