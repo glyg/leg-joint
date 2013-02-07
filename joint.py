@@ -49,12 +49,12 @@ def new_generation(eptm, growth_rate=1.8):
         if j is not None:
             pos0, pos1 = lj.find_energy_min(eptm, tol=1e-3, approx_grad=0)
             now = datetime.now()
-            eptm.graph.save("saved_graphs/xml/tmp/generation%s.xml"
-                            % now.isoformat())
-            outfname3d = 'saved_graphs/png/tmp/generation_3d_%03i.png' % num
-            outfname2d = 'saved_graphs/png/tmp/generation_sz_%03i.png' % num
-            lj.draw(eptm, output2d=outfname2d,
-                    output3d=outfname3d)
+            # eptm.graph.save("saved_graphs/xml/tmp/generation%s.xml"
+            #                 % now.isoformat())
+            # outfname3d = 'saved_graphs/png/tmp/generation_3d_%03i.png' % num
+            # outfname2d = 'saved_graphs/png/tmp/generation_sz_%03i.png' % num
+            # lj.draw(eptm, output2d=outfname2d,
+            #         output3d=outfname3d)
             #lj.optimizers.isotropic_optimum(eptm, 1e-6)
             #lj.resolve_small_edges(eptm, threshold=0.25)
         else:
@@ -75,7 +75,7 @@ if __name__ == '__main__':
     eptm = lj.Epithelium(graphXMLfile='saved_graphs/xml/initial_graph.xml',
                          paramfile='default/params.xml')
     lj.optimizers.isotropic_optimum(eptm, 1e-6)
-    for n in range(4):
+    for n in range(3):
         new_generation(eptm)
         lj.optimizers.isotropic_optimum(eptm, 1e-6)
     # z_min = eptm.zeds.fa.min()

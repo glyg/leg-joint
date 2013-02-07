@@ -3,6 +3,8 @@
 
 import os
 import numpy as np
+import visvis as vv
+
 from numpy.random import normal, random_sample
 import matplotlib.pyplot as plt
 #from mpl_toolkits.mplot3d import Axes3
@@ -17,7 +19,33 @@ from .utils import to_xy, to_rhotheta
 
 FLOAT = np.dtype('float32')
 
-fig, axes =  plt.subplots(2,2)
+
+def vv_edges(eptm):
+    #app = vv.use()
+    for n, je in enumerate(eptm.junctions):
+        ps = vv.Pointset(3)
+        src = vv.Point(eptm.ixs[je.source()],
+                       eptm.wys[je.source()],
+                       eptm.zeds[je.source()])
+        trgt = vv.Point(eptm.ixs[je.target()],
+                        eptm.wys[je.target()],
+                        eptm.zeds[je.target()])
+        ps.append(src)
+        ps.append(trgt)
+        if n == 0:
+            edgeline = vv.solidLine(ps, radius=0.05, N=4)
+            edgeline.faceColor = 'g'
+        else:
+            
+            segment =  vv.solidLine(ps, radius=0.05, N=4)
+            edgeline = vv.Mesh(edgeline, vv.solidLine(ps, radius=0.05, N=4))
+            edgeline.faceColor = 'g'
+    vv.meshWrite('test2.obj', edgeline)
+    #app.run()        
+    return edgeline
+
+
+
 
 def plot_ortho_gradients(eptm, axes=None,
                          scale=0.1, approx=0, **kwargs):

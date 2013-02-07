@@ -258,6 +258,15 @@ class EpitheliumFilters(object):
                         self.is_local_edge[self.graph.edge(adj_cell, jv)] = 1
                     for je in self.cells.junctions[adj_cell]:
                         self.is_local_edge[je] = 1
+                        # cell2, cell3 = self.junctions.adjacent_cells[je]
+                        # adj_cell2 = cell3 if cell2 == adj_cell else cell2
+                        # self.is_local_vert[adj_cell2] = 1
+                        # ctoj_0 = self.graph.edge(adj_cell2, je.source())
+                        # ctoj_1 = self.graph.edge(adj_cell2, je.target())
+                        # if ctoj_0 is not None:
+                        #     self.is_local_edge[ctoj_0] = 1
+                        # if ctoj_1 is not None:
+                        #     self.is_local_edge[ctoj_1] = 1
 
     @no_filter
     def remove_local_mask(self, cell):

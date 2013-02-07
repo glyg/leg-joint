@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <parameters>
-  <param max="30" min="0" name="n_sigmas" step="1" value="7">
+  <param max="30" min="0" name="n_sigmas" step="1" value="13">
     <unit>um</unit>
     <description>Initial number of cell along sigma </description>
   </param>
-  <param max="30" min="0" name="n_zeds" step="1" value="11">
+  <param max="30" min="0" name="n_zeds" step="1" value="17">
     <unit>um</unit>
     <description>Initial number of cell along zed</description>
   </param>
@@ -48,7 +48,7 @@
     <unit>adim</unit>
     <description>Cell contractility</description>
   </param>
-  <param max="10." min="-10." name="line_tension" step="0.01" value="1.1">
+  <param max="10." min="-10." name="line_tension" step="0.01" value="1.7">
     <unit>adim</unit>
     <description>Line tension</description>
   </param>

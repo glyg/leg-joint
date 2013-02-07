@@ -272,15 +272,15 @@ def cell_division(eptm, mother_cell,
             adj_cell = cell1 if cell0 == mother_cell else cell0
             new_jv = eptm.new_vertex(j_src)
             new_jvs.append(new_jv)
-            # sigma_n = - ((sigma_src * zed_trgt
-            #               - zed_src * sigma_trgt)
-            #              / (zed_src - zed_trgt
-            #                 + (sigma_trgt - sigma_src
-            #                )/ np.tan(phi_division)))
-            # zed_n = sigma_n / np.tan(phi_division)
+            sigma_n = - ((sigma_src * zed_trgt
+                          - zed_src * sigma_trgt)
+                         / (zed_src - zed_trgt
+                            + (sigma_trgt - sigma_src
+                           )/ np.tan(phi_division)))
+            zed_n = sigma_n / np.tan(phi_division)
             ## The midle of the segment is closer to the final optimum
-            sigma_n = (sigma_src + sigma_trgt) / 2.
-            zed_n = (zed_src + zed_trgt) / 2.
+            # sigma_n = (sigma_src + sigma_trgt) / 2.
+            # zed_n = (zed_src + zed_trgt) / 2.
             
             eptm.rhos[new_jv] = (eptm.rhos[j_src] +
                                  eptm.rhos[j_trgt]) / 2.
@@ -318,11 +318,12 @@ def cell_division(eptm, mother_cell,
                                mother_cell, daughter_cell)
     eptm.set_local_mask(daughter_cell)
     eptm.update_xy()
-    # eptm.graph.set_edge_filter(eptm.is_local_edge)
+    
     # eptm.graph.set_vertex_filter(eptm.is_local_vert)
+    # eptm.graph.set_edge_filter(eptm.is_local_edge)
     eptm.reset_topology()
-    # eptm.graph.set_edge_filter(None)
     # eptm.graph.set_vertex_filter(None)
+    # eptm.graph.set_edge_filter(None)
 
     if eptm.__verbose__: print 'Division completed'
     return septum
@@ -400,6 +401,63 @@ def type3_transition(eptm, cell, reduce_edgenum=True, verbose=False):
     return new_jv
 
 
+def remove_cell(eptm, cell):
+
+    eptm.graph.set_vertex_filter(None)
+    eptm.graph.set_edge_filter(None)
+    edge_trash = []
+    vertex_trash = []
+    new_ctojs = []
+    new_jes =[]
+    ctojs = [ctoj for ctoj in cell.out_edges()]
+    cell_jes = eptm.cells.junctions[cell]
+    jvs = [jv for jv in cell.out_neighbours()]
+    edge_trash.extend(ctojs)
+    edge_trash.extend(cell_jes)
+    new_jv = eptm.new_vertex(jvs[0])
+    eptm.is_local_vert[jv] = 1
+    eptm.ixs[new_jv] = eptm.ixs[cell]
+    eptm.wys[new_jv] = eptm.wys[cell]
+    eptm.zeds[new_jv] = eptm.zeds[cell]
+    adjacent_cells = []
+    for je in cell_jes:
+        cell0, cell1 = eptm.junctions.adjacent_cells[je]
+        adj_cell = cell0 if cell1 == cell else cell1
+        adjacent_cells.append(adj_cell)
+        adj_ctojs = [ctoj for ctoj in adj_cell.out_edges()
+                     if ctoj.target() in jvs]
+        edge_trash.extend(adj_ctojs)
+        new_ctojs.append((adj_cell, new_jv))
+    for jv in jvs:
+        for je in jv.all_edges():
+            if eptm.is_ctoj_edge[je]: continue
+            if je in cell_jes: continue
+            jv0, jv1 = je
+            opposite = jv0 if jv1 == jv else jv1
+            edge_trash.append(je)
+            new_jes.append((opposite, new_jv))
+        vertex_trash.append(jv)
+        
+    for cell, jv in new_ctojs:
+        ctoj = eptm.new_ctoj_edge(cell, jv)
+        eptm.is_ctoj_edge[ctoj] = 1
+        eptm.is_local_edge[ctoj] = 1
+    for jv0, jv1 in new_jes:
+        je = eptm.new_j_edge(jv0, jv1)
+        eptm.is_junction_edge[je] = 1
+        eptm.is_local_edge[je] = 1
+    for e in edge_trash:
+        try:
+            eptm.graph.remove_edge(e)
+        except ValueError:
+            print('edge already destroyed')
+    for v in vertex_trash:
+        eptm.is_alive[v] = 0
+        eptm.is_cell_vert[v] = 0
+    eptm.is_alive[cell] = 0
+    eptm.is_cell_vert[cell] = 0
+    eptm.reset_topology()
+    
 def resolve_small_edges(eptm, threshold=5e-2, vfilt=None, efilt=None):
     # Collapse 3 sided cells
     if vfilt == None:
