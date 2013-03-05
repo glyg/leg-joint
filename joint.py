@@ -51,12 +51,18 @@ def new_generation(eptm, growth_rate=1.8):
             now = datetime.now()
             # eptm.graph.save("saved_graphs/xml/tmp/generation%s.xml"
             #                 % now.isoformat())
-            # outfname3d = 'saved_graphs/png/tmp/generation_3d_%03i.png' % num
-            # outfname2d = 'saved_graphs/png/tmp/generation_sz_%03i.png' % num
-            # lj.draw(eptm, output2d=outfname2d,
-            #         output3d=outfname3d)
-            #lj.optimizers.isotropic_optimum(eptm, 1e-6)
+            outfname3d = 'saved_graphs/png/tmp/generation_3d_%03i.png' % num
+            outfname2d = 'saved_graphs/png/tmp/generation_sz_%03i.png' % num
+            lj.draw(eptm, output2d=outfname2d,
+                    output3d=outfname3d)
+            lj.optimizers.isotropic_optimum(eptm, 1e-6)
             #lj.resolve_small_edges(eptm, threshold=0.25)
+            small_cells = [cell for cell in eptm.cells
+                           if eptm.cells.areas[cell] < 1e-6]
+            if len(small_cells) > 0:
+                for small_cell in small_cells:
+                    print 'removing cell %s' % str(small_cell)
+                    lj.remove_cell(eptm, small_cell)
         else:
             print 'division failed'
         num += 1

@@ -402,7 +402,8 @@ class Triangle(object):
         self.j_edge = j_edge
         self.ctoj_edges = [eptm.graph.edge(self.cell, j_edge.source()),
                            eptm.graph.edge(self.cell, j_edge.target())]
-
+        self.update_geometry()
+        
     def update_geometry(self):
         ctoj0, ctoj1 = self.ctoj_edges
         self.deltas = np.array([[self.eptm.dixs[ctoj0], 
