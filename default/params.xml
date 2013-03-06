@@ -44,11 +44,11 @@
     <unit>um2</unit>
     <description>Prefered area</description>
   </param>
-  <param max="10." min="0.001" name="contractility" step="0.01" value="0.4">
+  <param max="10." min="0.001" name="contractility" step="0.01" value="0.3">
     <unit>adim</unit>
     <description>Cell contractility</description>
   </param>
-  <param max="10." min="-10." name="line_tension" step="0.01" value="1.7">
+  <param max="10." min="-10." name="line_tension" step="0.01" value="1.55">
     <unit>adim</unit>
     <description>Line tension</description>
   </param>

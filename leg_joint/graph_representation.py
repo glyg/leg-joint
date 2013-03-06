@@ -132,8 +132,8 @@ def plot_ortho_proj(eptm, ax=None, vfilt=None, efilt=None, **kwargs):
 
     divider = make_axes_locatable(ax)
     
-    ax_zr = divider.append_axes("top", 2., pad=0.1, sharex=ax)
-    ax_rs = divider.append_axes("right", 2., pad=0.1, sharey=ax)
+    ax_zr = divider.append_axes("top", 1., pad=0.1, sharex=ax)
+    ax_rs = divider.append_axes("right", 1., pad=0.1, sharey=ax)
     
     plot_cells_zr(eptm, ax=ax_zr,
                   vfilt=vfilt, efilt=efilt)

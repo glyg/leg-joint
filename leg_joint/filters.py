@@ -187,6 +187,18 @@ class EpitheliumFilters(object):
         else:
             return self.any_edge(jv0, jv1)
 
+    def new_edge(self, vertex0, vertex1, source_edge):
+        j_edge_out = self.graph.edge(vertex0, vertex1)
+        j_edge_in = self.graph.edge(vertex1, vertex0)
+        if self.any_edge(vertex0, vertex1) is None:
+            new_edge = self.graph.add_edge(vertex0, vertex1)
+            for prop in self.graph.edge_properties.values():
+                prop[new_edge] = prop[source_edge]
+            return new_edge
+        else:
+            return self.any_edge(vertex0, vertex1)
+
+            
     def new_vertex(self, source_vertex):
         new_v = self.graph.add_vertex()
         for prop in self.graph.vertex_properties.values():
@@ -246,18 +258,32 @@ class EpitheliumFilters(object):
         for j_vert in cell.out_neighbours():
             self.is_local_vert[j_vert] = 1
             self.is_active_vert[j_vert] = 1
-            for edge in j_vert.all_edges():
-                self.is_local_edge[edge] = 1
-                self.is_active_edge[edge] = 1
-                if self.is_junction_edge[edge]:
-                    cell0, cell1 = self.junctions.adjacent_cells[edge]
-                    adj_cell = cell0 if cell1 == cell else cell1
-                    self.is_local_vert[adj_cell] = 1
-                    for jv in adj_cell.out_neighbours():
+            ctoj = self.graph.edge(cell, j_vert)
+            self.is_local_edge[ctoj] = 1
+            for neighb_cell in j_vert.all_neighbours():
+                if self.is_cell_vert[neighb_cell] and neighb_cell != cell:
+                    self.is_local_vert[neighb_cell] = 1
+                    for jv in neighb_cell.out_neighbours():
                         self.is_local_vert[jv] = 1
-                        self.is_local_edge[self.graph.edge(adj_cell, jv)] = 1
-                    for je in self.cells.junctions[adj_cell]:
+                        self.is_local_edge[self.graph.edge(neighb_cell,
+                                                           jv)] = 1
+                    for je in self.cells.junctions[neighb_cell]:
                         self.is_local_edge[je] = 1
+                    
+            for edge in j_vert.all_edges():
+                self.is_active_edge[edge] = 1
+                
+
+
+            #     if self.is_junction_edge[edge]:
+            #         cell0, cell1 = self.junctions.adjacent_cells[edge]
+            #         adj_cell = cell0 if cell1 == cell else cell1
+            #         self.is_local_vert[adj_cell] = 1
+            #         for jv in adj_cell.out_neighbours():
+            #             self.is_local_vert[jv] = 1
+            #             self.is_local_edge[self.graph.edge(adj_cell, jv)] = 1
+            #         for je in self.cells.junctions[adj_cell]:
+            #             self.is_local_edge[je] = 1
                         # cell2, cell3 = self.junctions.adjacent_cells[je]
                         # adj_cell2 = cell3 if cell2 == adj_cell else cell2
                         # self.is_local_vert[adj_cell2] = 1

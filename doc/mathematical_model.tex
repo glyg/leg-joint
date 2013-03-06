@@ -1,0 +1,64 @@
+\documentclass[12pt]{article}
+\usepackage[english]{babel} 
+\usepackage{fontspec}
+\setmainfont{Free Sans}
+\usepackage{fancyhdr}
+\usepackage{xcolor}
+
+% AMS math et autre
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{xspace}
+\usepackage{upgreek}
+
+\graphicspath{{imgs/}}
+\sloppy{}
+
+\title{Mathematical model of pual leg epithelium}
+
+\author{G. Gay}
+
+\date{}
+
+\begin{document}
+
+\section{The elementary cell}
+
+The architecture of the epithelium model consists in a graph containing
+
+\begin{itemize}
+\item two types of vertices:
+  \begin{itemize}
+  \item The cells themselves
+  \item The appical junctions vertices
+  \end{itemize}
+\item and two types of edges:
+  \begin{itemize}
+  \item The junction edges, structuring the apical surface of the
+    epithelium
+  \item The cell to junction edges linking one cell to its
+    neighbouring junction vertices.
+  \end{itemize}
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=6cm]{one_cell}
+  \caption{A single cell in the epithelium, with its constituants}
+  \label{fig:single_cell}
+\end{figure}
+
+
+
+
+\end{document}
+
+
+
+
+%%% Local Variables: 
+%%% ispell-local-dictionary: "british"
+%%% mode: latex
+%%% TeX-master: t
+%%% End: 

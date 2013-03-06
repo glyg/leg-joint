@@ -55,10 +55,10 @@ def new_generation(eptm, growth_rate=1.8):
             outfname2d = 'saved_graphs/png/tmp/generation_sz_%03i.png' % num
             lj.draw(eptm, output2d=outfname2d,
                     output3d=outfname3d)
-            lj.optimizers.isotropic_optimum(eptm, 1e-6)
+            lj.optimizers.isotropic_optimum(eptm, 1e-4)
             #lj.resolve_small_edges(eptm, threshold=0.25)
             small_cells = [cell for cell in eptm.cells
-                           if eptm.cells.areas[cell] < 1e-6]
+                           if eptm.cells.areas[cell] < 1e-4]
             if len(small_cells) > 0:
                 for small_cell in small_cells:
                     print 'removing cell %s' % str(small_cell)
