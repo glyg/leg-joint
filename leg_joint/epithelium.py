@@ -61,7 +61,7 @@ class Epithelium(EpitheliumFilters,
 
     """
     def __init__(self, graphXMLfile=None,
-                 paramtree=None,
+                 paramtree=None, n_sigmas=None, n_zeds=None,
                  paramfile=PARAMFILE,
                  graph=None, verbose=False):
         """
@@ -94,9 +94,12 @@ class Epithelium(EpitheliumFilters,
         else:
             self.paramtree = paramtree
         self.params = self.paramtree.absolute_dic
-
+        
         # Graph instanciation
         if graph is None and graphXMLfile is None:
+            if n_sigmas is not None:
+                self.params['n_sigmas'] = n_sigmas
+                self.params['n_zeds'] = n_zeds
             print 'Created new graph'
             self.graph = gt.Graph(directed=True)
             self.new = True
@@ -147,6 +150,7 @@ class Epithelium(EpitheliumFilters,
             if self.__verbose__: print 'Periodic boundary'
             self.periodic_boundary_condition()
         if self.__verbose__: print 'Update geometry'
+        self.zetas = self.dzeds.copy()
         self.update_geometry()
         
     def __str__(self):
@@ -183,7 +187,7 @@ class Epithelium(EpitheliumFilters,
             self.diamonds[j_edge].update_geometry()
         for cell in self.cells:
             self._one_cell_geom(cell)
-
+            
     def _one_cell_geom(self, cell):
         """
         """
@@ -383,7 +387,43 @@ class Epithelium(EpitheliumFilters,
             edge_trash.append(old_edge)
         vertex_trash.append(jv1)
         return vertex_trash, edge_trash
-        
+
+    @filters.cells_out
+    def radial_smooth(self, smth=0.5, local=True):
+        for v in self.graph.vertices():
+            if not self.is_alive[v]:
+                continue
+            if not self.is_local_vert[v] and local:
+                continue
+            n_rhos = np.array([self.rhos[nv]
+                               for nv in v.all_neighbours()])
+            n_rhos = n_rhos.take(np.isfinite(n_rhos))
+            if n_rhos.size > 0:
+                self.rhos[v] = ((1. - smth) * self.rhos[v]
+                                + smth * n_rhos.mean())
+        self.update_xy()
+
+    @filters.cells_out
+    def radial_smooth(self, smth=0.5, local=True):
+        for v in self.graph.vertices():
+            if not self.is_alive[v]:
+                continue
+            if not self.is_local_vert[v] and local:
+                continue
+            n_rhos = np.array([self.rhos[nv]
+                               for nv in v.all_neighbours()])
+            n_rhos = n_rhos.take(np.isfinite(n_rhos))
+            if n_rhos.size > 0:
+                self.rhos[v] = ((1. - smth) * self.rhos[v]
+                                + smth * n_rhos.mean())
+        self.update_xy()
+
+    def update_tension(self, base=1., amp=1.):
+        self.update_dsigmas()
+        self.zetas.a = np.arctan2(self.dzeds.a, self.dsigmas.a)
+        self.junctions.line_tensions.a = (self.params['line_tension']
+                                          * (base + amp
+                                             * np.cos(self.zetas.a)**2))
         
 def triangle_geometry(sz0, sz1, sz2):
     c_code = """

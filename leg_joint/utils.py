@@ -4,6 +4,29 @@
 import numpy as np
 from scipy.interpolate import splrep, splev
 
+
+def local_slice(eptm, theta_c=0, theta_amp=np.pi/24, 
+                zed_c=0, zed_amp=None):
+    if theta_amp is None:
+        theta_min = eptm.theta.a.min()
+        theta_max = eptm.theta.a.max()
+    else:
+        theta_min = theta_c - theta_amp
+        theta_max = theta_c + theta_amp
+    if zed_amp is None:
+        zed_min = eptm.zeds.a.min()
+        zed_max = eptm.zeds.a.max()
+    else:
+        zed_min = zed_c - zed_amp
+        zed_max = zed_c + zed_amp
+        
+    slice_cells = [cell for cell in eptm.cells
+                   if (theta_min < eptm.thetas[cell] < theta_max)
+                   and (zed_min < eptm.zeds[cell] < zed_max)]
+    eptm.set_local_mask(None)
+    for cell in slice_cells:
+        eptm.set_local_mask(cell)
+
 def to_xy(rho, theta):
     x = rho * np.cos(theta)
     y = rho * np.sin(theta)

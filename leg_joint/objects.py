@@ -139,6 +139,7 @@ class AbstractRTZGraph(object):
         self.graph.edge_properties["u_dixs"] = self.u_dixs
         self.u_dwys = self.graph.new_edge_property('float')
         self.graph.edge_properties["u_dwys"] = self.u_dwys
+        
 
     def _get_edge_geometry(self):
         '''Creates the edge geometric property maps

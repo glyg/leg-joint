@@ -144,6 +144,52 @@ def plot_ortho_proj(eptm, ax=None, vfilt=None, efilt=None, **kwargs):
     plt.draw()
     return ax, ax_zr, ax_rs
 
+
+def plot_cells_generic(eptm, xprop, yprop, ax=None, 
+                       vfilt=None, efilt=None):
+    if ax is None:
+        fig, ax = plt.subplots(1,1)
+    eptm.graph.set_vertex_filter(vfilt)
+    for cell in eptm.cells :
+        ax.plot(xprop[cell],
+                yprop[cell], 'bo', alpha=0.3)
+
+    eptm.graph.set_vertex_filter(None)
+    plot_edges_generic(eptm, xprop, yprop, efilt, ax=ax)
+    ax.set_xlabel('Radius', fontsize='large')
+    return ax
+
+def plot_edges_generic(eptm, xprop, yprop, efilt=None,
+                       ax=None, **kwargs):
+    edge_width = eptm.junctions.line_tensions.copy()
+    if ax is None:
+        fig, ax = plt.subplots(1,1)
+    eptm.graph.set_edge_filter(efilt)
+    eptm.graph.set_vertex_filter(None)
+    edge_width.fa = 2. * (eptm.junctions.line_tensions.fa
+                          / eptm.junctions.line_tensions.fa.mean())**0.5
+    edge_width.fa *= (1 - eptm.at_boundary.fa)
+    for edge in eptm.graph.edges():
+        if edge is None:
+            print "invalid edge %s" %str(edge)
+            continue
+        ixs = (xprop[edge.source()],
+               xprop[edge.target()])
+        wys = (yprop[edge.source()],
+               yprop[edge.target()])
+        if eptm.is_junction_edge[edge]:
+            ax.plot(ixs, wys,
+                    'g-', lw=edge_width[edge],
+                    alpha=0.4, **kwargs)
+        else:
+            if not eptm.at_boundary[edge]:
+                ax.plot(ixs, wys,
+                        'k-', lw=1.,
+                        alpha=0.2, **kwargs)
+            
+    ax.set_aspect('equal')
+    eptm.graph.set_edge_filter(None)
+
     
 def plot_cells_zr(eptm, ax=None, 
                   vfilt=None, efilt=None):
@@ -189,6 +235,8 @@ def plot_edges_rs(eptm, efilt=None,
     eptm.graph.set_vertex_filter(None)
     edge_width.fa = 2. * (eptm.junctions.line_tensions.fa
                           / eptm.junctions.line_tensions.fa.mean())**0.5
+    eptm.update_dsigmas()
+    edge_width.fa *= (1 - eptm.at_boundary.fa)
     proj_sigmas = eptm.proj_sigma()
     for edge in eptm.graph.edges():
         if edge is None:
@@ -203,9 +251,10 @@ def plot_edges_rs(eptm, efilt=None,
                     'g-', lw=edge_width[edge],
                     alpha=0.4, **kwargs)
         else:
-            ax.plot(rhos, sigmas,
-                    'k-', lw=1.,
-                    alpha=0.2, **kwargs)
+            if not eptm.at_boundary[edge]:
+                ax.plot(rhos, sigmas,
+                        'k-', lw=1.,
+                        alpha=0.2, **kwargs)
             
     ax.set_aspect('equal')
     eptm.graph.set_edge_filter(None)
@@ -221,6 +270,9 @@ def plot_edges_zr(eptm, efilt=None,
     eptm.graph.set_vertex_filter(None)
     edge_width.fa = 2. * (eptm.junctions.line_tensions.fa
                           / eptm.junctions.line_tensions.fa.mean())**0.5
+    eptm.update_dsigmas()
+    edge_width.fa *= (1 - eptm.at_boundary.fa)
+
     for edge in eptm.graph.edges():
         if edge is None:
             print "invalid edge %s" %str(edge)
@@ -234,9 +286,10 @@ def plot_edges_zr(eptm, efilt=None,
                     'g-', lw=edge_width[edge],
                     alpha=0.4, **kwargs)
         else:
-            ax.plot(zeds, rhos,
-                    'k-', lw=1,
-                    alpha=0.2, **kwargs)
+            if not eptm.at_boundary[edge]:
+                ax.plot(zeds, rhos,
+                        'k-', lw=1,
+                        alpha=0.2, **kwargs)
 
     ax.set_aspect('equal')
     eptm.graph.set_edge_filter(None)
@@ -280,11 +333,13 @@ def plot_edges_zs(eptm, efilt=None,
     eptm.graph.set_vertex_filter(None)
     edge_width.fa = 2. * (eptm.junctions.line_tensions.fa
                           / eptm.junctions.line_tensions.fa.mean())**0.5
+    eptm.update_dsigmas()
+    edge_width.fa *= (1 - eptm.at_boundary.fa)
     proj_sigmas = eptm.proj_sigma()
+    has_text = eptm.is_cell_vert.copy()
+    has_text.a = 0
+    
     for edge in eptm.graph.edges():
-        if edge is None:
-            print "invalid edge %s" %str(edge)
-            continue
         sigmas = (proj_sigmas[edge.source()],
                   proj_sigmas[edge.target()])
         zeds = (eptm.zeds[edge.source()],
@@ -295,14 +350,22 @@ def plot_edges_zs(eptm, efilt=None,
                     'g-', lw=edge_width[edge],
                     alpha=0.4, **kwargs)
             if text:
-                ax.text(eptm.zeds[edge.source()],
-                        proj_sigmas[edge.source()],
-                        str(edge.source()))
+                if not has_text[edge.source()]:
+                    ax.text(eptm.zeds[edge.source()],
+                            proj_sigmas[edge.source()],
+                            str(edge.source()))
+                    has_text[edge.source()] = 1
+                if not has_text[edge.target()]:
+                    ax.text(eptm.zeds[edge.target()],
+                            proj_sigmas[edge.target()],
+                            str(edge.target()))
+                    has_text[edge.target()] = 1
         else:
-            ax.plot(zeds,
-                    sigmas,
-                    'k-', lw=1,
-                    alpha=0.2, **kwargs)
+            if not eptm.at_boundary[edge]:
+                ax.plot(zeds,
+                        sigmas,
+                        'k-', lw=1,
+                        alpha=0.2, **kwargs)
             
     ax.set_aspect('equal')
     eptm.graph.set_edge_filter(None)

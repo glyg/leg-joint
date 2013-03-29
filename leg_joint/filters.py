@@ -255,6 +255,8 @@ class EpitheliumFilters(object):
         if isinstance(cell, int):
             cell = self.graph.vertex(cell)
         self.is_local_vert[cell] = 1
+        for je in self.cells.junctions[cell]:
+            self.is_local_edge[je] = 1
         for j_vert in cell.out_neighbours():
             self.is_local_vert[j_vert] = 1
             self.is_active_vert[j_vert] = 1

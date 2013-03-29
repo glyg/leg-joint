@@ -96,8 +96,6 @@ class Dynamics(object):
                       * (self.cells.vols.fa - self.cells.prefered_vol.fa)**2
         cells_energy = contractile_term + volume_term
         return cells_energy
-
-    
         
     @filters.j_edges_in
     def calc_junctions_energy(self):

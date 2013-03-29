@@ -4,6 +4,7 @@ import os
 import numpy as np
 #import filters
 from graph_representation import epithelium_draw
+from optimizers import find_energy_min
 
 from datetime import datetime
 
@@ -28,7 +29,37 @@ def snapshot(func, *args, **kwargs):
         # epithelium_draw(eptm, output2d=outfname2d, output3d=outfname3d)
         return out
     return new_func
+
+
+def apoptosis(eptm, a_cell, idx=0,
+              vol_reduction=0.01,
+              contractility=1.,
+              radial_tension=0.):
     
+    eptm.set_local_mask(None)
+    eptm.set_local_mask(a_cell)
+    
+    eptm.cells.prefered_vol[a_cell] *= vol_reduction
+    eptm.cells.contractilities[a_cell] *= contractility
+    mean_lt = np.array([eptm.junctions.line_tensions[je]
+                        for je in eptm.cells.junctions[a_cell]]).mean()
+    for jv in a_cell.out_neighbours():
+        eptm.junctions.radial_tensions[jv] = radial_tension * mean_lt
+        for v in jv.all_neighbours():
+            if v == a_cell: 
+                continue
+            if not eptm.is_cell_vert[v]:
+                continue
+            eptm.set_local_mask(v)
+    find_energy_min(eptm, tol=1e-4)
+    tag = 'vr%.2f_ctr%.2f_rt%.2f_%02i' % (vol_reduction, contractility,
+                                          radial_tension, idx)
+    out2d = '../saved_graphs/png/apopto_2d_'+tag+'.png'
+    out3d = '../saved_graphs/png/apopto_3d_'+tag+'.png'
+    out_xml = '../saved_graphs/xml/apopto_'+tag+'.xml'
+    eptm.graph.save(out_xml)
+    epithelium_draw(eptm, output2d=out2d, output3d=out3d)
+
 @snapshot
 def type1_transition(eptm, elements, verbose=False):
     """
@@ -328,20 +359,6 @@ def cell_division(eptm, mother_cell,
     return septum
 
 @snapshot
-def apoptosis(eptm, apoptotic_cell):
-    eptm.set_local_mask(None)
-    eptm.set_local_mask(apoptotic_cell)
-    j_edges = eptm.cells.junctions[apoptotic_cell]
-    edge_lengths = np.array([eptm.edge_lengths[je] for je in j_edges])
-    for n in range(len(j_edges) - 2):
-        je = j_edges[edge_lengths.argmin()]
-        new_jv = type3_transition(eptm, apoptotic_cell)
-        if new_jv is not None:
-            print "Cell's dead, baby, cell's dead"
-    eptm.reset_topology()
-    return new_jv
-
-@snapshot
 def type3_transition(eptm, cell, reduce_edgenum=True, verbose=False):
     """
     
@@ -400,18 +417,20 @@ def type3_transition(eptm, cell, reduce_edgenum=True, verbose=False):
     return new_jv
 
 def remove_cell(eptm, cell):
+
+    if isinstance(cell, int):
+        cell = eptm.graph.vertex(cell)
     
     eptm.set_local_mask(None)
     eptm.graph.set_vertex_filter(None)
     eptm.graph.set_edge_filter(None)
-    edge_trash = []
     vertex_trash = []
     new_ctojs = []
     new_jes =[]
     ctojs = [ctoj for ctoj in cell.out_edges()]
     cell_jes = eptm.cells.junctions[cell]
     jvs = [jv for jv in cell.out_neighbours()]
-    edge_trash.extend(ctojs)
+    edge_trash = ctojs
     edge_trash.extend(cell_jes)
     new_jv = eptm.new_vertex(jvs[0])
     print 'new vertex %s' % str(new_jv)
@@ -420,38 +439,31 @@ def remove_cell(eptm, cell):
     eptm.wys[new_jv] = eptm.wys[cell]
     eptm.zeds[new_jv] = eptm.zeds[cell]
     adjacent_cells = []
-    for je in cell_jes:
-        cell0, cell1 = eptm.junctions.adjacent_cells[je]
-        adj_cell = cell0 if cell1 == cell else cell1
-        adjacent_cells.append(adj_cell)
-        
-        adj_ctojs = [ctoj for ctoj in adj_cell.out_edges()
-                     if ctoj.target() in jvs]
-        edge_trash.extend(adj_ctojs)
-        new_ctojs.append((adj_cell, new_jv))
     for jv in jvs:
-        for je in jv.all_edges():
-            if eptm.is_ctoj_edge[je]: continue
-            if je in cell_jes: continue
-            jv0, jv1 = je
-            opposite = jv0 if jv1 == jv else jv1
-            edge_trash.append(je)
-            new_jes.append((opposite, new_jv))
         vertex_trash.append(jv)
+        for edge in jv.all_edges():
+            if edge in edge_trash:
+                continue
+            edge_trash.append(edge)
+            if eptm.is_ctoj_edge[edge]:
+                adj_cell = edge.source()
+                adjacent_cells.append(adj_cell)
+                new_ctojs.append((adj_cell, new_jv))
+            elif eptm.is_junction_edge[edge]:
+                jv0, jv1 = edge
+                opposite = jv0 if jv1 == jv else jv1
+                new_jes.append((opposite, new_jv))
         
     for neighb_cell, jv in new_ctojs:
-        ctoj = eptm.new_edge(neighb_cell, jv, adj_ctojs[0])
+        ctoj = eptm.new_edge(neighb_cell, jv, ctojs[0])
     for jv0, jv1 in new_jes:
         je = eptm.new_edge(jv0, jv1, cell_jes[0])
         
     eptm.is_alive[cell] = 0
     eptm.is_cell_vert[cell] = 0
-
-    
     for v in vertex_trash:
         eptm.is_alive[v] = 0
         eptm.is_cell_vert[v] = 0
-    
     for e in edge_trash:
         try:
             eptm.graph.remove_edge(e)
