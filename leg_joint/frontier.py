@@ -2,8 +2,11 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 
-def find_circumference(eptm, edge0):
-    eptm.graph.set_edge_filter(eptm.is_junction_edge)
+def find_circumference(eptm, edge0, efilt=None):
+    if efilt is None:
+        eptm.graph.set_edge_filter(eptm.is_junction_edge)
+    else:
+        eptm.graph.set_edge_filter(efilt)
     front_verts = [edge0.source(), edge0.target()]
     ref_jv = edge0.source()
     front_edges = [edge0]
@@ -13,6 +16,8 @@ def find_circumference(eptm, edge0):
         v0 = front_verts[-2]
         v1 = front_verts[-1]
         neighbs = [jv for jv in v1.all_neighbours() if jv != v0]
+        if len(neighbs) == 0:
+            break
         sigmas = np.array([eptm.sigmas[jv] for jv in neighbs])
         zeds = np.array([eptm.zeds[jv] for jv in neighbs])
         tangent = np.abs((sigmas - eptm.sigmas[v0])

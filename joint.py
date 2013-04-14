@@ -13,104 +13,86 @@ from datetime import datetime
 import leg_joint as lj
 import random
 
-# eptm = lj.Epithelium(paramfile='default/few_big_cells.xml')
-def new_generation(eptm, growth_rate=1.8):
-    eptm.graph.set_vertex_filter(eptm.is_cell_vert)
-    cells =  [cell for cell in eptm.graph.vertices()
-              if eptm.is_alive[cell]]
-    print 'there are %i cells to devide' % len(cells)
-    num = 0
-    eptm.graph.set_vertex_filter(None)
-    t0  = time.time()
-    try:
-        mkdir('tmp')
-    except OSError:
-        pass
-    random.seed(3)
-    random.shuffle(cells)
-    for mother_cell in cells:
-        print('dividing cell %s' %str(mother_cell))
-        skip = False
-        # No division
-        # Mother cell might have died earlier in the loop
-        if not eptm.is_alive[mother_cell]:
-            print('skipping dead cell %s' % str(mother_cell))
-            skip = True
-        for je in eptm.cells.junctions[mother_cell]:
-            try:
-                cell0, cell1 = eptm.junctions.adjacent_cells[je]
-                if not eptm.is_alive[cell0]:
-                    print('skipping dead cell %s' % str(cell0))
-                    skip = True
-                    if not eptm.is_alive[cell1]:
-                        print('skipping dead cell %s' % str(cell1))
-                        skip = True
-            except ValueError:
-                skip = True
-        if skip: continue
-        eptm.set_local_mask(None)
-        eptm.set_local_mask(mother_cell)
-        eptm.cells.prefered_vol[mother_cell] *= growth_rate
-        pos0, pos1 = lj.find_energy_min(eptm, tol=1e-3, approx_grad=0)
-        phi_division = np.random.normal()
-        rand_phi = np.random.normal(0, np.pi/12.)
-        j = lj.cell_division(eptm, mother_cell,
-                             phi_division=rand_phi,
-                             verbose=False)
-        eptm.update_tension(base=0.5, amp=1.)
-        if j is not None:
-            pos0, pos1 = lj.find_energy_min(eptm, tol=1e-3, approx_grad=0)
-            #eptm.radial_smooth(0.5)
-            lj.optimizers.isotropic_optimum(eptm, 1e-4)
-            #lj.resolve_small_edges(eptm, threshold=0.25)
-            small_cells = [cell for cell in eptm.cells
-                           if eptm.cells.areas[cell] < 1e-1]
-            if len(small_cells) > 0:
-                for small_cell in small_cells:
-                    if eptm.is_alive[small_cell]:
-                        print 'removing cell %s' % str(small_cell)
-                        lj.remove_cell(eptm, small_cell)
-            eptm.graph.save("saved_graphs/xml/latest.xml")
-            now = datetime.now()
-            outfname3d = 'saved_graphs/png/tmp/generation_3d_%03i.png' % num
-            outfname2d = 'saved_graphs/png/tmp/generation_sz_%03i.png' % num
-            lj.draw(eptm, output2d=outfname2d,
-                    output3d=outfname3d)
-        else:
-            print 'division failed'
-        num += 1
-        elapsed = time.time() - t0
-        time_left = (elapsed / num) * (len(cells) - num)
-        print str(num)+'/'+str(len(cells))
-        print 'time left: %3f' % time_left
-    # eptm.anisotropic_relax()
-    eptm.update_geometry()
-    eptm.params['n_zeds'] *= 2
-    eptm.params['n_sigmas'] *= 2
-    eptm.graph.save("saved_graphs/xml/generation%s.xml" % now.isoformat())
+def p_apopto(zed, theta, z0=0., width_apopto=1.5, p0=0.95):
+    p = p0 * np.exp(- (zed - z0)**2 / width_apopto**2
+                    ) * (0.3 + 0.7 * np.abs(np.cos(theta/2.)))
+    return p
 
+def get_apoptotic_cells(eptm, seed, **kwargs):
+    ''' '''
+    is_apoptotic = eptm.is_alive.copy()
+    is_apoptotic.a[:] = 0
+    np.random.seed(seed)
+    for cell in eptm.cells:
+        dice = np.random.random()
+        if dice < p_apopto(eptm.zeds[cell], eptm.thetas[cell], **kwargs):
+            is_apoptotic[cell] = 1
+    print "Number of apoptotic cells: %i" % is_apoptotic.a.sum()
+
+    apopto_cells = np.array([cell for cell in eptm.cells
+                             if is_apoptotic[cell]])
+    thetas = np.array([eptm.thetas[cell] for cell in apopto_cells])
+    theta_idx = np.argsort(np.cos(thetas/2))[::-1]
+    return apopto_cells.take(theta_idx)
+
+def get_sequence(apopto_cells, num_steps):
+    apopto_sequence = []
+    num_cells = apopto_cells.size
+    for k in np.arange(- num_steps, num_cells + num_steps):
+        start = max(k, 0)
+        stop = min(k + num_steps, num_cells)
+        apopto_sequence.append(apopto_cells[start:stop])
+    return apopto_sequence
+
+def gradual_apoptosis(eptm, apopto_cells, num_steps, **kwargs):
+
+    apopto_sequence = get_sequence(apopto_cells, num_steps)
+    print '%i steps will be performed' % len(apopto_sequence)
+
+    i = 0
+    for cell_seq in apopto_sequence:
+        for a_cell in cell_seq:
+            i += 1
+            lj.apoptosis(eptm, a_cell, idx=i, **kwargs)
+            eptm.update_geometry()
+    
+def show_distribution(eptm):
+    lj.local_slice(eptm, zed_amp=2., theta_amp=None)
+    axes = lj.plot_edges_generic(eptm, eptm.zeds, eptm.wys, ctoj=False)#,
+                                 #efilt=eptm.is_local_edge)
+    x_min = eptm.ixs.a.min()
+    x_max = eptm.ixs.a.max()
+    for cell in eptm.cells:
+        if is_apoptotic[cell]:
+            alpha = 0.3 + 0.7 * (eptm.ixs[cell] - x_min)/(x_max - x_min)
+            axes.plot(eptm.zeds[cell], eptm.wys[cell], 'ro', alpha=alpha)
+    return axes
+            
     
 if __name__ == '__main__':
-    eptm = lj.Epithelium(graphXMLfile='saved_graphs/xml/initial_graph.xml',
+    eptm = lj.Epithelium(graphXMLfile='saved_graphs/xml/before_apoptosis.xml',
                          paramfile='default/params.xml')
 
-    eptm.update_tension(base=0.5, amp=1.)
-    for cell in eptm.cells:
-        if not eptm.is_alive[cell]: continue
-        print cell
-        eptm.set_local_mask(None)
-        eptm.set_local_mask(cell)
-        lj.find_energy_min(eptm, tol=1e-3, approx_grad=0)
+    import sys
+    args = [np.float(arg) if '.' in arg else np.int(arg)
+            for arg in sys.argv[1:]]
+    if len(args) != 5:
+        print("""Usage:
+              You need to provide the values for 5 parameters: 
+              python joint.py p1 p2 p3 p4 p5
+              with the following meaning:
+              p1 : seed for the random process
+              p2 : number of steps to complete apoptosis
+              p3 : volume reduction of the cell at each step
+              p4 : contractility multiplication at each steps 
+              p5 : radial tension
+              """ )
+        raise ValueError('Bad number of parameters')
+    (seed, num_steps, vol_reduction, contractility, radial_tension) = args
 
-    # eptm.graph.save('saved_graphs/xml/initial_graph.xml')
-
-    #lj.optimizers.isotropic_optimum(eptm, 1e-6)
-    for n in range(1):
-        new_generation(eptm)
-        #lj.optimizers.isotropic_optimum(eptm, 1e-6)
-    # z_min = eptm.zeds.fa.min()
-    # z_max = eptm.zeds.fa.max()
-    # zed0 = (z_max - z_min) / 3.
-    # zed1 = 2. * (z_max - z_min) / 3.
-    # lj.create_frontier(eptm, zed0, tension_increase=4.)
-    # lj.create_frontier(eptm, zed1, tension_increase=4.)
+    apopto_cells = get_apoptotic_cells(eptm, seed)
+    gradual_apoptosis(eptm, apopto_cells, num_steps,
+                      vol_reduction=vol_reduction,
+                      contractility=contractility,
+                      radial_tension=radial_tension)
+    

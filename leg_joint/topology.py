@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import os
 import numpy as np
+import glob
 #import filters
 from graph_representation import epithelium_draw
 from optimizers import find_energy_min
@@ -52,13 +53,25 @@ def apoptosis(eptm, a_cell, idx=0,
                 continue
             eptm.set_local_mask(v)
     find_energy_min(eptm, tol=1e-4)
-    tag = 'vr%.2f_ctr%.2f_rt%.2f_%02i' % (vol_reduction, contractility,
-                                          radial_tension, idx)
-    out2d = '../saved_graphs/png/apopto_2d_'+tag+'.png'
-    out3d = '../saved_graphs/png/apopto_3d_'+tag+'.png'
-    out_xml = '../saved_graphs/xml/apopto_'+tag+'.xml'
+    tag = 'vr%.2f_ctr%.2f_rt%.2f' % (vol_reduction, contractility,
+                                     radial_tension)
+
+    png_dir = os.path.join(GRAPH_SAVE_DIR, 'png', 'apopto_'+tag)
+    try:
+        os.mkdir(png_dir)
+    except OSError:
+        pass
+
+    xml_dir = os.path.join(GRAPH_SAVE_DIR, 'xml', 'apopto_'+tag)
+    try:
+        os.mkdir(xml_dir)
+    except OSError:
+        pass
+    out2d = os.path.join(png_dir, 'apopto_2d_%04i.png' % idx)
+    out3d = os.path.join(png_dir, 'apopto_3d_%04i.png' % idx)
+    out_xml = os.path.join(xml_dir, 'apopto_%04i.xml' % idx)
     eptm.graph.save(out_xml)
-    epithelium_draw(eptm, output2d=out2d, output3d=out3d)
+    epithelium_draw(eptm, output2d=out2d, output3d=out3d, d_theta=np.pi/2)
 
 @snapshot
 def type1_transition(eptm, elements, verbose=False):

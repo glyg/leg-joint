@@ -8,8 +8,8 @@ from scipy.interpolate import splrep, splev
 def local_slice(eptm, theta_c=0, theta_amp=np.pi/24, 
                 zed_c=0, zed_amp=None):
     if theta_amp is None:
-        theta_min = eptm.theta.a.min()
-        theta_max = eptm.theta.a.max()
+        theta_min = eptm.thetas.a.min()
+        theta_max = eptm.thetas.a.max()
     else:
         theta_min = theta_c - theta_amp
         theta_max = theta_c + theta_amp

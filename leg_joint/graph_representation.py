@@ -21,6 +21,10 @@ FLOAT = np.dtype('float32')
 
 
 def vv_edges(eptm):
+    '''
+    Tentative 3d rendering using visvis - not quite succesfull
+    Better use blender
+    '''
     #app = vv.use()
     for n, je in enumerate(eptm.junctions):
         ps = vv.Pointset(3)
@@ -44,11 +48,12 @@ def vv_edges(eptm):
     #app.run()        
     return edgeline
 
-
-
-
 def plot_ortho_gradients(eptm, axes=None,
-                         scale=0.1, approx=0, **kwargs):
+                         scale=1., approx=0, **kwargs):
+    '''
+    Displays the gradients for the active vertices on top of
+    an `ortho_proj` graph
+    '''
     if approx == 1:
         grad_xyz = approx_grad(eptm)
         ec = fc = 'blue'
@@ -155,12 +160,11 @@ def plot_cells_generic(eptm, xprop, yprop, ax=None,
                 yprop[cell], 'bo', alpha=0.3)
 
     eptm.graph.set_vertex_filter(None)
-    plot_edges_generic(eptm, xprop, yprop, efilt, ax=ax)
-    ax.set_xlabel('Radius', fontsize='large')
+    ax = plot_edges_generic(eptm, xprop, yprop, efilt, ax=ax)
     return ax
 
 def plot_edges_generic(eptm, xprop, yprop, efilt=None,
-                       ax=None, **kwargs):
+                       ax=None, ctoj=True, **kwargs):
     edge_width = eptm.junctions.line_tensions.copy()
     if ax is None:
         fig, ax = plt.subplots(1,1)
@@ -181,7 +185,7 @@ def plot_edges_generic(eptm, xprop, yprop, efilt=None,
             ax.plot(ixs, wys,
                     'g-', lw=edge_width[edge],
                     alpha=0.4, **kwargs)
-        else:
+        elif ctoj:
             if not eptm.at_boundary[edge]:
                 ax.plot(ixs, wys,
                         'k-', lw=1.,
@@ -189,6 +193,7 @@ def plot_edges_generic(eptm, xprop, yprop, efilt=None,
             
     ax.set_aspect('equal')
     eptm.graph.set_edge_filter(None)
+    return ax
 
     
 def plot_cells_zr(eptm, ax=None, 
