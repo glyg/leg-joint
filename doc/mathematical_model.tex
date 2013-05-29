@@ -23,14 +23,16 @@
 
 \begin{document}
 
-\section{The elementary cell}
+\section{Architecture}
+
+
+\subsection{The elementary cell}
 
 The architecture of the epithelium model consists in a graph containing
-
 \begin{itemize}
 \item two types of vertices:
   \begin{itemize}
-  \item The cells themselves
+  \item The cell centres
   \item The appical junctions vertices
   \end{itemize}
 \item and two types of edges:
@@ -49,6 +51,21 @@ The architecture of the epithelium model consists in a graph containing
   \label{fig:single_cell}
 \end{figure}
 
+\subsection{3D geometry}
+
+The position of the vertices is given in two 3D coordinate systems,
+Cartesian $(x, y, z)$ and cylindrical $(\rho, \theta, z)$.
+
+Initially, the vertices are distributed over a cylinder centered around
+the $z$ axis. The volume of a cell is computed as the sum of the area
+of each triangle formed by a junction edge and two cell-to-junction
+edges times the height of the cell center. Of course this is an
+approximation:
+$$
+V_\alpha = \sum_{i,j} A_{\alpha ij} h_\alpha c_{\alpha i} c_{\alpha j} c_{ij}
+$$
+with $c_{uv} = 1$ if vertices $u$ and $v$ are connected and 0 otherwise.  
+and $A_{\alpha ij} = || \mathbf{r}_{\alpha i} \times \mathbf{ r}_{\alpha j} || / 2 $
 
 
 

@@ -2,6 +2,9 @@
 
 """
 
+
+
+
 """
 
 import os
@@ -31,14 +34,16 @@ class AbstractRTZGraph(object):
     dixs, dwys, dzeds, drhos, dthetas, dsigmas : edge PropertyMaps of the
         edge components along the various axis. For exemple:
         `self.dixs[edge] = self.ixs[edge.source()] - self.ixs[edge.target()]`
+
     edge_lengths: edge PropertyMap giving the edge lengths
 
+    u_dixs, u_dwys, ...: Coordinates of the unitary vector colinear to an edge
+    
+    
     Methods:
     ===========
 
-    rtz_group : Creates or updates two `GroupPropertyMap`,
-        `rtz_pos` and `sz_pos` containing the ::math:(\rho, \theta, z):
-        and ::math:(\sigma, z): positions of the vertices, respectively.
+    scale()
 
     '''
 
@@ -97,7 +102,7 @@ class AbstractRTZGraph(object):
         self.graph.vertex_properties["wys"] = self.wys
 
     def _get_vertex_geometry(self):
-        '''Creates the vertices geometric property maps
+        '''Creates attributes from the vertices geometric property maps
         '''
         # Position in the rho theta zed space
         self.rhos = self.graph.vertex_properties["rhos"]
@@ -142,7 +147,8 @@ class AbstractRTZGraph(object):
         
 
     def _get_edge_geometry(self):
-        '''Creates the edge geometric property maps
+        '''
+        Creates attributes from  the  geometric property maps
         '''
         # deltas 
         self.dthetas = self.graph.edge_properties["dthetas"]
@@ -259,7 +265,8 @@ class AbstractRTZGraph(object):
         return gt.group_vector_property(sigmazs, value_type='float')
 
     def update_rhotheta(self):
-        '''Computes the values of the `rhos`, `thetas` and `sigmas` property
+        '''
+        Computes the values of the `rhos`, `thetas` and `sigmas` property
         maps, from the current values of the `ixs` and `xys` property maps
         '''
         self.rhos.a, self.thetas.a = to_rhotheta(self.ixs.a, self.wys.a)
@@ -396,8 +403,16 @@ class AbstractRTZGraph(object):
 
 
 class Triangle(object):
+    '''
+    A triangle is formed by a cell and two junction vertices linked by a junction edge
 
+    Attributes:
+    ===========
+    
+    
+    '''
     def __init__(self, eptm, cell, j_edge):
+        
         self.eptm = eptm
         self.cell  = cell
         self.j_edge = j_edge

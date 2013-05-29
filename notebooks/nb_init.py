@@ -10,7 +10,7 @@ curdir = os.path.abspath(os.path.curdir)
 sys.path.append(os.path.dirname(curdir))
 
 import graph_tool.all as gt
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import leg_joint as lj
 
 
