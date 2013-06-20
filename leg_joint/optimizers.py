@@ -40,7 +40,7 @@ def precondition(eptm):
 
 @local_subgraph
 def find_energy_min(eptm, method='fmin_l_bfgs_b',
-                    tol=1e-8, approx_grad=0):
+                    tol=1e-8, approx_grad=0, epsilon=1e-8):
     '''
     Performs the energy minimisation
     '''
@@ -55,10 +55,10 @@ def find_energy_min(eptm, method='fmin_l_bfgs_b',
                                         #approx_grad=approx_grad,
                                         bounds=bounds.flatten(),
                                         args=(eptm,),
-                                        factr=1e8,
+                                        factr=1e11,
                                         m=10,
                                         pgtol=tol,
-                                        epsilon=1e-8,
+                                        epsilon=epsilon,
                                         iprint=1,
                                         maxfun=150,
                                         disp=None)

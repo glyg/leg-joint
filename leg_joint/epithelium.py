@@ -418,13 +418,7 @@ class Epithelium(EpitheliumFilters,
                                 + smth * n_rhos.mean())
         self.update_xy()
 
-    def update_tension(self, base=1., amp=1.):
-        self.update_dsigmas()
-        self.zetas.a = np.arctan2(self.dzeds.a, self.dsigmas.a)
-        self.junctions.line_tensions.a = (self.params['line_tension']
-                                          * (base + amp
-                                             * np.cos(self.zetas.a)**2))
-        
+
 def triangle_geometry(sz0, sz1, sz2):
     c_code = """
     double s0 = sz0[0];

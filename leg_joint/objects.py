@@ -627,6 +627,24 @@ class Cells():
                 if j_edge is not None:
                     j_edges.append(j_edge)
         return j_edges
+
+    def anisotropy(self, cell):
+        sigmas = np.array([self.eptm.sigmas[jv]
+                           for jv in cell.out_neighbours()])
+        zeds = np.array([self.eptm.zeds[jv]
+                         for jv in cell.out_neighbours()])
+        if sigmas.size > 0:
+            return np.ptp(sigmas)/np.ptp(zeds)
+        return 0
+
+    def get_anisotropies(self):
+        anisotropies = self.areas.copy()
+        self.eptm.update_rhotheta()
+        for cell in self:
+            # if not self.eptm.is_alive[cell]:
+            #     anisotropies[cell] = 0.
+            anisotropies[cell] = self.anisotropy(cell)
+        return anisotropies
         
 class ApicalJunctions():
 

@@ -6,7 +6,7 @@ import numpy as np
 # Import mpltlib before graph-tool to
 # avoid Gtk seg fault (don't ask why)
 import matplotlib.pyplot as plt
-import graph_tool.all as gt     # 
+import graph_tool.all as gt
 import time
 from datetime import datetime
 
@@ -15,7 +15,7 @@ import random
 
 
 # eptm = lj.Epithelium(paramfile='default/few_big_cells.xml')
-def new_generation(eptm, growth_rate=1.8):
+def new_generation(eptm, growth_rate=1.8, pola=False):
     eptm.graph.set_vertex_filter(eptm.is_cell_vert)
     cells =  [cell for cell in eptm.graph.vertices()
               if eptm.is_alive[cell]]
@@ -53,12 +53,13 @@ def new_generation(eptm, growth_rate=1.8):
         eptm.set_local_mask(mother_cell)
         eptm.cells.prefered_vol[mother_cell] *= growth_rate
         pos0, pos1 = lj.find_energy_min(eptm, tol=1e-3, approx_grad=0)
-        phi_division = np.random.normal()
-        rand_phi = np.random.normal(0, np.pi/12.)
+
+        rand_phi = np.random.normal(0, np.pi/8.)
         j = lj.cell_division(eptm, mother_cell,
                              phi_division=rand_phi,
                              verbose=False)
-        #eptm.update_tension(base=0.5, amp=1.)
+        if pola:
+            eptm.update_tensions(phi, np.pi/3)
         if j is not None:
             pos0, pos1 = lj.find_energy_min(eptm, tol=1e-3, approx_grad=0)
             #eptm.radial_smooth(0.5)
@@ -94,26 +95,25 @@ def new_generation(eptm, growth_rate=1.8):
 if __name__ == '__main__':
     eptm = lj.Epithelium(graphXMLfile='saved_graphs/xml/initial_graph.xml',
                          paramfile='default/params.xml')
-
+    #lj.optimizers.isotropic_optimum(eptm, 1e-6)
+    
     #eptm.update_tension(base=0.5, amp=1.)
     cells = [cell for cell in eptm.cells if eptm.is_alive[cell]]
     random.shuffle(cells)
+    pola = False
+    
+    phi = eptm.dsigmas.copy()
+    if pola:
+        eptm.update_tensions(phi, np.pi/3)
     for cell in cells:
         if not eptm.is_alive[cell]: continue
         print cell
         eptm.set_local_mask(None)
         eptm.set_local_mask(cell)
         lj.find_energy_min(eptm, tol=1e-3, approx_grad=0)
-
-    eptm.graph.save('saved_graphs/xml/initial_graph.xml')
-
-    #lj.optimizers.isotropic_optimum(eptm, 1e-6)
+        if pola:
+            eptm.update_tensions(phi, np.pi/3)
+    if pola:
+        eptm.graph.save('saved_graphs/xml/initial_squeezed.xml')
     for n in range(1):
-        new_generation(eptm)
-        #lj.optimizers.isotropic_optimum(eptm, 1e-6)
-    # z_min = eptm.zeds.fa.min()
-    # z_max = eptm.zeds.fa.max()
-    # zed0 = (z_max - z_min) / 3.
-    # zed1 = 2. * (z_max - z_min) / 3.
-    # lj.create_frontier(eptm, zed0, tension_increase=4.)
-    # lj.create_frontier(eptm, zed1, tension_increase=4.)
+        new_generation(eptm, pola)

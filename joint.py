@@ -55,7 +55,7 @@ def gradual_apoptosis(eptm, apopto_cells, num_steps, **kwargs):
             i += 1
             lj.apoptosis(eptm, a_cell, idx=i, **kwargs)
             eptm.update_geometry()
-    
+        
 def show_distribution(eptm):
     lj.local_slice(eptm, zed_amp=2., theta_amp=None)
     axes = lj.plot_edges_generic(eptm, eptm.zeds, eptm.wys, ctoj=False)#,

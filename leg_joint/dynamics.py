@@ -132,7 +132,7 @@ class Dynamics(object):
             self.calc_vol_grad_cell(cell)
 
     def calc_vol_grad_cell(self, cell):
-
+        
         vol_grad = [0, 0, 0]
         if  self.is_alive[cell]:
             for j_edge in self.cells.junctions[cell]:
@@ -189,9 +189,6 @@ class Dynamics(object):
         self.grad_zed[jv1] += tension * u_zg
 
         dmnd = self.diamonds[j_edge]
-        rij_vect = np.array([self.dixs[j_edge],
-                             self.dwys[j_edge],
-                             self.dzeds[j_edge]])
         for triangle in dmnd.triangles.values():
             # K_alpha DeltaV h_alpha / 2
             v_grad_a = 0.5 * (self.volume_grad_apical[triangle.cell]
@@ -216,7 +213,6 @@ class Dynamics(object):
             self.grad_ix[jv1] += v_grad_r * self.ixs[jv1] / self.rhos[jv1]
             self.grad_wy[jv1] += v_grad_r * self.wys[jv1] / self.rhos[jv1]
 
-            
             ctr_grad = self.contractile_grad[triangle.cell]
             self.grad_ix[jv0] -= ctr_grad * u_xg
             self.grad_wy[jv0] -= ctr_grad * u_yg
@@ -254,7 +250,6 @@ class Dynamics(object):
         self.set_vertex_state([(self.is_cell_vert, False),
                                (self.is_alive, False)])
         area = self.cells.areas.fa.mean()
-        vol =  self.cells.vols.fa.mean()
         self.set_vertex_state()
         ### Searching for the correct scaling (see the doc)
         area0 = self.params['prefered_area']
@@ -291,3 +286,24 @@ class Dynamics(object):
         tension = lbda * mu * delta / 2.
         energy = elasticity + contractility + tension
         return energy
+
+    def update_tensions(self, phi, delta_phi, factor=2.):
+        '''
+        Multiplies tension by `factor` for junctions that verify:
+        ::math::(\pi - \Delta\phi)/2 < |\phi| < (\pi + \Delta\phi)/2::
+        with
+        ::math::\phi = \tan^{-1}\frac{\sqrt{\delta x^2 + \delta y^2}}{\delta z}
+        
+        '''
+
+        lt0 = self.params['line_tension']
+        phi.a = np.abs(np.arctan2(np.sqrt(self.dixs.a**2
+                                          + self.dwys.a**2),
+                                  self.dzeds.a))
+        lower = np.pi / 2 - delta_phi / 2
+        upper = np.pi / 2 + delta_phi / 2
+        for je in self.junctions:
+            if (lower < phi[je] < upper):
+                self.junctions.line_tensions[je] = factor * lt0
+            else:
+                self.junctions.line_tensions[je] = lt0
