@@ -3,7 +3,10 @@
 
 import os
 import numpy as np
-import visvis as vv
+try:
+    import visvis as vv
+except ImportError:
+    print('visvis not found')
 
 from numpy.random import normal, random_sample
 import matplotlib.pyplot as plt
