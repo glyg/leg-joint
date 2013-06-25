@@ -13,9 +13,9 @@ from datetime import datetime
 import leg_joint as lj
 import random
 
-def p_apopto(zed, theta, z0=0., width_apopto=1.5, p0=0.95):
+def p_apopto(zed, theta, z0=0., width_apopto=1.5, p0=0.95, amp=0.7):
     p = p0 * np.exp(- (zed - z0)**2 / width_apopto**2
-                    ) * (0.3 + 0.7 * np.abs(np.cos(theta/2.)))
+                    ) * ((1-amp) + amp * np.abs(np.cos(theta/2.)))
     return p
 
 def get_apoptotic_cells(eptm, seed, **kwargs):
@@ -44,18 +44,31 @@ def get_sequence(apopto_cells, num_steps):
         apopto_sequence.append(apopto_cells[start:stop])
     return apopto_sequence
 
-def gradual_apoptosis(eptm, apopto_cells, num_steps, **kwargs):
+def gradual_apoptosis(eptm, apopto_cells, num_steps, pola, **kwargs):
 
     apopto_sequence = get_sequence(apopto_cells, num_steps)
     print '%i steps will be performed' % len(apopto_sequence)
-
+    phi = eptm.dsigmas.copy()
+    phi.a[:] = 0
+    lj.local_slice(eptm, theta_amp=None, zed_c=0., zed_amp=1.5)
+    fold_cells = [cell for cell in eptm.cells
+                  if eptm.is_local_vert[cell]]
+    eptm.set_local_mask(None)
     i = 0
     for cell_seq in apopto_sequence:
         for a_cell in cell_seq:
             i += 1
             lj.apoptosis(eptm, a_cell, idx=i, **kwargs)
             eptm.update_geometry()
-        
+            if pola:
+                eptm.update_tensions(phi, np.pi / 4, 1.26**4)
+        np.random.shuffle(fold_cells)
+        for cell in fold_cells:
+            eptm.set_local_mask(None)
+            eptm.set_local_mask(cell)
+            lj.find_energy_min(eptm)
+            eptm.update_tensions(phi, np.pi / 4, 1.26**4)
+            
 def show_distribution(eptm):
     lj.local_slice(eptm, zed_amp=2., theta_amp=None)
     axes = lj.plot_edges_generic(eptm, eptm.zeds, eptm.wys, ctoj=False)#,
@@ -63,7 +76,7 @@ def show_distribution(eptm):
     x_min = eptm.ixs.a.min()
     x_max = eptm.ixs.a.max()
     for cell in eptm.cells:
-        if is_apoptotic[cell]:
+        if eptm.is_apoptotic[cell]:
             alpha = 0.3 + 0.7 * (eptm.ixs[cell] - x_min)/(x_max - x_min)
             axes.plot(eptm.zeds[cell], eptm.wys[cell], 'ro', alpha=alpha)
     return axes

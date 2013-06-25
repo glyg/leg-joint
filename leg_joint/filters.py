@@ -175,8 +175,6 @@ class EpitheliumFilters(object):
             return self.graph.edge(cell, jv)
 
     def new_j_edge(self, jv0, jv1):
-        j_edge_out = self.graph.edge(jv0, jv1)
-        j_edge_in = self.graph.edge(jv1, jv0)
         if self.any_edge(jv0, jv1) is None:
             j_edge = self.graph.add_edge(jv0, jv1)
             self.is_ctoj_edge[j_edge] = 0
@@ -188,8 +186,6 @@ class EpitheliumFilters(object):
             return self.any_edge(jv0, jv1)
 
     def new_edge(self, vertex0, vertex1, source_edge):
-        j_edge_out = self.graph.edge(vertex0, vertex1)
-        j_edge_in = self.graph.edge(vertex1, vertex0)
         if self.any_edge(vertex0, vertex1) is None:
             new_edge = self.graph.add_edge(vertex0, vertex1)
             for prop in self.graph.edge_properties.values():

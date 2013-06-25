@@ -9,6 +9,7 @@ from numpy.random import normal, random_sample
 import matplotlib.pyplot as plt
 #from mpl_toolkits.mplot3d import Axes3
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib.patches import Polygon
 
 
 import graph_tool.all as gt
@@ -19,6 +20,30 @@ from .utils import to_xy, to_rhotheta
 
 FLOAT = np.dtype('float32')
 
+def draw_polygons(eptm, coord1, coord2, colors,
+                  vfilt=None, efilt=None, ax=None):
+    eptm.graph.set_vertex_filter(vfilt)
+    eptm.graph.set_edge_filter(efilt)
+    polygons = [eptm.cells.polygon(cell, coord1, coord2)[0]
+                for cell in eptm.cells if eptm.is_alive[cell]]
+    colors = np.array([colors[cell] for cell in eptm.cells
+                       if eptm.is_alive[cell]])
+    colors /= colors.max()
+    eptm.graph.set_vertex_filter(None)
+    eptm.graph.set_edge_filter(None)
+
+    colors = plt.cm.jet(colors)
+    if ax is None:
+        fig, ax = plt.subplots()
+    for poly, color in zip(polygons, colors):
+        patch = Polygon(poly, color=color, fill=True, closed=True)
+        ax.add_patch(patch)
+    ax.autoscale_view()
+    ax.set_aspect('equal')
+
+    eptm.graph.set_vertex_filter(None)
+    eptm.graph.set_edge_filter(None)
+    return ax
 
 def vv_edges(eptm):
     '''

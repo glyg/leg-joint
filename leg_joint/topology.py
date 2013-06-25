@@ -441,6 +441,11 @@ def remove_cell(eptm, cell):
     ctojs = [ctoj for ctoj in cell.out_edges()]
     cell_jes = eptm.cells.junctions[cell]
     jvs = [jv for jv in cell.out_neighbours()]
+    if not len(jvs):
+        print('No neighbours for cell %s' %cell)
+        eptm.is_alive[cell] = 0
+        eptm.is_cell_vert[cell] = 0
+        return
     edge_trash = ctojs
     edge_trash.extend(cell_jes)
     new_jv = eptm.new_vertex(jvs[0])

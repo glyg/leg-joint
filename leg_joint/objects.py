@@ -11,9 +11,10 @@ import os
 import numpy as np
 
 import graph_tool.all as gt
-from scipy import weave
+from scipy import weave, spatial
 from .filters import EpitheliumFilters
 from .utils import to_xy, to_rhotheta
+from sklearn.decomposition import PCA
 
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
@@ -401,7 +402,6 @@ class AbstractRTZGraph(object):
         return vecinos
 
 
-
 class Triangle(object):
     '''
     A triangle is formed by a cell and two junction vertices linked by a junction edge
@@ -629,22 +629,61 @@ class Cells():
         return j_edges
 
     def anisotropy(self, cell):
-        sigmas = np.array([self.eptm.sigmas[jv]
-                           for jv in cell.out_neighbours()])
+
+        rhos = np.array([self.eptm.rhos[jv]
+                         for jv in cell.out_neighbours()])
         zeds = np.array([self.eptm.zeds[jv]
                          for jv in cell.out_neighbours()])
-        if sigmas.size > 0:
-            return np.ptp(sigmas)/np.ptp(zeds)
-        return 0
+        
+        ixs = np.array([self.eptm.ixs[jv]
+                        for jv in cell.out_neighbours()])# - self.eptm.ixs[cell]
+        wys = np.array([self.eptm.wys[jv]
+                        for jv in cell.out_neighbours()])# - self.eptm.wys[cell]
+        sigmas = np.arctan2(wys, ixs) * rhos.mean()
+        pos = np.vstack((sigmas, zeds)).T
+        if pos.shape[0] > 0:
+            pca = PCA(n_components=2)
+            pca_pos = pca.fit_transform(pos)
+            delta_x = np.ptp(pca_pos[:, 0])
+            delta_y = np.ptp(pca_pos[:, 1])
+            alignement = np.abs(pca.components_[:, 1][1])
+            return delta_x / delta_y, alignement
+        return 0, 0
 
     def get_anisotropies(self):
         anisotropies = self.areas.copy()
+        anisotropies.a[:] = 0
+        alignements = anisotropies.copy()
         self.eptm.update_rhotheta()
         for cell in self:
             # if not self.eptm.is_alive[cell]:
             #     anisotropies[cell] = 0.
-            anisotropies[cell] = self.anisotropy(cell)
-        return anisotropies
+            anisotropies[cell], alignements[cell] = self.anisotropy(cell)
+        return anisotropies, alignements
+
+    def polygon(self, cell, coord1, coord2):
+
+        ixs = self.eptm.ixs
+        wys = self.eptm.wys
+        zeds = self.eptm.zeds
+
+        c_x, c_y, c_z =  ixs[cell], wys[cell], zeds[cell]
+
+        j_xx = np.array([ixs[jv] for jv in cell.out_neighbours()])
+        j_yy = np.array([wys[jv] for jv in cell.out_neighbours()])
+        j_zz = np.array([zeds[jv] for jv in cell.out_neighbours()])
+        rel_xx = j_xx - c_x
+        rel_yy = j_yy - c_y
+        rel_zz = j_zz - c_z
+        rel_ss = np.arctan2(rel_yy, rel_xx) * np.hypot(rel_yy, rel_xx)
+        phis = np.arctan2(rel_zz, rel_ss)
+        indices = np.argsort(phis)
+
+        u = np.array([coord1[je] for je in cell.out_neighbours()])
+        v = np.array([coord2[je] for je in cell.out_neighbours()])
+        uv = np.vstack((u[indices], v[indices])).T
+        return uv, indices
+
         
 class ApicalJunctions():
 
