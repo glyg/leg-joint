@@ -38,7 +38,7 @@ def get_apoptotic_cells(eptm, seed, **kwargs):
 def get_sequence(apopto_cells, num_steps):
     apopto_sequence = []
     num_cells = apopto_cells.size
-    for k in np.arange(- num_steps, num_cells + num_steps):
+    for k in np.arange(- num_steps + 1, num_cells):
         start = max(k, 0)
         stop = min(k + num_steps, num_cells)
         apopto_sequence.append(apopto_cells[start:stop])
@@ -51,10 +51,14 @@ def gradual_apoptosis(eptm, apopto_cells, num_steps, pola, **kwargs):
     phi = eptm.dsigmas.copy()
     phi.a[:] = 0
     lj.local_slice(eptm, theta_amp=None, zed_c=0., zed_amp=1.5)
-    fold_cells = [cell for cell in eptm.cells
-                  if eptm.is_local_vert[cell]]
+    fold_cells = np.array([cell for cell in eptm.cells
+                           if eptm.is_local_vert[cell]])
+    thetas = np.array([eptm.thetas[cell] for cell in fold_cells])
+    theta_idx = np.argsort(np.cos(thetas/2))[::-1]
+    fold_cells = fold_cells[theta_idx]
     eptm.set_local_mask(None)
     i = 0
+    prev_first = apopto_cells[0]
     for cell_seq in apopto_sequence:
         for a_cell in cell_seq:
             i += 1
@@ -62,13 +66,26 @@ def gradual_apoptosis(eptm, apopto_cells, num_steps, pola, **kwargs):
             eptm.update_geometry()
             if pola:
                 eptm.update_tensions(phi, np.pi / 4, 1.26**4)
-        np.random.shuffle(fold_cells)
+        first = cell_seq[0]
+        if first != prev_first:
+            old_jv = [jv for jv in prev_first.out_neighbours()][0]
+            new_jv = lj.remove_cell(eptm, prev_first)
+            eptm.junctions.radial_tensions[new_jv] = (
+                eptm.junctions.radial_tensions[old_jv])
+            eptm.update_tensions(phi, np.pi / 4, 1.26**4)
+        prev_first = first
         for cell in fold_cells:
+            if not eptm.is_alive[cell]:
+                continue
             eptm.set_local_mask(None)
             eptm.set_local_mask(cell)
             lj.find_energy_min(eptm)
             eptm.update_tensions(phi, np.pi / 4, 1.26**4)
-            
+    old_jv = [jv for jv in prev_first.out_neighbours()][0]
+    new_jv = lj.remove_cell(prev_first)
+    eptm.junctions.radial_tensions[new_jv] = (
+        eptm.junctions.radial_tensions[old_jv])
+        
 def show_distribution(eptm):
     lj.local_slice(eptm, zed_amp=2., theta_amp=None)
     axes = lj.plot_edges_generic(eptm, eptm.zeds, eptm.wys, ctoj=False)#,

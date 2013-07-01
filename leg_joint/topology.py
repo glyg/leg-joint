@@ -488,6 +488,7 @@ def remove_cell(eptm, cell):
         
     eptm.reset_topology()
     eptm.update_geometry()
+    return new_jv
     
 def resolve_small_edges(eptm, threshold=5e-2, vfilt=None, efilt=None):
     # Collapse 3 sided cells
