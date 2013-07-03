@@ -54,9 +54,9 @@ def new_generation(eptm, growth_rate=1.8, pola=False):
         eptm.cells.prefered_vol[mother_cell] *= growth_rate
         pos0, pos1 = lj.find_energy_min(eptm, tol=1e-3, approx_grad=0)
 
-        rand_phi = np.random.normal(0, np.pi/8.)
+        #rand_phi = np.random.normal(0, np.pi/8.)
         j = lj.cell_division(eptm, mother_cell,
-                             phi_division=rand_phi,
+        #                     phi_division=rand_phi,
                              verbose=False)
         if pola:
             eptm.update_tensions(phi, np.pi/3)
@@ -96,7 +96,6 @@ if __name__ == '__main__':
     eptm = lj.Epithelium(graphXMLfile='saved_graphs/xml/initial_graph.xml',
                          paramfile='default/params.xml')
     #lj.optimizers.isotropic_optimum(eptm, 1e-6)
-    
     #eptm.update_tension(base=0.5, amp=1.)
     cells = [cell for cell in eptm.cells if eptm.is_alive[cell]]
     random.shuffle(cells)

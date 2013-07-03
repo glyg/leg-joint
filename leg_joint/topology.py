@@ -13,6 +13,10 @@ CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 GRAPH_SAVE_DIR = os.path.join(ROOT_DIR, 'saved_graphs')
 
+
+__all__ = ['apoptosis', 'type1_transition',
+           'type3_transition', 'remove_cell']
+
 def snapshot(func, *args, **kwargs):
     def new_func(eptm, *args, **kwargs):
         out = func(eptm, *args, **kwargs)
@@ -36,7 +40,25 @@ def apoptosis(eptm, a_cell, idx=0,
               vol_reduction=0.01,
               contractility=1.,
               radial_tension=0.):
-    
+    '''
+    Simulates an apoptosis
+
+    Parameters:
+    -----------
+
+    eptm:  ::class:`Epithelium` instance
+
+    a_cell: the cell vertex of `eptm` to kill
+
+    idx: int, optional, identifier used for saving
+
+    vol_reduction: float, the relative reduction of the
+        the cell's equilibrium volume
+
+    contractility: float, the relative increase in cell contractility
+
+    radial_tension: float, the amount of apical basal tension
+    '''
     eptm.set_local_mask(None)
     eptm.set_local_mask(a_cell)
     
@@ -90,13 +112,21 @@ def type1_transition(eptm, elements, verbose=False):
      / \         c  f        c  4  f 
     c 4 f                     
 
-    Paramters
-    =========
+    Parameters
+    ----------
+
+    eptm:  ::class:`Epithelium` instance
+    
     elements: graph edge or vertex:
         Can be either:
+    
         * two cell vertices (1 and 3),
         * two junction vertices (a and b)
         * or a single edge (between a and b)
+
+    verbose: bool, default `False`
+        if True, prints informations
+    
     """
     #### Parsing arguments
     # Cells
@@ -472,6 +502,7 @@ def remove_cell(eptm, cell):
         
     for neighb_cell, jv in new_ctojs:
         ctoj = eptm.new_edge(neighb_cell, jv, ctojs[0])
+        eptm.set_local_mask(neighb_cell)
     for jv0, jv1 in new_jes:
         je = eptm.new_edge(jv0, jv1, cell_jes[0])
         
@@ -485,9 +516,9 @@ def remove_cell(eptm, cell):
             eptm.graph.remove_edge(e)
         except ValueError:
             print('edge already destroyed')
-        
     eptm.reset_topology()
     eptm.update_geometry()
+    eptm.set_local_mask(None)
     return new_jv
     
 def resolve_small_edges(eptm, threshold=5e-2, vfilt=None, efilt=None):

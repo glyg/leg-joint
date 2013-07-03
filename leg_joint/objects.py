@@ -510,6 +510,12 @@ class Cells():
             if self.eptm.is_cell_vert[vertex]:
                 yield vertex
 
+    def local_cells(self):
+        for vertex in gt.find_vertex(self.eptm.graph,
+                                     self.eptm.is_local_vert, 1):
+            if self.eptm.is_cell_vert[vertex]:
+                yield vertex
+                
     def _init_cell_geometry(self):
         '''
         Creates the `areas`, `vols` and `perimeters` properties 
@@ -611,11 +617,10 @@ class Cells():
                                               (z_min, z_max)])
         return graph
 
-    def update_junctions(self):
-        for cell in self:
-            self.junctions[cell] = self.get_cell_junctions(cell)
-            self.num_sides[cell]\
-                = self.eptm.graph.degree_property_map('out')[cell]
+    def update_junctions(self, cell):
+        self.junctions[cell] = self.get_cell_junctions(cell)
+        self.num_sides[cell]\
+            = self.eptm.graph.degree_property_map('out')[cell]
 
     def get_cell_junctions(self, cell):
         jvs = [jv for jv in cell.out_neighbours()]
@@ -699,17 +704,21 @@ class ApicalJunctions():
             self._init_junction_params()
         else:
             self._get_junction_params()
-            self.update_adjacent()
-            
+            for j_edge in self:
+                self.update_adjacent(j_edge)
+    
     def __iter__(self):
-
-        # for edge in gt.find_edge(self.eptm.graph,
-        #                          self.is_junction_edge, 1):
-
+        
         for edge in self.eptm.graph.edges():
             if self.eptm.is_junction_edge[edge] :
                 yield edge
 
+    def local_junctions(self):
+        for edge in gt.find_edge(self.eptm.graph,
+                                 self.eptm.is_local_edge, 1):
+            if self.eptm.is_junction_edge[edge] :
+                yield edge
+                
     def _init_junction_params(self):
                                  
         line_tension0 = self.eptm.params['line_tension']
@@ -723,7 +732,6 @@ class ApicalJunctions():
         self.eptm.graph.vertex_properties["radial_tensions"]\
                                  = self.radial_tensions
 
-
     def _get_junction_params(self):
         self.line_tensions\
             = self.eptm.graph.edge_properties["line_tensions"]
@@ -731,12 +739,11 @@ class ApicalJunctions():
             = self.eptm.graph.vertex_properties["radial_tensions"]
         
 
-    def update_adjacent(self):
-        for j_edge in self:
-            adj_cells = self.get_adjacent_cells(j_edge)
-            self.adjacent_cells[j_edge] = adj_cells
-            self.eptm.diamonds[j_edge] = Diamond(self.eptm,
-                                                 j_edge, adj_cells)
+    def update_adjacent(self, j_edge):
+        adj_cells = self.get_adjacent_cells(j_edge)
+        self.adjacent_cells[j_edge] = adj_cells
+        self.eptm.diamonds[j_edge] = Diamond(self.eptm,
+                                             j_edge, adj_cells)
 
     def get_adjacent_cells(self, j_edge):
         jv0 = j_edge.source()

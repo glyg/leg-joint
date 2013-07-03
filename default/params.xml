@@ -4,7 +4,7 @@
     <unit>um</unit>
     <description>Initial number of cell along sigma </description>
   </param>
-  <param max="30" min="0" name="n_zeds" step="1" value="41">
+  <param max="30" min="0" name="n_zeds" step="1" value="17">
     <unit>um</unit>
     <description>Initial number of cell along zed</description>
   </param>

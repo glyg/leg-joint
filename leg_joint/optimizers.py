@@ -127,9 +127,6 @@ def check_local_grad(eptm):
 ## For consistency, the first argument must be the postion
 def opt_energy(pos, eptm):
     """
-    After setting the rho, theta, zed position to pos,
-    computes the energy over the graph as filtered
-    by vfilt and efilt vertex and edge filters (respectively)
     """
     # Position setting
     eptm.set_new_pos(pos)

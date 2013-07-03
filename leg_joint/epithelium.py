@@ -30,60 +30,58 @@ tau = 2. * np.pi
 class Epithelium(EpitheliumFilters,
                  AbstractRTZGraph,
                  Dynamics):
-    """
-    The ::class::`Epithelium` is the container for all the simulation.
+    """The :class:`Epithelium` class is the container for all the simulation.
     It inherits attributes form the following classes:
-    * ::class::`EpitheliumFilters`, providing utilities to create and
-    filter the graph edges and vertices.
-    * ::class::`AbstractRTZGraph` containing the geometrical aspects of
-    the simulation in 3D space (e.g. coordinate systems)
-    * ::class::`Dynamics` containing the dynamical aspects, i.e. the
-    functions to compute the energy and the gradients.
+    
+    * :class:`EpitheliumFilters`, providing utilities to create and
+        filter the graph edges and vertices.
+    * :class:`AbstractRTZGraph` containing the geometrical aspects of
+        the simulation in 3D space (e.g. coordinate systems)
+    * :class:`Dynamics` containing the dynamical aspects, i.e. the
+        functions to compute the energy and the gradients.
 
     Please refer to those classes documentations for more details.
-
-    Main class attributes:
-    ======================
-
-    graph: a graph_tool ::class::`gt.Graph` instance
-        The epithelium graph is oriented and contains two types of
-        vertices:
-        * the cell centers, with their properties contained in a
-          class::Cells: instance
-        * the apical junctions vertices
-        Each cell is linked to each of its vertices by a graph edge, oriented
-        from the cell to the junction vertices.
-        The apical junctions are formed by oriented edges from one junction
-        vertex to the other
-
-    params: a dictionnary of the parameters.
     
+    The main attribute of the :class:`Epithelium` is a `graph_tool`
+    :class:`gt.Graph` instance. The epithelium graph is oriented and
+    contains two types of vertices:
+
+     1 the cell centers, with their properties contained in a :class:`Cells` instance
+    
+     2 the apical vertices
+
+    Each cell is linked to each of its vertices by
+    a graph edge, oriented from the cell to the junction vertices.
+
+    The apical junctions are formed by oriented edges from one
+    junction vertex to the other, and their properties are contained
+    in a :class:`Junctions` instance.
 
     """
+
     def __init__(self, graphXMLfile=None,
                  paramtree=None, n_sigmas=None, n_zeds=None,
                  paramfile=PARAMFILE,
                  graph=None, verbose=False):
         """
-        Parameters:
-        ==========
-
-        graphXMLfile: file name or file instance, optional.
+        Parameters
+        ----------
+        graphXMLfile : file name or file instance, optional.
             It should point to an `xml` (or `xml.gz`) file as output by
-            a graph_tool ::calss:Graph: `save` attribute from a previous
+            a graph_tool :class:`Graph` `save` attribute from a previous
             simulation. If it is not provided, a nex graph will be created
 
-        paramtree: an instance of the ::class:ParamTree:, optional
+        paramtree : an instance of the :class:`ParamTree` class, optional
            the corresponding class is defined in
            the `xml_handler` module. If not provided, paramters
            will be read from the `paramfile` argument
 
-        paramfile: an xml file, defaults to `default/params.xml`
+        paramfile : an xml file, defaults to `default/params.xml`
            paramfile contains the paramters values for the simulation.
 
-        graph: a graph_tool ::class:Graph instance
+        graph : a graph_tool :class:`Graph` instance
 
-        verbose: bool, optional
+        verbose : bool, optional
            if `True`, the simulation will output -possibly lots of-
            information on the successive operations.
         
@@ -138,10 +136,8 @@ class Epithelium(EpitheliumFilters,
             self.graph.purge_edges()
             self.set_vertex_state()
             self.set_edge_state()
-        
-        self.cells.update_junctions()
-        self.junctions.update_adjacent() #Also registers the diamonds
 
+        self.reset_topology(local=False)
         # Dynamical components
         Dynamics.__init__(self)
         if self.new:
@@ -170,6 +166,11 @@ class Epithelium(EpitheliumFilters,
 
         
     def update_geometry(self):
+        '''
+        Computes cell positions (at the geometrical center
+        of the junction vertices), the edge lengths and the
+        cell geometry (area and volume)
+        '''
         
         # Cells
         if self.__verbose__: print ('Cells geometry update on %i vertices'
@@ -212,10 +213,19 @@ class Epithelium(EpitheliumFilters,
                 self.cells.vols[cell] += tr.vol
         
     def set_new_pos(self, new_xyz_pos):
-        self.set_junction_pos(new_xyz_pos)
+        '''
+        Modifies the position of the **active** junction vertices
+
+        Parameters:
+        ----------
+        new_xyz_pos: ndarray with shape (N, 3)
+            where N is the number of active vertices, containing the
+            new positions in the cartesian coordinate system
+        '''
+        self._set_junction_pos(new_xyz_pos)
         
     @filters.active
-    def set_junction_pos(self, new_xyz_pos):
+    def _set_junction_pos(self, new_xyz_pos):
         new_xyz_pos = new_xyz_pos.flatten()
         assert len(new_xyz_pos) / 3 == self.graph.num_vertices()
         self.ixs.fa = new_xyz_pos[::3]
@@ -224,42 +234,42 @@ class Epithelium(EpitheliumFilters,
 
     def update_cells_pos(self):
         for cell in self.cells:
-            self.set_cell_pos(cell)
+            self._set_cell_pos(cell)
     
-    def set_cell_pos(self, cell):
+    def _set_cell_pos(self, cell):
         j_xyz = np.array([[self.ixs[jv], self.wys[jv], self.zeds[jv]]
                           for jv in cell.out_neighbours()])
         if len(j_xyz) < 3:
             return
         self.ixs[cell], self.wys[cell], self.zeds[cell] = j_xyz.mean(axis=0)
         
-    def reset_topology(self):
-        self.cells.update_junctions()
-        self.junctions.update_adjacent()
+    def reset_topology(self, local=True):
+        '''Computes the epithelium topology, by finding *de novo* the
+        cell's junction edges and the adjacent cells for each junction
+        edge.  If `local` is `True`, performs this operation only over
+        local cells and junction edges.
+        '''
+        if local:
+            for cell in self.cells.local_cells():
+                self.cells.update_junctions(cell)
+            for j_edge in self.junctions.local_junctions():
+                self.junctions.update_adjacent(j_edge)
+        else:
+            for cell in self.cells:
+                self.cells.update_junctions(cell)
+            for j_edge in self.junctions:
+                self.junctions.update_adjacent(j_edge)
+            
         # #self.update_cells_pos()
         # self.update_geometry()
         # self.update_gradient()
-        
-    def check_phase_space(self, gamma, lbda):
-        # See the energies.pynb notebook for the derivation of this:
-        mu = 6 * np.sqrt(2. / (3 * np.sqrt(3)))
-        if (gamma < - lbda / (2 * mu)):
-            report= ("Contractility is too low,"
-                     "Soft network not supported")
-            return False, report
-        if 2 * gamma * mu**2 > 4:
-            lambda_max = 0.
-        else:
-            lambda_max = ((4 - 2 * gamma * mu**2) / 3.)**(3./2.) / mu
-        if lbda > lambda_max:
-            report = ("Invalid value for the line tension: "
-                      "it should be lower than %.2f "
-                      "for a contractility of %.2f "
-                    % (lambda_max, gamma))
-            return False, report
-        return True, 'ok!'
 
     def add_junction(self, j_verta, j_vertb, cell0, cell1):
+        '''Adds a junction to the epithelium, creating a junction edge
+        between `j_verta` and `j_vertb`, cell to junction edges
+        between `cell0` and `j_edgea`, `cell0` and `j_edgeb`, `cell1`
+        and `j_edgea` and `cell1` and `j_edgeb`
+        '''
         ##### TODO: This block should go in a decorator
         valid = np.array([obj.is_valid() for obj in
                           (cell0, j_verta, j_vertb)])
@@ -328,6 +338,11 @@ class Epithelium(EpitheliumFilters,
         return j_verta, j_vertb, cell0, cell1
 
     def remove_junction(self, j_verta, j_vertb, cell0, cell1):
+        '''Removes junction between `j_edgea` and `j_edgeb`, and the
+        corresponding cell to junction edges for `cell0` and
+        `cell1`
+        '''
+        
         #This block should go in a decorator
         valid = np.array([element.is_valid() for element in
                           (cell0, j_verta, j_vertb)])
@@ -364,6 +379,9 @@ class Epithelium(EpitheliumFilters,
 
     @filters.j_edges_in
     def merge_j_verts(self, jv0, jv1):
+        '''Merge junction vertices `jv0` and `jv1`. Raises an error if
+        those vertices are not connected
+        '''
         vertex_trash = []
         edge_trash = []
         je = self.any_edge(jv0, jv1)
@@ -388,35 +406,20 @@ class Epithelium(EpitheliumFilters,
         vertex_trash.append(jv1)
         return vertex_trash, edge_trash
 
-    @filters.cells_out
-    def radial_smooth(self, smth=0.5, local=True):
-        for v in self.graph.vertices():
-            if not self.is_alive[v]:
-                continue
-            if not self.is_local_vert[v] and local:
-                continue
-            n_rhos = np.array([self.rhos[nv]
-                               for nv in v.all_neighbours()])
-            n_rhos = n_rhos.take(np.isfinite(n_rhos))
-            if n_rhos.size > 0:
-                self.rhos[v] = ((1. - smth) * self.rhos[v]
-                                + smth * n_rhos.mean())
-        self.update_xy()
-
-    @filters.cells_out
-    def radial_smooth(self, smth=0.5, local=True):
-        for v in self.graph.vertices():
-            if not self.is_alive[v]:
-                continue
-            if not self.is_local_vert[v] and local:
-                continue
-            n_rhos = np.array([self.rhos[nv]
-                               for nv in v.all_neighbours()])
-            n_rhos = n_rhos.take(np.isfinite(n_rhos))
-            if n_rhos.size > 0:
-                self.rhos[v] = ((1. - smth) * self.rhos[v]
-                                + smth * n_rhos.mean())
-        self.update_xy()
+    # @filters.cells_out
+    # def radial_smooth(self, smth=0.5, local=True):
+    #     for v in self.graph.vertices():
+    #         if not self.is_alive[v]:
+    #             continue
+    #         if not self.is_local_vert[v] and local:
+    #             continue
+    #         n_rhos = np.array([self.rhos[nv]
+    #                            for nv in v.all_neighbours()])
+    #         n_rhos = n_rhos.take(np.isfinite(n_rhos))
+    #         if n_rhos.size > 0:
+    #             self.rhos[v] = ((1. - smth) * self.rhos[v]
+    #                             + smth * n_rhos.mean())
+    #     self.update_xy()
 
 
 def triangle_geometry(sz0, sz1, sz2):

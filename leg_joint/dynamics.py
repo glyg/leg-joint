@@ -116,11 +116,17 @@ class Dynamics(object):
         return gradient / self.norm_factor
 
     def update_gradient(self):
-        self.update_cells_grad()
-        self.update_junctions_grad()
+        '''
+        Updates the components of the gradient exerted on the junction
+        vertices
+
         
-    #@filters.cells_in
-    def update_cells_grad(self):
+        '''
+        
+        self._update_cells_grad()
+        self._update_junctions_grad()
+        
+    def _update_cells_grad(self):
         # Cell vertices
         self.contractile_grad.fa =  self.cells.contractilities.fa \
                                     * self.cells.perimeters.fa
@@ -131,7 +137,7 @@ class Dynamics(object):
         for cell in self.cells:
             self.calc_vol_grad_cell(cell)
 
-    def calc_vol_grad_cell(self, cell):
+    def _calc_vol_grad_cell(self, cell):
         
         vol_grad = [0, 0, 0]
         if  self.is_alive[cell]:
@@ -141,12 +147,10 @@ class Dynamics(object):
                                                        triangle.rij_vect) / 2.
             vol_grad *= self.volume_grad_radial[cell]\
                         / self.cells.num_sides[cell]
-        self.volume_grad_cell[cell] = vol_grad
-
-
+        self._volume_grad_cell[cell] = vol_grad
             
-    def update_junctions_grad(self):
-        # Junction edges
+    def _update_junctions_grad(self):
+        
         if self.__verbose__ :
             num_cells = self.is_cell_vert.a.sum()
             num_jverts = self.graph.num_vertices() - num_cells
@@ -160,12 +164,17 @@ class Dynamics(object):
         self.grad_wy.a = 0.
         self.grad_ix.a = 0.
         self.grad_zed.a = 0.
-        
+
+        # Radial tension
         radial = self.junctions.radial_tensions.a
         self.grad_ix.a += radial * self.ixs.a / self.rhos.a
         self.grad_wy.a += radial * self.wys.a / self.rhos.a
+
+        # Contribution from junction edges
         for j_edge in self.junctions:
-            self.update_edge_grad(j_edge)
+            self._update_edge_grad(j_edge)
+
+        # Contribution from neighboring cells
         for ctoj_edge in gt.find_edge(self.graph, self.is_ctoj_edge, True):
             cell, j_vert = ctoj_edge
             gc_x, gc_y, gc_z = self.volume_grad_cell[cell]
@@ -173,8 +182,17 @@ class Dynamics(object):
             self.grad_wy[j_vert] += gc_y
             self.grad_zed[j_vert] += gc_z
             
-    def update_edge_grad(self, j_edge):
+    def _update_edge_grad(self, j_edge):
+        ''' Computes the components of the gradient for the junction edge
+        `j_edge` vertices 
 
+        Parameter
+        ---------
+        j_edge : a junction edge
+        
+        '''
+
+        
         tension = self.junctions.line_tensions[j_edge]
         jv0, jv1 = j_edge
         u_xg = self.u_dixs[j_edge]
@@ -222,17 +240,43 @@ class Dynamics(object):
             self.grad_wy[jv1] += ctr_grad * u_yg
             self.grad_zed[jv1] += ctr_grad * u_zg
             
+    def update_tensions(self, phi, delta_phi, factor=2.):
+        '''
+        Multiplies tension by `factor` for junctions that verify:
+        .. math::
+
+           - \Delta\phi/2 < \phi <  \Delta\phi/2
+        with
+        ..math::
+
+           \phi = \tan^{-1}\frac{\sqrt{\delta x^2 + \delta y^2}}{\delta z}
+        
+        Parameters
+        ----------
+        phi : graph_tool :class:`EdgePropertyMap` with `float` data type
+            used to store the values for the angle :math:`phi`
+
+        delta_phi : float
+            Angular range for which the line tension is changed
+        
+        '''
+
+        lt0 = self.params['line_tension']
+        phi.a = np.arctan2(np.sqrt(self.dixs.a**2
+                                   + self.dwys.a**2),
+                           self.dzeds.a)
+        lower = - delta_phi
+        upper = delta_phi
+        for je in self.junctions:
+            if (lower < phi[je] < upper):
+                self.junctions.line_tensions[je] = factor * lt0
+            else:
+                self.junctions.line_tensions[je] = lt0
 
     def isotropic_relax(self):
         
         gamma = self.paramtree.relative_dic['contractility']
         lbda = self.paramtree.relative_dic['line_tension']
-        # good, report = self.check_phase_space(gamma, lbda)
-        # if not good:
-        #     raise ValueError("Invalid values for "
-        #                      "the average contractility and elasticity \n"
-        #                      +report)
-        ### Computing the optimal dilation for the parameters
         delta0 = 0.9
         delta_o,  = optimize.fsolve(self.isotropic_grad, delta0,
                                     args=(gamma, lbda))
@@ -270,10 +314,6 @@ class Dynamics(object):
         self.update_geometry()
         self.update_gradient()
         
-    def isotropic_grad(self, delta, gamma, lbda):
-        mu = 6 * np.sqrt(2. / (3 * np.sqrt(3)))
-        grad = 4 * delta**3 + (2 * gamma * mu**2 - 4) * delta + lbda * mu
-        return grad
 
     def isotropic_energy(self, delta, gamma, lbda):
         """
@@ -287,23 +327,40 @@ class Dynamics(object):
         energy = elasticity + contractility + tension
         return energy
 
-    def update_tensions(self, phi, delta_phi, factor=2.):
-        '''
-        Multiplies tension by `factor` for junctions that verify:
-        ::math::(\pi - \Delta\phi)/2 < |\phi| < (\pi + \Delta\phi)/2::
-        with
-        ::math::\phi = \tan^{-1}\frac{\sqrt{\delta x^2 + \delta y^2}}{\delta z}
-        
-        '''
 
-        lt0 = self.params['line_tension']
-        phi.a = np.abs(np.arctan2(np.sqrt(self.dixs.a**2
-                                          + self.dwys.a**2),
-                                  self.dzeds.a))
-        lower = np.pi / 2 - delta_phi / 2
-        upper = np.pi / 2 + delta_phi / 2
-        for je in self.junctions:
-            if (lower < phi[je] < upper):
-                self.junctions.line_tensions[je] = factor * lt0
-            else:
-                self.junctions.line_tensions[je] = lt0
+    def isotropic_grad(self, delta, gamma, lbda):
+        '''
+        .. deprecaded:: 0.1
+           not suited to 3D
+        '''
+        mu = 6 * np.sqrt(2. / (3 * np.sqrt(3)))
+        grad = 4 * delta**3 + (2 * gamma * mu**2 - 4) * delta + lbda * mu
+        return grad
+        
+    def check_phase_space(self, gamma, lbda):
+        '''
+        .. deprecaded:: 0.1
+           not suited to 3D
+
+        Checks wether parameter values `gamma` and `lbda` yields a
+        correct phase space. This is outdated (not 3D)
+        '''
+        # See the energies.pynb notebook for the derivation of this:
+        mu = 6 * np.sqrt(2. / (3 * np.sqrt(3)))
+        if (gamma < - lbda / (2 * mu)):
+            report= ("Contractility is too low,"
+                     "Soft network not supported")
+            return False, report
+        if 2 * gamma * mu**2 > 4:
+            lambda_max = 0.
+        else:
+            lambda_max = ((4 - 2 * gamma * mu**2) / 3.)**(3./2.) / mu
+        if lbda > lambda_max:
+            report = ("Invalid value for the line tension: "
+                      "it should be lower than %.2f "
+                      "for a contractility of %.2f "
+                    % (lambda_max, gamma))
+            return False, report
+        return True, 'ok!'
+
+
