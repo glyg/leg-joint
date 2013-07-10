@@ -10,6 +10,14 @@ from .topology import type3_transition, apoptosis
 from .topology import remove_cell, resolve_small_edges
 from .frontier import find_circumference, create_frontier
 from .graph_representation import plot_ortho_proj, plot_ortho_gradients
+from .graph_representation import plot_cells_generic, plot_cells_zs, plot_active
 from .graph_representation import epithelium_draw as draw
 from .utils import local_slice
+
+
+
+
+
+
+
 

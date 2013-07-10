@@ -47,7 +47,7 @@ def get_sequence(apopto_cells, num_steps):
 def gradual_apoptosis(eptm, apopto_cells, num_steps, pola, **kwargs):
 
     apopto_sequence = get_sequence(apopto_cells, num_steps)
-    print '%i steps will be performed' % len(apopto_sequence)
+    print '%i steps will be performed' % (len(apopto_cells) * num_steps)
     phi = eptm.dsigmas.copy()
     phi.a[:] = 0
     lj.local_slice(eptm, theta_amp=None, zed_c=0., zed_amp=1.5)
@@ -63,26 +63,31 @@ def gradual_apoptosis(eptm, apopto_cells, num_steps, pola, **kwargs):
         for a_cell in cell_seq:
             i += 1
             lj.apoptosis(eptm, a_cell, idx=i, **kwargs)
-            eptm.update_geometry()
+            # eptm.update_geometry()
             if pola:
                 eptm.update_tensions(phi, np.pi / 4, 1.26**4)
+        # for cell in fold_cells:
+        #     if not eptm.is_alive[cell]:
+        #         continue
+        #     eptm.set_local_mask(None)
+        #     eptm.set_local_mask(cell)
+        #     lj.find_energy_min(eptm)
+        #     if pola:
+        #         eptm.update_tensions(phi, np.pi / 4, 1.26**4)
+
         first = cell_seq[0]
         if first != prev_first:
-            old_jv = [jv for jv in prev_first.out_neighbours()][0]
+            old_jvs = [jv for jv in prev_first.out_neighbours()]
             new_jv = lj.remove_cell(eptm, prev_first)
             eptm.junctions.radial_tensions[new_jv] = (
-                eptm.junctions.radial_tensions[old_jv])
-            eptm.update_tensions(phi, np.pi / 4, 1.26**4)
+                eptm.junctions.radial_tensions[old_jvs[0]] * len(old_jvs))
+            if pola:
+                eptm.update_tensions(phi, np.pi / 4, 1.26**4)
         prev_first = first
-        for cell in fold_cells:
-            if not eptm.is_alive[cell]:
-                continue
-            eptm.set_local_mask(None)
-            eptm.set_local_mask(cell)
-            lj.find_energy_min(eptm)
-            eptm.update_tensions(phi, np.pi / 4, 1.26**4)
+
+                
     old_jv = [jv for jv in prev_first.out_neighbours()][0]
-    new_jv = lj.remove_cell(prev_first)
+    new_jv = lj.remove_cell(eptm, prev_first)
     eptm.junctions.radial_tensions[new_jv] = (
         eptm.junctions.radial_tensions[old_jv])
         

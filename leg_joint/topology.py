@@ -57,7 +57,7 @@ def apoptosis(eptm, a_cell, idx=0,
 
     contractility: float, the relative increase in cell contractility
 
-    radial_tension: float, the amount of apical basal tension
+    radial_tension: float, the increase of apical basal tension
     '''
     eptm.set_local_mask(None)
     eptm.set_local_mask(a_cell)
@@ -67,7 +67,7 @@ def apoptosis(eptm, a_cell, idx=0,
     mean_lt = np.array([eptm.junctions.line_tensions[je]
                         for je in eptm.cells.junctions[a_cell]]).mean()
     for jv in a_cell.out_neighbours():
-        eptm.junctions.radial_tensions[jv] = radial_tension * mean_lt
+        eptm.junctions.radial_tensions[jv] += radial_tension * mean_lt
         for v in jv.all_neighbours():
             if v == a_cell: 
                 continue
@@ -79,11 +79,12 @@ def apoptosis(eptm, a_cell, idx=0,
                                      radial_tension)
 
     png_dir = os.path.join(GRAPH_SAVE_DIR, 'png', 'apopto_'+tag)
-    try:
+    if not os.path.isdir(png_dir):
         os.mkdir(png_dir)
-    except OSError:
-        pass
-
+    # else:
+    #     pngs = [png for png in os.listdir(png_dir) if png.endswith('png')]
+    #     for png in pngs:
+    #         os.remove(os.path.join(png_dir, png))
     xml_dir = os.path.join(GRAPH_SAVE_DIR, 'xml', 'apopto_'+tag)
     try:
         os.mkdir(xml_dir)
@@ -505,6 +506,9 @@ def remove_cell(eptm, cell):
         eptm.set_local_mask(neighb_cell)
     for jv0, jv1 in new_jes:
         je = eptm.new_edge(jv0, jv1, cell_jes[0])
+        eptm.is_local_vert[jv0] = 1
+        eptm.is_local_vert[jv1] = 1
+        eptm.is_local_edge[je] = 1
         
     eptm.is_alive[cell] = 0
     eptm.is_cell_vert[cell] = 0

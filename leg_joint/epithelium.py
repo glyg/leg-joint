@@ -207,11 +207,13 @@ class Epithelium(EpitheliumFilters,
             self.cells.perimeters[cell] = 0.
             self.cells.vols[cell] = 0.
             for j_edge in j_edges:
-                tr = self.diamonds[j_edge].triangles[cell]
-                self.cells.areas[cell] += tr.area
-                self.cells.perimeters[cell] += tr.length
-                self.cells.vols[cell] += tr.vol
-        
+                try:
+                    tr = self.diamonds[j_edge].triangles[cell]
+                    self.cells.areas[cell] += tr.area
+                    self.cells.perimeters[cell] += tr.length
+                    self.cells.vols[cell] += tr.vol
+                except KeyError:
+                    pass
     def set_new_pos(self, new_xyz_pos):
         '''
         Modifies the position of the **active** junction vertices

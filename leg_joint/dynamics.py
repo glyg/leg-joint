@@ -135,19 +135,23 @@ class Dynamics(object):
         self.volume_grad_radial.fa = k_deltav# * self.cells.areas.fa
         self.volume_grad_apical.fa = k_deltav
         for cell in self.cells:
-            self.calc_vol_grad_cell(cell)
+            self._calc_vol_grad_cell(cell)
 
     def _calc_vol_grad_cell(self, cell):
         
         vol_grad = [0, 0, 0]
         if  self.is_alive[cell]:
             for j_edge in self.cells.junctions[cell]:
-                triangle = self.diamonds[j_edge].triangles[cell]
-                vol_grad += triangle.height * np.cross(triangle.u_cross,
-                                                       triangle.rij_vect) / 2.
+                try:
+                    triangle = self.diamonds[j_edge].triangles[cell]
+                    vol_grad += (triangle.height
+                                 * np.cross(triangle.u_cross,
+                                            triangle.rij_vect) / 2.)
+                except KeyError:
+                    pass
             vol_grad *= self.volume_grad_radial[cell]\
                         / self.cells.num_sides[cell]
-        self._volume_grad_cell[cell] = vol_grad
+        self.volume_grad_cell[cell] = vol_grad
             
     def _update_junctions_grad(self):
         

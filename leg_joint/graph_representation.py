@@ -127,7 +127,7 @@ def plot_active(eptm, ax=None):
     sigmas = eptm.proj_sigma().fa
     zeds = eptm.zeds.fa
     if ax is None:
-        ax =  plot_cells_sz(eptm, ax=None,
+        ax =  plot_cells_zs(eptm, ax=None,
                             vfilt=eptm.is_local_vert,
                             efilt=eptm.is_local_edge)
     ax.plot(zeds, sigmas, 'ro', alpha=0.5, ms=8)
@@ -478,7 +478,7 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
     edge_width = eptm.graph.new_edge_property('float') 
 
     j_filt = eptm.is_cell_vert.copy()
-    j_filt.a *= (1 - eptm.is_alive.a)
+    #j_filt.a *= (1 - eptm.is_alive.a)
     eptm.graph.set_vertex_filter(j_filt,
                                  inverted=True)
     if verbose: print eptm.graph.num_vertices()
@@ -501,17 +501,17 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
     cell_filt.a *= eptm.is_alive.a
     eptm.graph.set_vertex_filter(cell_filt,
                                  inverted=False)
-    vertex_red.fa = 105/256.
-    vertex_green.fa = 201/256.
-    vertex_blue.fa = 237/256.
-    vertex_size.fa = 5.
+    vertex_red.fa = 105 / 256.
+    vertex_green.fa = 201 / 256.
+    vertex_blue.fa = 237 / 256.
+    vertex_size.fa = 0.
     eptm.graph.set_vertex_filter(None)
 
     eptm.graph.set_edge_filter(eptm.is_ctoj_edge,
                                inverted=False)
-    edge_red.fa = 0.9
-    edge_green.fa = 0.9
-    edge_blue.fa = 0.9
+    edge_red.fa = 105 / 256.
+    edge_green.fa = 201 / 256.
+    edge_blue.fa = 237 / 256.
     edge_width.fa = 0.3
     eptm.graph.set_edge_filter(None)
 
@@ -526,10 +526,13 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
 
     depth = rhos.a * (1 - np.cos(thetas.a + d_theta))
     normed_depth = (depth - depth.min()) / (depth.max() - depth.min())
-    vertex_alpha.a = normed_depth * 0.6 + 0.4 * eptm.is_alive.a
+    vertex_alpha.a = (normed_depth * 0.8 + 0.2) * eptm.is_alive.a
+
     
     for edge in eptm.graph.edges():
         edge_alpha[edge] = vertex_alpha[edge.source()]
+
+    vertex_alpha.a *= (1 - eptm.is_cell_vert.a)
 
     vorder = eptm.graph.new_vertex_property('float') 
     vorder.a = np.argsort(vertex_alpha.a)
@@ -557,6 +560,14 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
     sigma = eptm.proj_sigma()
     zs = [zeds, sigma]
     zs_pos = gt.group_vector_property(zs, value_type='float')
+    eptm.update_dsigmas()
+    edge_alpha.a = 1.
+    edge_alpha.a *= (1 - eptm.at_boundary.a)
+    edge_alpha.a *= eptm.is_junction_edge.a
+    
+    edge_rgba = [edge_red, edge_green, edge_blue, edge_alpha]
+    edge_color = gt.group_vector_property(edge_rgba, value_type='float')
+    
     pmap2 = gt.graph_draw(eptm.graph, zs_pos,
                           vertex_fill_color=vertex_color,
                           vertex_color=vertex_color,
