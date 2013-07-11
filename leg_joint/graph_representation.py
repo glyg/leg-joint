@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 import os
@@ -17,7 +16,7 @@ from matplotlib.patches import Polygon
 
 import graph_tool.all as gt
 
-from . import  filters
+import leg_joint.filters as filters
 from .optimizers import precondition, approx_grad
 from .utils import to_xy, to_rhotheta
 
@@ -111,11 +110,11 @@ def plot_ortho_gradients(eptm, axes=None,
     else:
         ax_zs, ax_zr, ax_rs = axes
     for s, z, r in zip(v_sigmas, v_zeds, v_radial):
-        ax_zs.arrow(z[0], s[0], z[1], s[1], width=0.1,
+        ax_zs.arrow(z[0], s[0], z[1], s[1], width=0.01,
                     ec=ec, fc=fc, alpha=0.5)
-        ax_zr.arrow(z[0], r[0], z[1], r[1], width=0.1,
+        ax_zr.arrow(z[0], r[0], z[1], r[1], width=0.01,
                     ec=ec, fc=fc, alpha=0.5)
-        ax_rs.arrow(r[0], s[0], r[1], s[1], width=0.1,
+        ax_rs.arrow(r[0], s[0], r[1], s[1], width=0.01,
                     ec=ec, fc=fc, alpha=0.5)
         
     plt.draw()
@@ -234,7 +233,7 @@ def plot_cells_zr(eptm, ax=None,
     for cell in eptm.cells :
         ax.plot(zeds[cell],
                 rhos[cell], 'bo', alpha=0.3)
-    basal_rho = np.ones_like(zeds.fa) * eptm.params['rho_lumen']
+    basal_rho = np.ones_like(zeds.fa) * eptm.rho_lumen
     #ax.plot(zeds.fa, basal_rho, 'k-')
     eptm.graph.set_vertex_filter(None)
     plot_edges_zr(eptm, efilt, ax=ax)
@@ -251,7 +250,7 @@ def plot_cells_rs(eptm, ax=None,
     for cell in eptm.cells :
         ax.plot(rhos[cell],
                 sigmas[cell], 'bo', alpha=0.3)
-    basal_rho = np.ones_like(sigmas.fa) * eptm.params['rho_lumen']
+    basal_rho = np.ones_like(sigmas.fa) * eptm.rho_lumen
     #ax.plot(basal_rho, sigmas.fa, 'k-')
 
     eptm.graph.set_vertex_filter(None)

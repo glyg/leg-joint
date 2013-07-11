@@ -320,7 +320,7 @@ class Epithelium(EpitheliumFilters,
         for e_prop in self.graph.edge_properties.values():
             e_prop[ctoj_0a] = e_prop[ctoj_old]
             e_prop[ctoj_0b] = e_prop[ctoj_old]
-        self.set_cell_pos(cell0)
+        self._set_cell_pos(cell0)
 
         if cell1 is not None:
             ctoj_1a = self.graph.edge(cell1, j_verta)
@@ -336,7 +336,7 @@ class Epithelium(EpitheliumFilters,
                 e_prop[ctoj_1a] = e_prop[ctoj_old]
                 e_prop[ctoj_1b] = e_prop[ctoj_old]
 
-            self.set_cell_pos(cell1)
+            self._set_cell_pos(cell1)
         return j_verta, j_vertb, cell0, cell1
 
     def remove_junction(self, j_verta, j_vertb, cell0, cell1):

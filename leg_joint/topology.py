@@ -295,7 +295,7 @@ def cell_division(eptm, mother_cell,
     eptm.update_dsigmas()
     a0 = eptm.params['prefered_area']
     h = eptm.params['prefered_height']
-    v0 = a0 * (eptm.rhos[mother_cell] - eptm.params['rho_lumen'])
+    v0 = a0 * (eptm.rhos[mother_cell] - eptm.rho_lumen)
     eptm.cells.prefered_vol[mother_cell] = v0    
     daughter_cell = eptm.new_vertex(mother_cell)
     eptm.is_cell_vert[daughter_cell] = 1

@@ -1,3 +1,6 @@
+
+from __future__ import division
+
 ## Import matplotlib here to avoid instabilities
 ## with graph-tool
 import matplotlib.pylab as plt

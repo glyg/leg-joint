@@ -8,6 +8,9 @@ from scipy import optimize
 import graph_tool.all as gt
 import filters
 
+mu = 6 * np.sqrt(2. / (3 * np.sqrt(3)))
+
+
 class Dynamics(object):
     '''
     Container for the various gradients and energy
@@ -102,7 +105,7 @@ class Dynamics(object):
         junctions_energy = self.junctions.line_tensions.fa\
                            * self.edge_lengths.fa
         radial_energy = self.junctions.radial_tensions.fa\
-                        * (self.rhos.fa - self.params['rho_lumen'])
+                        * (self.rhos.fa - self.rho_lumen)
         return junctions_energy, radial_energy
         
     @filters.active
@@ -278,92 +281,105 @@ class Dynamics(object):
                 self.junctions.line_tensions[je] = lt0
 
     def isotropic_relax(self):
-        
-        gamma = self.paramtree.relative_dic['contractility']
-        lbda = self.paramtree.relative_dic['line_tension']
-        delta0 = 0.9
-        delta_o,  = optimize.fsolve(self.isotropic_grad, delta0,
-                                    args=(gamma, lbda))
-        self.delta_o = delta_o
-        self.ground_energy = self.isotropic_energy(delta_o, gamma, lbda)
 
-        ### Relaxing tissue average height
-        height0 = self.params['prefered_height']
-        rho_avg = self.rhos.a.mean()
-        self.params['rho_lumen'] = rho_avg - height0
-        self.update_cells_pos()
-        self.update_geometry()
-
-        ### Cells only area
+        self.update_rhotheta()
+        area0 = self.params['prefered_area']
+        ### Cells only area and height
         self.set_vertex_state([(self.is_cell_vert, False),
                                (self.is_alive, False)])
-        area = self.cells.areas.fa.mean()
+        area_avg = self.cells.areas.fa.mean()
+        rho_avg = self.rhos.fa.mean()
         self.set_vertex_state()
-        ### Searching for the correct scaling (see the doc)
-        area0 = self.params['prefered_area']
-        R = self.params['rho_lumen']
-        cst = - (delta_o**2) * area0 * height0 / area
-        scaler_poly = [rho_avg, -R, 0., cst]
-        roots = np.roots(scaler_poly)
-        good_roots = np.real([r for r in roots if np.abs(r) == r])
-        if len(good_roots) == 1:
-            correction = good_roots[0]
-        else:
-            print 'More than one scaling solution, which is strange'
-            correction = good_roots.min()
+        
+        ### Current value for delta
+        delta_i = np.sqrt(area_avg / area0)
+
+        ### Optimal value for delta
+        delta_o = self.find_grad_roots()
+        if not np.isfinite(delta_o):
+            raise ValueError('invalid parameters values')
+        self.delta_o = delta_o
+        self.ground_energy = self.isotropic_energy(delta_o)
+        ### Scaling
+        correction = delta_o / delta_i
         self.scale(correction)
+        self.update_geometry()
+
         if self.__verbose__:
             print "Scaled all the distances by a factor %.3f" %correction
-        self.update_cells_pos()
-        self.update_geometry()
-        self.update_gradient()
         
 
-    def isotropic_energy(self, delta, gamma, lbda):
+    def isotropic_energy(self, delta):
         """
         Computes the theoritical energy per cell for the given
         parameters.
         """
-        mu = 6 * np.sqrt(2. / (3 * np.sqrt(3)))
-        elasticity = (delta**2 - 1**2)**2 / 2.
+        lbda = self.paramtree.relative_dic['line_tension']
+        gamma = self.paramtree.relative_dic['contractility']
+
+        elasticity = (delta**3 - 1 )**2 / 2.
         contractility = gamma * mu**2 * delta**2 / 2.
         tension = lbda * mu * delta / 2.
         energy = elasticity + contractility + tension
         return energy
-
-
-    def isotropic_grad(self, delta, gamma, lbda):
-        '''
-        .. deprecaded:: 0.1
-           not suited to 3D
-        '''
-        mu = 6 * np.sqrt(2. / (3 * np.sqrt(3)))
-        grad = 4 * delta**3 + (2 * gamma * mu**2 - 4) * delta + lbda * mu
-        return grad
         
-    def check_phase_space(self, gamma, lbda):
-        '''
-        .. deprecaded:: 0.1
-           not suited to 3D
 
-        Checks wether parameter values `gamma` and `lbda` yields a
-        correct phase space. This is outdated (not 3D)
+    def isotropic_grad_poly(self):
+        
+        lbda = self.paramtree.relative_dic['line_tension']
+        gamma = self.paramtree.relative_dic['contractility']
+        grad_poly = [3, 0, 0,
+                     -3,
+                     mu**2 * gamma,
+                     mu * lbda / 2.]
+        return grad_poly
+
+    def isotropic_grad(self, delta):
+        grad_poly = self.isotropic_grad_poly()
+        return np.polyval(grad_poly, delta)
+
+    def find_grad_roots(self):
+        p = self.isotropic_grad_poly()
+        roots = np.roots(p)            
+        good_roots = np.real([r for r in roots if np.abs(r) == r])
+        np.sort(good_roots)
+        if len(good_roots) == 1:
+            return good_roots
+        elif len(good_roots) > 1:
+            return good_roots[0]
+        else:
+            return np.nan
+
+        
+    def check_phase_space(self):
         '''
+        Checks wether parameter values `gamma` and `lbda` yields a
+        correct phase space.
+        '''
+        lbda = self.paramtree.relative_dic['line_tension']
+        gamma = self.paramtree.relative_dic['contractility']
+
         # See the energies.pynb notebook for the derivation of this:
-        mu = 6 * np.sqrt(2. / (3 * np.sqrt(3)))
         if (gamma < - lbda / (2 * mu)):
             report= ("Contractility is too low,"
                      "Soft network not supported")
             return False, report
-        if 2 * gamma * mu**2 > 4:
-            lambda_max = 0.
-        else:
-            lambda_max = ((4 - 2 * gamma * mu**2) / 3.)**(3./2.) / mu
-        if lbda > lambda_max:
-            report = ("Invalid value for the line tension: "
-                      "it should be lower than %.2f "
-                      "for a contractility of %.2f "
-                    % (lambda_max, gamma))
+
+        lbda_max = 6 * (2 / 5.)**(2/3.) * 0.6 / mu
+        gamma_max = 3 * 4**(-1 / 3.) * 0.75 / mu**2
+
+
+        if  gamma  > gamma_max:
+            report = ("Invalid value for the contractility")
+            return False, report
+
+        if lbda > lbda_max:
+            report = ("Invalid value for the line tension")
+            return False, report
+
+        delta_o = self.find_grad_roots()
+        if not np.isfinite(delta_o):
+            report = ('Invalid values for line tension and contractility')
             return False, report
         return True, 'ok!'
 

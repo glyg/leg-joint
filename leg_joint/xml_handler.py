@@ -83,9 +83,9 @@ class ParamTree(object):
         '''
         Note that the "value" attribute of the ElementTree instance are
         **not** modified. Also, applying this function on an already
-        dimentionalized  dictionnary won"t change any thing
+        dimentionalized  dictionnary won"t change anything
         '''
-
+        
         prefered_area = self.absolute_dic["prefered_area"]
         height = self.absolute_dic["prefered_height"]
         prefered_vol = prefered_area * height
@@ -95,12 +95,19 @@ class ParamTree(object):
         radial_tension = self.relative_dic["radial_tension"]
         vol_elasticity = self.relative_dic["vol_elasticity"]
         
-        self.absolute_dic["line_tension"] \
-            = line_tension * vol_elasticity * prefered_vol**(3 / 2.)
-        self.absolute_dic["radial_tension"] \
-            = radial_tension * vol_elasticity * prefered_vol**(3 / 2.)
-        self.absolute_dic["contractility"] \
-            = contractility * vol_elasticity * prefered_vol
+        self.absolute_dic["line_tension"] = (
+            line_tension * vol_elasticity
+            * prefered_area**(3 / 2.) * height**2)
+        self.absolute_dic["radial_tension"] = (
+            radial_tension * vol_elasticity
+            * prefered_area**(3 / 2.) * height**2)
+        self.absolute_dic["contractility"]  = (
+            contractility * vol_elasticity
+            * prefered_area * height**2)
+
+        self.absolute_dic["rho_lumen"] = (self.absolute_dic['rho0']
+            - self.absolute_dic["prefered_height"])
+
         
     def change_dic(self, key, new_value, write=False,
                    back_up=False, verbose=False):

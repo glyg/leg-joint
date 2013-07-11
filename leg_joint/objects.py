@@ -68,7 +68,7 @@ class AbstractRTZGraph(object):
         ### edge properties from vertex properties
         self.edge_src_rhos = self.graph.new_edge_property('float')
         self.edge_trgt_rhos = self.graph.new_edge_property('float')
-
+        self.rho_lumen = self.params['rho_lumen']
             
     def _init_edge_bool_props(self):
         '''
@@ -179,11 +179,12 @@ class AbstractRTZGraph(object):
         self.ixs.a *= scaling_factor
         self.wys.a *= scaling_factor
         self.zeds.a *= scaling_factor
+        self.rho_lumen *= scaling_factor
         self.update_rhotheta()
 
     def rotate(self, angle):
         '''Rotates the epithelium by an angle `angle` around
-        the ::math::z:: axis
+        the :math:`z` axis
         '''
         self.update_rhotheta()
         buf_theta = self.thetas.a + np.pi
@@ -404,7 +405,8 @@ class AbstractRTZGraph(object):
 
 class Triangle(object):
     '''
-    A triangle is formed by a cell and two junction vertices linked by a junction edge
+    A triangle is formed by a cell and two junction vertices linked
+    by a junction edge
 
     Attributes:
     ===========
@@ -435,8 +437,9 @@ class Triangle(object):
         self.area = np.linalg.norm(self.cross) / 2.
         self.u_cross = self.cross / (2. * self.area)
         jv0, jv1 = self.j_edge
-        self.height = ((self.eptm.rhos[jv0] + self.eptm.rhos[jv1]) / 2.
-                       - self.eptm.params['rho_lumen'])
+        # self.height = ((self.eptm.rhos[jv0] + self.eptm.rhos[jv1]) / 2.
+        #                - self.eptm.rho_lumen)
+        self.height = self.eptm.rhos[self.cell] - self.eptm.rho_lumen
         self.vol = self.height * self.area
         self.length = self.eptm.edge_lengths[self.j_edge]
         
@@ -583,7 +586,7 @@ class Cells():
         lambda_0 = self.eptm.params['lambda_0']
         height0 = self.eptm.params['prefered_height']
         rho_c = (n_sigmas - 1) * lambda_0 / (2 * np.pi)
-        self.eptm.params['rho_lumen'] = rho_c - height0
+        self.eptm.rho_lumen = rho_c - height0
         delta_sigma = 2 * np.pi * rho_c / n_sigmas
         delta_z = delta_sigma * np.sqrt(3)/2.
         
