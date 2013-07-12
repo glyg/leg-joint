@@ -121,7 +121,8 @@ The normalized energy :math:`\bar E = E/NK_v(h_0A_0)^2` then reads:
 
 .. math::
 
-   \bar E = \frac{1}{2} \left(\left(\frac{hA}{h_0A_0}^2 - 1\right)^2 + \frac{\bar\Gamma}{2} \frac{L^2}{h_0A_0} + 6\frac{\bar\Lambda\ell}{\sqrt{h_0A_0}}\right)
+   \bar E = \frac{1}{2} \left(\left(\frac{hA}{h_0A_0}^2 - 1\right)^2 
+   + \frac{\bar\Gamma}{2} \frac{L^2}{h_0A_0} + 6\frac{\bar\Lambda\ell}{\sqrt{h_0A_0}}\right)
 
 The perimeter :math:`L` of a cell is equal to :math:`6\ell` and the
 area :math:`A` equals :math:`(3\sqrt{3}/2)\ell^2`. We define a dilatation
@@ -138,7 +139,8 @@ then :math:`\ell = \frac{\mu}{6}\delta\sqrt{h_0A_0}` and :math:`L^2 =
 
 .. math::
 
-   \bar E = ((\delta^2 -1)^2 + \bar\Gamma\mu^2\delta^2 + \bar\Lambda\mu\delta) / 2 =  (\delta^4 + (\bar\Gamma\mu^2 - 2)\delta^2 + \bar\Lambda\mu\delta - 1)/2
+   \bar E = ((\delta^2 -1)^2 + \bar\Gamma\mu^2\delta^2 + \bar\Lambda\mu\delta) / 2 
+   =  (\delta^4 + (\bar\Gamma\mu^2 - 2)\delta^2 + \bar\Lambda\mu\delta - 1)/2
 
 
 Computation of the gradient
@@ -161,11 +163,25 @@ We have
 
 .. math::
 
-   \mathbf{\nabla_i}L_\alpha &= \sum_{kn} \mathbf{\nabla_i} \ell_{kn} c_{\alpha k} c_{\alpha n}
+   \mathbf{\nabla_i}\ell_{ij} &=  \frac{\mathbf{r}_{ij}}{\ell_{ij}}c_{ij}\\
+   \mathbf{\nabla_i}L_\alpha &= \sum_{kn} \mathbf{\nabla_i} 
+   \ell_{kn} c_{\alpha k} c_{\alpha n}
    = \sum_{j} \mathbf{\nabla_i}\ell_{ij} c_{ij} c_{\alpha i} c_{\alpha j}
    = \sum_{j} \frac{\mathbf{r_{ij}}}{\ell_{ij}}c_{ij}c_{\alpha i} c_{\alpha j}\\
-   \mathbf{\nabla_i}\ell_{ij} &=  \frac{\mathbf{r_{ij}}}{\ell_{ij}}c_{ij}
-   
+   \mathbf{\nabla_i}V_{\alpha} &=  \sum_{km}\mathbf{\nabla_i}V_{\alpha km}
+   c_{\alpha k}c_{\alpha m}c_{km}
+   = \sum_{km} \mathbf{\nabla_i}h_\alpha A_{\alpha km}
+   c_{\alpha k}c_{\alpha m}c_{km}
+   = A_\alpha \mathbf{\nabla_i}h_\alpha + 
+   h_\alpha \sum_{km} \mathbf{\nabla_i} A_{\alpha km}c_{\alpha k}
+   c_{\alpha m}c_{km}\\
+   \mathbf{\nabla_i}V_{\alpha} &= 
+   \frac{h_\alpha}{2} \sum_{km}\mathbf{u}_{\alpha km} 
+   \times \frac{\mathbf{r}_{km}}{\nu}c_{\alpha k}c_{\alpha m}c_{km}
+   + \sum_{j}\left(A_{\alpha ij}\frac{\mathbf{r_i}}{2\rho_i} 
+   + \frac{h_\alpha}{2}\mathbf{r}_{\alpha j} \times \mathbf{u}_{\alpha ij}\right)
+     c_{\alpha j}c_{ij}\\
+
 
 .. [Faradhifar07] Farhadifar, R., Röper, J.-C., Aigouy, B., Eaton, S., and
    Jülicher, F. 2007. *The influence of cell mechanics, Cell-Cell

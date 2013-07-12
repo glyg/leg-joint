@@ -692,6 +692,14 @@ class Cells():
         uv = np.vstack((u[indices], v[indices])).T
         return uv, indices
 
+
+    def get_neighbor_cells(self, cell):
+        jes = self.junctions[cell]
+        neighbors = []
+        for je in jes:
+            cell0, cell1 = self.eptm.junctions.adjacent_cells[je]
+            neighbors.append(cell0 if cell0 != cell else cell1)
+        return neighbors
         
 class ApicalJunctions():
 

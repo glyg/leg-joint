@@ -27,6 +27,8 @@ def new_generation(eptm, growth_rate=1.8, pola=False):
         mkdir('tmp')
     except OSError:
         pass
+    if pola:
+        phi = eptm.dsigmas.copy()
     random.seed(42)
     random.shuffle(cells)
     for mother_cell in cells:
@@ -95,24 +97,12 @@ def new_generation(eptm, growth_rate=1.8, pola=False):
 if __name__ == '__main__':
     eptm = lj.Epithelium(graphXMLfile='saved_graphs/xml/initial_graph.xml',
                          paramfile='default/params.xml')
-    #lj.optimizers.isotropic_optimum(eptm, 1e-6)
-    #eptm.update_tension(base=0.5, amp=1.)
-    cells = [cell for cell in eptm.cells if eptm.is_alive[cell]]
-    random.shuffle(cells)
     pola = False
-    
-    phi = eptm.dsigmas.copy()
-    if pola:
-        eptm.update_tensions(phi, np.pi/3)
-    for cell in cells:
-        if not eptm.is_alive[cell]: continue
-        print cell
-        eptm.set_local_mask(None)
-        eptm.set_local_mask(cell)
-        lj.find_energy_min(eptm, tol=1e-3, approx_grad=0)
-        if pola:
-            eptm.update_tensions(phi, np.pi/3)
+    lj.running_local_optimum(eptm, tol=1e-3, pola=pola, save_to=None)
     if pola:
         eptm.graph.save('saved_graphs/xml/initial_squeezed.xml')
+    else:
+        eptm.graph.save('saved_graphs/xml/initial_graph.xml')
     for n in range(1):
         new_generation(eptm, pola)
+    eptm.graph.save('saved_graphs/xml/before_apoptosis.xml')

@@ -2,12 +2,7 @@
 
 import os
 import numpy as np
-try:
-    import visvis as vv
-except ImportError:
-    print('visvis not found')
 
-from numpy.random import normal, random_sample
 import matplotlib.pyplot as plt
 #from mpl_toolkits.mplot3d import Axes3
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -18,7 +13,7 @@ import graph_tool.all as gt
 
 import leg_joint.filters as filters
 from .optimizers import precondition, approx_grad
-from .utils import to_xy, to_rhotheta
+from .utils import to_rhotheta
 
 FLOAT = np.dtype('float32')
 
@@ -46,34 +41,6 @@ def draw_polygons(eptm, coord1, coord2, colors,
     eptm.graph.set_vertex_filter(None)
     eptm.graph.set_edge_filter(None)
     return ax
-
-def vv_edges(eptm):
-    '''
-    Tentative 3d rendering using visvis - not quite succesfull
-    Better use blender
-    '''
-    #app = vv.use()
-    for n, je in enumerate(eptm.junctions):
-        ps = vv.Pointset(3)
-        src = vv.Point(eptm.ixs[je.source()],
-                       eptm.wys[je.source()],
-                       eptm.zeds[je.source()])
-        trgt = vv.Point(eptm.ixs[je.target()],
-                        eptm.wys[je.target()],
-                        eptm.zeds[je.target()])
-        ps.append(src)
-        ps.append(trgt)
-        if n == 0:
-            edgeline = vv.solidLine(ps, radius=0.05, N=4)
-            edgeline.faceColor = 'g'
-        else:
-            
-            segment =  vv.solidLine(ps, radius=0.05, N=4)
-            edgeline = vv.Mesh(edgeline, vv.solidLine(ps, radius=0.05, N=4))
-            edgeline.faceColor = 'g'
-    vv.meshWrite('test2.obj', edgeline)
-    #app.run()        
-    return edgeline
 
 def plot_ortho_gradients(eptm, axes=None,
                          scale=1., approx=0, **kwargs):
@@ -122,41 +89,24 @@ def plot_ortho_gradients(eptm, axes=None,
 
 
 @filters.active
-def plot_active(eptm, ax=None):
-    sigmas = eptm.proj_sigma().fa
-    zeds = eptm.zeds.fa
+def plot_active(eptm, xcoord, ycoord, ax=None):
+    
+    
+    xs = xcoord.fa
+    ys = ycoord.fa
     if ax is None:
-        ax =  plot_cells_zs(eptm, ax=None,
-                            vfilt=eptm.is_local_vert,
-                            efilt=eptm.is_local_edge)
-    ax.plot(zeds, sigmas, 'ro', alpha=0.5, ms=8)
+        ax =  plot_cells_generic(eptm, xcoord, ycoord, ax=None,
+                                 vfilt=eptm.is_local_vert,
+                                 efilt=eptm.is_local_edge)
+    ax.plot(xs, ys, 'ro', alpha=0.5, ms=8)
     plt.draw()
     return ax
 
-def sz_scatter(eptm, pmap, ax, log=False,
-               vfilt=(None, False), clip=0, **kwargs):
-    
-    eptm.graph.set_vertex_filter(vfilt[0], vfilt[1])   
-    n_data = pmap.fa - pmap.fa.min()
-    if clip > 0. :
-        h, bins = np.histogram(n_data, bins=100, normed=True)
-        cumhist = np.cumsum(h)
-        norm = 100. / cumhist[-1]
-        cumhist *= norm
-        bin_inf = bins[cumhist > clip][0]     
-        bin_sup = bins[cumhist < 100 - clip][-1]
-        n_data = n_data.clip(bin_inf, bin_sup)
-    n_data /= np.float(n_data.max())
-    if log: 
-        n_data = np.log(1 + n_data)
-        
-    proj_sigma = eptm.proj_sigma()
-    ax.scatter(eptm.zeds.fa, proj_sigma.fa, c=n_data,
-               cmap=plt.cm.jet, **kwargs)
-    eptm.graph.set_vertex_filter(None)
-
-
-def plot_ortho_proj(eptm, ax=None, vfilt=None, efilt=None, **kwargs):
+def plot_ortho_proj(eptm, ax=None, vfilt=None,
+                    efilt=None, local=True, **kwargs):
+    if local:
+        vfilt = eptm.is_local_vert
+        efilt = eptm.is_local_edge
     if ax is None:
         fig, ax = plt.subplots(1,1)
     plot_cells_zs(eptm, ax=ax,
@@ -177,21 +127,25 @@ def plot_ortho_proj(eptm, ax=None, vfilt=None, efilt=None, **kwargs):
     return ax, ax_zr, ax_rs
 
 
-def plot_cells_generic(eptm, xprop, yprop, ax=None, 
-                       vfilt=None, efilt=None):
+def plot_cells_generic(eptm, xcoord, ycoord, ax=None, 
+                       vfilt=None, efilt=None,
+                       xlabel='', ylabel=''):
     if ax is None:
         fig, ax = plt.subplots(1,1)
     eptm.graph.set_vertex_filter(vfilt)
     for cell in eptm.cells :
-        ax.plot(xprop[cell],
-                yprop[cell], 'bo', alpha=0.3)
+        ax.plot(xcoord[cell],
+                ycoord[cell], 'bo', alpha=0.1)
 
     eptm.graph.set_vertex_filter(None)
-    ax = plot_edges_generic(eptm, xprop, yprop, efilt, ax=ax)
+    ax = plot_edges_generic(eptm, xcoord, ycoord,
+                            efilt, ax)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
     return ax
 
-def plot_edges_generic(eptm, xprop, yprop, efilt=None,
-                       ax=None, ctoj=True, **kwargs):
+def plot_edges_generic(eptm, xcoord, ycoord, efilt=None,
+                       ax=None, **kwargs):
     edge_width = eptm.junctions.line_tensions.copy()
     if ax is None:
         fig, ax = plt.subplots(1,1)
@@ -199,25 +153,17 @@ def plot_edges_generic(eptm, xprop, yprop, efilt=None,
     eptm.graph.set_vertex_filter(None)
     edge_width.fa = 2. * (eptm.junctions.line_tensions.fa
                           / eptm.junctions.line_tensions.fa.mean())**0.5
-    edge_width.fa *= (1 - eptm.at_boundary.fa)
     for edge in eptm.graph.edges():
-        if edge is None:
-            print "invalid edge %s" %str(edge)
-            continue
-        ixs = (xprop[edge.source()],
-               xprop[edge.target()])
-        wys = (yprop[edge.source()],
-               yprop[edge.target()])
+        ixs = (xcoord[edge.source()],
+               xcoord[edge.target()])
+        wys = (ycoord[edge.source()],
+               ycoord[edge.target()])
         if eptm.is_junction_edge[edge]:
-            ax.plot(ixs, wys,
-                    'g-', lw=edge_width[edge],
+            ax.plot(ixs, wys, 'g-', lw=edge_width[edge],
                     alpha=0.4, **kwargs)
-        elif ctoj:
-            if not eptm.at_boundary[edge]:
-                ax.plot(ixs, wys,
-                        'k-', lw=1.,
-                        alpha=0.2, **kwargs)
-            
+        else:
+            ax.plot(ixs, wys, 'k-', lw=1.,
+                    alpha=0.2, **kwargs)
     ax.set_aspect('equal')
     eptm.graph.set_edge_filter(None)
     return ax
@@ -225,185 +171,42 @@ def plot_edges_generic(eptm, xprop, yprop, efilt=None,
     
 def plot_cells_zr(eptm, ax=None, 
                   vfilt=None, efilt=None):
-    if ax is None:
-        fig, ax = plt.subplots(1,1)
-    eptm.graph.set_vertex_filter(vfilt)
-    rhos = eptm.rhos.copy()
     zeds = eptm.zeds.copy()
-    for cell in eptm.cells :
-        ax.plot(zeds[cell],
-                rhos[cell], 'bo', alpha=0.3)
-    basal_rho = np.ones_like(zeds.fa) * eptm.rho_lumen
-    #ax.plot(zeds.fa, basal_rho, 'k-')
-    eptm.graph.set_vertex_filter(None)
-    plot_edges_zr(eptm, efilt, ax=ax)
-    ax.set_ylabel('Radius', fontsize='large')
+    rhos = eptm.rhos.copy()
+    ax = plot_cells_generic(eptm, zeds, rhos,
+                            ax, vfilt, efilt,
+                            xlabel='Proximal - distal',
+                            ylabel='Radius')
     return ax
 
 def plot_cells_rs(eptm, ax=None, 
                   vfilt=None, efilt=None):
-    if ax is None:
-        fig, ax = plt.subplots(1,1)
-    eptm.graph.set_vertex_filter(vfilt)
-    sigmas = eptm.proj_sigma()
     rhos = eptm.rhos.copy()
-    for cell in eptm.cells :
-        ax.plot(rhos[cell],
-                sigmas[cell], 'bo', alpha=0.3)
-    basal_rho = np.ones_like(sigmas.fa) * eptm.rho_lumen
-    #ax.plot(basal_rho, sigmas.fa, 'k-')
-
-    eptm.graph.set_vertex_filter(None)
-    plot_edges_rs(eptm, efilt, ax=ax)
-    ax.set_xlabel('Radius', fontsize='large')
+    sigmas = eptm.proj_sigma()
+    eptm.update_dsigmas()
+    efilt = efilt.copy()
+    efilt.a *= (1 - eptm.at_boundary.a)
+    ax = plot_cells_generic(eptm, rhos, sigmas,
+                            ax, vfilt, efilt,
+                            xlabel='Radius',
+                            ylabel='Latitude')
     return ax
 
-def plot_edges_rs(eptm, efilt=None,
-                  ax=None, **kwargs):
-    edge_width = eptm.junctions.line_tensions.copy()
-    if ax is None:
-        fig, ax = plt.subplots(1,1)
-    eptm.graph.set_edge_filter(efilt)
-    eptm.graph.set_vertex_filter(None)
-    edge_width.fa = 2. * (eptm.junctions.line_tensions.fa
-                          / eptm.junctions.line_tensions.fa.mean())**0.5
-    eptm.update_dsigmas()
-    edge_width.fa *= (1 - eptm.at_boundary.fa)
-    proj_sigmas = eptm.proj_sigma()
-    for edge in eptm.graph.edges():
-        if edge is None:
-            print "invalid edge %s" %str(edge)
-            continue
-        rhos = (eptm.rhos[edge.source()],
-                  eptm.rhos[edge.target()])
-        sigmas = (proj_sigmas[edge.source()],
-                  proj_sigmas[edge.target()])
-        if eptm.is_junction_edge[edge]:
-            ax.plot(rhos, sigmas,
-                    'g-', lw=edge_width[edge],
-                    alpha=0.4, **kwargs)
-        else:
-            if not eptm.at_boundary[edge]:
-                ax.plot(rhos, sigmas,
-                        'k-', lw=1.,
-                        alpha=0.2, **kwargs)
-            
-    ax.set_aspect('equal')
-    eptm.graph.set_edge_filter(None)
 
-def plot_edges_zr(eptm, efilt=None,
-                  ax=None, **kwargs):
-    edge_width = eptm.junctions.line_tensions.copy()
-    rhos = []
-    zeds = []
-    if ax is None:
-        fig, ax = plt.subplots(1,1)
-    eptm.graph.set_edge_filter(efilt)
-    eptm.graph.set_vertex_filter(None)
-    edge_width.fa = 2. * (eptm.junctions.line_tensions.fa
-                          / eptm.junctions.line_tensions.fa.mean())**0.5
-    eptm.update_dsigmas()
-    edge_width.fa *= (1 - eptm.at_boundary.fa)
-
-    for edge in eptm.graph.edges():
-        if edge is None:
-            print "invalid edge %s" %str(edge)
-            continue
-        rhos = (eptm.rhos[edge.source()],
-                  eptm.rhos[edge.target()])
-        zeds = (eptm.zeds[edge.source()],
-                eptm.zeds[edge.target()])
-        if eptm.is_junction_edge[edge]:
-            ax.plot(zeds, rhos,
-                    'g-', lw=edge_width[edge],
-                    alpha=0.4, **kwargs)
-        else:
-            if not eptm.at_boundary[edge]:
-                ax.plot(zeds, rhos,
-                        'k-', lw=1,
-                        alpha=0.2, **kwargs)
-
-    ax.set_aspect('equal')
-    eptm.graph.set_edge_filter(None)
 
 def plot_cells_zs(eptm, ax=None, text=True,
                   vfilt=None, efilt=None,
                   c_text=True, j_text=False):
-    if ax is None:
-        fig, ax = plt.subplots(1,1)
-    eptm.graph.set_vertex_filter(vfilt)
-    # We project the shape on the average *
-    mean_rho = eptm.rhos.fa.mean()
     sigmas = eptm.proj_sigma()
-    #sigmas.fa = eptm.thetas.fa * mean_rho
     zeds = eptm.zeds.copy()
-    for cell in eptm.cells :
-        if text and c_text:
-            ax.text(zeds[cell],
-                    sigmas[cell],
-                    str(cell))
-        ax.plot(zeds[cell],
-                sigmas[cell], 'bo', alpha=0.3)
-    eptm.graph.set_vertex_filter(None)
-    eptm.graph.set_edge_filter(efilt)
-    plot_edges_zs(eptm, efilt, ax=ax, text=j_text)
-    eptm.graph.set_edge_filter(None)
-    ax.set_xlabel('Proximo distal', fontsize='large')
-    ax.set_ylabel('Around the leg', fontsize='large')
-    plt.draw()
-    return ax
-    
-def plot_edges_zs(eptm, efilt=None,
-                  text=False, ax=None,
-                  ls='g-', **kwargs):
-    edge_width = eptm.junctions.line_tensions.copy()
-    sigmas = []
-    zeds = []
-    if ax is None:
-        fig, ax = plt.subplots(1,1)
-    eptm.graph.set_edge_filter(efilt)
-    eptm.graph.set_vertex_filter(None)
-    edge_width.fa = 2. * (eptm.junctions.line_tensions.fa
-                          / eptm.junctions.line_tensions.fa.mean())**0.5
     eptm.update_dsigmas()
-    edge_width.fa *= (1 - eptm.at_boundary.fa)
-    proj_sigmas = eptm.proj_sigma()
-    has_text = eptm.is_cell_vert.copy()
-    has_text.a = 0
-    
-    for edge in eptm.graph.edges():
-        sigmas = (proj_sigmas[edge.source()],
-                  proj_sigmas[edge.target()])
-        zeds = (eptm.zeds[edge.source()],
-                eptm.zeds[edge.target()])
-        if eptm.is_junction_edge[edge]:
-            ax.plot(zeds,
-                    sigmas,
-                    'g-', lw=edge_width[edge],
-                    alpha=0.4, **kwargs)
-            if text:
-                if not has_text[edge.source()]:
-                    ax.text(eptm.zeds[edge.source()],
-                            proj_sigmas[edge.source()],
-                            str(edge.source()))
-                    has_text[edge.source()] = 1
-                if not has_text[edge.target()]:
-                    ax.text(eptm.zeds[edge.target()],
-                            proj_sigmas[edge.target()],
-                            str(edge.target()))
-                    has_text[edge.target()] = 1
-        else:
-            if not eptm.at_boundary[edge]:
-                ax.plot(zeds,
-                        sigmas,
-                        'k-', lw=1,
-                        alpha=0.2, **kwargs)
-            
-    ax.set_aspect('equal')
-    eptm.graph.set_edge_filter(None)
-
-
-
+    efilt = efilt.copy()
+    efilt.a *= (1 - eptm.at_boundary.a)
+    ax = plot_cells_generic(eptm, zeds, sigmas,
+                            ax, vfilt, efilt,
+                            xlabel='Proximo distal',
+                            ylabel='Latitude')
+    return ax
 
 def sfdp_draw(graph, output="lattice_3d.pdf"):
     output = os.path.join('saved_graph/pdf', output)

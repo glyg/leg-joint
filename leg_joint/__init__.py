@@ -6,7 +6,7 @@ from __future__ import division
 import matplotlib.pylab as plt
 
 from .epithelium import Epithelium
-from .optimizers import find_energy_min, isotropic_optimum
+from .optimizers import find_energy_min, isotropic_optimum, running_local_optimum
 from .optimizers import approx_grad, check_local_grad
 from .topology import cell_division, type1_transition
 from .topology import type3_transition, apoptosis

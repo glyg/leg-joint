@@ -60,7 +60,7 @@ def apoptosis(eptm, a_cell, idx=0,
     radial_tension: float, the increase of apical basal tension
     '''
     eptm.set_local_mask(None)
-    eptm.set_local_mask(a_cell)
+    eptm.set_local_mask(a_cell, wider=True)
     
     eptm.cells.prefered_vol[a_cell] *= vol_reduction
     eptm.cells.contractilities[a_cell] *= contractility
@@ -68,12 +68,6 @@ def apoptosis(eptm, a_cell, idx=0,
                         for je in eptm.cells.junctions[a_cell]]).mean()
     for jv in a_cell.out_neighbours():
         eptm.junctions.radial_tensions[jv] += radial_tension * mean_lt
-        for v in jv.all_neighbours():
-            if v == a_cell: 
-                continue
-            if not eptm.is_cell_vert[v]:
-                continue
-            eptm.set_local_mask(v)
     find_energy_min(eptm, tol=1e-4)
     tag = 'vr%.2f_ctr%.2f_rt%.2f' % (vol_reduction, contractility,
                                      radial_tension)
@@ -388,7 +382,8 @@ def cell_division(eptm, mother_cell,
     # Cytokinesis
     septum = eptm.add_junction(new_jvs[0], new_jvs[1],
                                mother_cell, daughter_cell)
-    eptm.set_local_mask(daughter_cell)
+    eptm.set_local_mask(mother_cell, wider=True)
+    eptm.set_local_mask(daughter_cell, wider=True)
     eptm.update_xy()
     
     # eptm.graph.set_vertex_filter(eptm.is_local_vert)

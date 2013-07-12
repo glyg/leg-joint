@@ -20,7 +20,7 @@
     <unit>um</unit>
     <description>lumen radius</description>
   </param>
-  <param max="20." min="0.5" name="prefered_height" step="0.1" value="24.">
+  <param max="20." min="0.5" name="prefered_height" step="0.1" value="12.">
     <unit>um3</unit>
     <description>cell height</description>
   </param>
