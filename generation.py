@@ -15,7 +15,7 @@ import random
 
 
 # eptm = lj.Epithelium(paramfile='default/few_big_cells.xml')
-def new_generation(eptm, growth_rate=1.8, pola=False):
+def new_generation(eptm, growth_rate=2.2, pola=False):
     eptm.graph.set_vertex_filter(eptm.is_cell_vert)
     cells =  [cell for cell in eptm.graph.vertices()
               if eptm.is_alive[cell]]
@@ -30,7 +30,7 @@ def new_generation(eptm, growth_rate=1.8, pola=False):
     if pola:
         phi = eptm.dsigmas.copy()
     random.seed(42)
-    random.shuffle(cells)
+    #random.shuffle(cells)
     for mother_cell in cells:
         print('dividing cell %s' %str(mother_cell))
         skip = False
@@ -54,8 +54,8 @@ def new_generation(eptm, growth_rate=1.8, pola=False):
         eptm.set_local_mask(None)
         eptm.set_local_mask(mother_cell)
         eptm.cells.prefered_vol[mother_cell] *= growth_rate
-        pos0, pos1 = lj.find_energy_min(eptm, tol=1e-3, approx_grad=0)
-
+        pos0, pos1 = lj.find_energy_min(eptm, tol=1e-5)
+        eptm.isotropic_relax()
         #rand_phi = np.random.normal(0, np.pi/8.)
         j = lj.cell_division(eptm, mother_cell,
         #                     phi_division=rand_phi,
@@ -63,9 +63,8 @@ def new_generation(eptm, growth_rate=1.8, pola=False):
         if pola:
             eptm.update_tensions(phi, np.pi/3)
         if j is not None:
-            pos0, pos1 = lj.find_energy_min(eptm, tol=1e-3, approx_grad=0)
-            #eptm.radial_smooth(0.5)
-            lj.optimizers.isotropic_optimum(eptm, 1e-4)
+            pos0, pos1 = lj.find_energy_min(eptm, tol=1e-5)
+            eptm.isotropic_relax()
             #lj.resolve_small_edges(eptm, threshold=0.25)
             small_cells = [cell for cell in eptm.cells
                            if eptm.cells.areas[cell] < 1e-1]
@@ -87,7 +86,6 @@ def new_generation(eptm, growth_rate=1.8, pola=False):
         time_left = (elapsed / num) * (len(cells) - num)
         print str(num)+'/'+str(len(cells))
         print 'time left: %3f' % time_left
-    # eptm.anisotropic_relax()
     eptm.update_geometry()
     eptm.params['n_zeds'] *= 2
     eptm.params['n_sigmas'] *= 2
@@ -95,9 +93,11 @@ def new_generation(eptm, growth_rate=1.8, pola=False):
 
     
 if __name__ == '__main__':
-    eptm = lj.Epithelium(graphXMLfile='saved_graphs/xml/initial_graph.xml',
+    eptm = lj.Epithelium(#graphXMLfile='saved_graphs/xml/initial_graph.xml',
                          paramfile='default/params.xml')
     pola = False
+    eptm.isotropic_relax()
+
     lj.running_local_optimum(eptm, tol=1e-3, pola=pola, save_to=None)
     if pola:
         eptm.graph.save('saved_graphs/xml/initial_squeezed.xml')

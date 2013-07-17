@@ -314,7 +314,7 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
     edge_red.fa = 105 / 256.
     edge_green.fa = 201 / 256.
     edge_blue.fa = 237 / 256.
-    edge_width.fa = 0.3
+    edge_width.fa = 0.
     eptm.graph.set_edge_filter(None)
 
     eptm.update_rhotheta()

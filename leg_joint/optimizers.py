@@ -10,7 +10,9 @@ from .utils import local_subgraph
     
 @filters.active
 def precondition(eptm):
-    eptm.update_rhotheta()
+    '''Grabd the positions and computes the maximum displacements
+    before optimisation. 
+    '''
     pos0 = np.vstack([eptm.ixs.fa,
                       eptm.wys.fa,
                       eptm.zeds.fa]).T.flatten()
@@ -25,11 +27,11 @@ def precondition(eptm):
     if eptm.__verbose__: print ('bounds array has shape: %s'
                          % str(bounds.shape))
     x_bounds = np.vstack((eptm.ixs.fa - max_disp,
-                         eptm.ixs.fa + max_disp)).T
+                          eptm.ixs.fa + max_disp)).T
     y_bounds = np.vstack((eptm.wys.fa - max_disp,
-                         eptm.wys.fa + max_disp)).T
+                          eptm.wys.fa + max_disp)).T
     z_bounds = np.vstack((eptm.zeds.fa - max_disp,
-                         eptm.zeds.fa + max_disp)).T
+                          eptm.zeds.fa + max_disp)).T
 
     for n in range(pos0.shape[0]/3):
         bounds[3 * n] = (x_bounds[n, 0], x_bounds[n, 1])
@@ -48,7 +50,7 @@ def find_energy_min(eptm, method='fmin_l_bfgs_b',
     output = 0
     if method == 'fmin_l_bfgs_b':
         # On my box, machine precision is 10^-19, so
-        ## I set factr to 1e11 to avoid too long computation
+        ## I set `factr` to 1e11 to avoid too long computation
         output = optimize.fmin_l_bfgs_b(opt_energy,
                                         pos0.flatten(),
                                         fprime=opt_gradient,
@@ -163,7 +165,10 @@ def isotropic_optimum(eptm, tol):
 
 
 def running_local_optimum(eptm, tol, pola=False, save_to=None):
-
+    '''
+    Computes the local energy minimum for each cell on the epithelium
+    in a random order
+    '''
     cells = [cell for cell in eptm.cells if eptm.is_alive[cell]]
     np.random.shuffle(cells)
     if pola:

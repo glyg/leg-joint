@@ -284,15 +284,16 @@ class Dynamics(object):
 
         self.update_rhotheta()
         area0 = self.params['prefered_area']
+        h_0 = self.params['prefered_height']
         ### Cells only area and height
         self.set_vertex_state([(self.is_cell_vert, False),
                                (self.is_alive, False)])
-        area_avg = self.cells.areas.fa.mean()
+        vol_avg = self.cells.vols.fa.mean()
         rho_avg = self.rhos.fa.mean()
         self.set_vertex_state()
         
         ### Current value for delta
-        delta_i = np.sqrt(area_avg / area0)
+        delta_i = (vol_avg / (area0 * h_0))**(1/3.)
 
         ### Optimal value for delta
         delta_o = self.find_grad_roots()
