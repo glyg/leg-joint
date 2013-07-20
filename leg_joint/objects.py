@@ -585,7 +585,8 @@ class Cells():
 
         lambda_0 = self.eptm.params['lambda_0']
         height0 = self.eptm.params['prefered_height']
-        rho_c = (n_sigmas - 1) * lambda_0 / (2 * np.pi)
+        #rho_c = (n_sigmas - 1) * lambda_0 / (2 * np.pi)
+        rho_c = (n_sigmas) * lambda_0 / (2 * np.pi)
         self.eptm.rho_lumen = rho_c - height0
         delta_sigma = 2 * np.pi * rho_c / n_sigmas
         delta_z = delta_sigma * np.sqrt(3)/2.

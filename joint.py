@@ -44,7 +44,7 @@ def get_sequence(apopto_cells, num_steps):
         apopto_sequence.append(apopto_cells[start:stop])
     return apopto_sequence
 
-def gradual_apoptosis(eptm, apopto_cells, num_steps, pola, **kwargs):
+def gradual_apoptosis(eptm, apopto_cells, num_steps, pola=False, **kwargs):
 
     apopto_sequence = get_sequence(apopto_cells, num_steps)
     print '%i steps will be performed' % (len(apopto_cells) * num_steps)
@@ -66,14 +66,14 @@ def gradual_apoptosis(eptm, apopto_cells, num_steps, pola, **kwargs):
             # eptm.update_geometry()
             if pola:
                 eptm.update_tensions(phi, np.pi / 4, 1.26**4)
-        # for cell in fold_cells:
-        #     if not eptm.is_alive[cell]:
-        #         continue
-        #     eptm.set_local_mask(None)
-        #     eptm.set_local_mask(cell)
-        #     lj.find_energy_min(eptm)
-        #     if pola:
-        #         eptm.update_tensions(phi, np.pi / 4, 1.26**4)
+        for cell in fold_cells:
+            if not eptm.is_alive[cell]:
+                continue
+            eptm.set_local_mask(None)
+            eptm.set_local_mask(cell, wider=True)
+            lj.find_energy_min(eptm)
+            if pola:
+                eptm.update_tensions(phi, np.pi / 4, 1.26**4)
 
         first = cell_seq[0]
         if first != prev_first:
@@ -83,6 +83,15 @@ def gradual_apoptosis(eptm, apopto_cells, num_steps, pola, **kwargs):
                 eptm.junctions.radial_tensions[old_jvs[0]] * len(old_jvs))
             if pola:
                 eptm.update_tensions(phi, np.pi / 4, 1.26**4)
+            # for cell in fold_cells:
+            #     if not eptm.is_alive[cell]:
+            #         continue
+            #     eptm.set_local_mask(None)
+            #     eptm.set_local_mask(cell)
+            #     lj.find_energy_min(eptm)
+            #     if pola:
+            #         eptm.update_tensions(phi, np.pi / 4, 1.26**4)
+
         prev_first = first
 
                 
@@ -105,7 +114,7 @@ def show_distribution(eptm):
             
     
 if __name__ == '__main__':
-    eptm = lj.Epithelium(graphXMLfile='saved_graphs/xml/before_apoptosis.xml',
+    eptm = lj.Epithelium(graphXMLfile='saved_graphs/xml/big_graph.xml',
                          paramfile='default/params.xml')
 
     import sys
@@ -129,5 +138,5 @@ if __name__ == '__main__':
     gradual_apoptosis(eptm, apopto_cells, num_steps,
                       vol_reduction=vol_reduction,
                       contractility=contractility,
-                      radial_tension=radial_tension)
+                      radial_tension=radial_tension, pola=False)
     

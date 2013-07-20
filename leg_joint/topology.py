@@ -39,7 +39,7 @@ def snapshot(func, *args, **kwargs):
 def apoptosis(eptm, a_cell, idx=0,
               vol_reduction=0.01,
               contractility=1.,
-              radial_tension=0.):
+              radial_tension=0., save=True):
     '''
     Simulates an apoptosis
 
@@ -84,11 +84,12 @@ def apoptosis(eptm, a_cell, idx=0,
         os.mkdir(xml_dir)
     except OSError:
         pass
-    out2d = os.path.join(png_dir, 'apopto_2d_%04i.png' % idx)
-    out3d = os.path.join(png_dir, 'apopto_3d_%04i.png' % idx)
-    out_xml = os.path.join(xml_dir, 'apopto_%04i.xml' % idx)
-    eptm.graph.save(out_xml)
-    epithelium_draw(eptm, output2d=out2d, output3d=out3d, d_theta=np.pi/2)
+    if save:
+        out2d = os.path.join(png_dir, 'apopto_2d_%04i.png' % idx)
+        out3d = os.path.join(png_dir, 'apopto_3d_%04i.png' % idx)
+        out_xml = os.path.join(xml_dir, 'apopto_%04i.xml' % idx)
+        eptm.graph.save(out_xml)
+        epithelium_draw(eptm, output2d=out2d, output3d=out3d, d_theta=np.pi/2)
 
 @snapshot
 def type1_transition(eptm, elements, verbose=False):

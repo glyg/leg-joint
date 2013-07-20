@@ -15,7 +15,7 @@ import random
 
 
 # eptm = lj.Epithelium(paramfile='default/few_big_cells.xml')
-def new_generation(eptm, growth_rate=2.2, pola=False):
+def new_generation(eptm, growth_rate=1.5, pola=False):
     eptm.graph.set_vertex_filter(eptm.is_cell_vert)
     cells =  [cell for cell in eptm.graph.vertices()
               if eptm.is_alive[cell]]
@@ -29,9 +29,13 @@ def new_generation(eptm, growth_rate=2.2, pola=False):
         pass
     if pola:
         phi = eptm.dsigmas.copy()
-    random.seed(42)
-    #random.shuffle(cells)
-    for mother_cell in cells:
+    random.seed(3)
+    random.shuffle(cells)
+    rhos = np.array([eptm.rhos[cell] for cell in cells])
+    cells = np.array(cells)[rhos.argsort()[::-1]]
+    cells = list(cells)
+    while len(cells):
+        mother_cell = cells.pop()
         print('dividing cell %s' %str(mother_cell))
         skip = False
         # No division
@@ -86,6 +90,9 @@ def new_generation(eptm, growth_rate=2.2, pola=False):
         time_left = (elapsed / num) * (len(cells) - num)
         print str(num)+'/'+str(len(cells))
         print 'time left: %3f' % time_left
+        rhos = np.array([eptm.rhos[cell] for cell in cells])
+        cells = np.array(cells)[rhos.argsort()[::-1]]
+        cells = list(cells)
     eptm.update_geometry()
     eptm.params['n_zeds'] *= 2
     eptm.params['n_sigmas'] *= 2
@@ -93,16 +100,16 @@ def new_generation(eptm, growth_rate=2.2, pola=False):
 
     
 if __name__ == '__main__':
-    eptm = lj.Epithelium(#graphXMLfile='saved_graphs/xml/initial_graph.xml',
+    eptm = lj.Epithelium(graphXMLfile='saved_graphs/xml/initial_graph.xml',
                          paramfile='default/params.xml')
     pola = False
     eptm.isotropic_relax()
 
-    lj.running_local_optimum(eptm, tol=1e-3, pola=pola, save_to=None)
-    if pola:
-        eptm.graph.save('saved_graphs/xml/initial_squeezed.xml')
-    else:
-        eptm.graph.save('saved_graphs/xml/initial_graph.xml')
+    # lj.running_local_optimum(eptm, tol=1e-3, pola=pola, save_to=None)
+    # if pola:
+    #     eptm.graph.save('saved_graphs/xml/initial_squeezed.xml')
+    # else:
+    #     eptm.graph.save('saved_graphs/xml/initial_graph.xml')
     for n in range(1):
         new_generation(eptm, pola)
     eptm.graph.save('saved_graphs/xml/before_apoptosis.xml')
