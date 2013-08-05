@@ -111,6 +111,7 @@ def plot_ortho_proj(eptm, ax=None, vfilt=None,
         efilt = eptm.is_local_edge
     if ax is None:
         fig, ax = plt.subplots(1,1)
+        
     plot_cells_zs(eptm, ax=ax,
                   vfilt=vfilt, efilt=efilt,
                   depth_color=depth_color, **kwargs)
@@ -215,8 +216,9 @@ def plot_cells_rs(eptm, ax=None, c_text=False,
     rhos = eptm.rhos.copy()
     sigmas = eptm.proj_sigma()
     eptm.update_dsigmas()
-    efilt = efilt.copy()
-    efilt.a *= (1 - eptm.at_boundary.a)
+    if efilt is not None:
+        efilt = efilt.copy()
+        efilt.a *= (1 - eptm.at_boundary.a)
     ax = plot_cells_generic(eptm, rhos, sigmas,
                             ax, vfilt, efilt,
                             c_text=c_text,
@@ -233,8 +235,9 @@ def plot_cells_zs(eptm, ax=None, text=True,
     sigmas = eptm.proj_sigma()
     zeds = eptm.zeds.copy()
     eptm.update_dsigmas()
-    efilt = efilt.copy()
-    efilt.a *= (1 - eptm.at_boundary.a)
+    if efilt is not None:
+        efilt = efilt.copy()
+        efilt.a *= (1 - eptm.at_boundary.a)
     ax = plot_cells_generic(eptm, zeds, sigmas,
                             ax, vfilt, efilt, c_text,
                             depth_color=depth_color,

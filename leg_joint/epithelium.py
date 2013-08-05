@@ -46,7 +46,8 @@ class Epithelium(EpitheliumFilters,
     :class:`gt.Graph` instance. The epithelium graph is oriented and
     contains two types of vertices:
 
-     1 the cell centers, with their properties contained in a :class:`Cells` instance
+     1 the cell centers, with their properties contained
+       in a :class:`Cells` instance
     
      2 the apical vertices
 
@@ -60,9 +61,9 @@ class Epithelium(EpitheliumFilters,
     """
 
     def __init__(self, graphXMLfile=None,
-                 paramtree=None, n_sigmas=None, n_zeds=None,
+                 paramtree=None,
                  paramfile=PARAMFILE,
-                 graph=None, verbose=False):
+                 graph=None, verbose=False, **params):
         """
         Parameters
         ----------
@@ -91,23 +92,28 @@ class Epithelium(EpitheliumFilters,
             self.paramtree = ParamTree(paramfile)
         else:
             self.paramtree = paramtree
+        for key, value in params.items():
+            try:
+                self.paramtree.change_dic(key, value)
+            except KeyError:
+                pass
         self.params = self.paramtree.absolute_dic
         
         # Graph instanciation
         if graph is None and graphXMLfile is None:
-            if n_sigmas is not None:
-                self.params['n_sigmas'] = n_sigmas
-                self.params['n_zeds'] = n_zeds
             print 'Created new graph'
             self.graph = gt.Graph(directed=True)
             self.new = True
+            self.generate = True
         elif graphXMLfile is not None :
             self.graph = gt.load_graph(graphXMLfile)
             self.new = False
+            self.generate = False
             self.xmlfname = graphXMLfile
         elif graph is not None:
             self.graph = graph
             self.new = False
+            self.generate = False
 
         self.__verbose__ = verbose
         EpitheliumFilters.__init__(self)
@@ -122,7 +128,7 @@ class Epithelium(EpitheliumFilters,
         if self.__verbose__:
             print 'Initial junctions'
         self.junctions = ApicalJunctions(self)
-        if self.new:
+        if self.generate:
             self.is_alive.a = 1
             # Remove cell to cell edges after graph construction
             efilt = self.is_ctoj_edge.copy()
@@ -214,6 +220,7 @@ class Epithelium(EpitheliumFilters,
                     self.cells.vols[cell] += tr.vol
                 except KeyError:
                     pass
+                    
     def set_new_pos(self, new_xyz_pos):
         '''
         Modifies the position of the **active** junction vertices

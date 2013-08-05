@@ -17,7 +17,7 @@ from .graph_representation import plot_cells_generic, plot_cells_zs, plot_active
 from .graph_representation import epithelium_draw as draw
 from .utils import local_slice
 
-
+from .explore_params import explore_delta_h_1D
 
 
 

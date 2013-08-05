@@ -83,10 +83,11 @@ class Dynamics(object):
         
     def calc_energy(self):
         """ Computes the apical energy on the filtered epithelium """
-        cells_term = self.calc_cells_energy()
+        contractile_term, volume_term = self.calc_cells_energy()
         junction_term, radial_term = self.calc_junctions_energy()
         
-        total_energy = (cells_term.sum()
+        total_energy = (contractile_term.sum()
+                        + volume_term.sum()
                         + junction_term.sum()
                         + radial_term.sum())
         return total_energy / self.norm_factor
@@ -97,8 +98,7 @@ class Dynamics(object):
                            self.cells.perimeters.fa**2
         volume_term = 0.5 * self.cells.vol_elasticities.fa \
                       * (self.cells.vols.fa - self.cells.prefered_vol.fa)**2
-        cells_energy = contractile_term + volume_term
-        return cells_energy
+        return contractile_term, volume_term
         
     @filters.j_edges_in
     def calc_junctions_energy(self):
@@ -288,12 +288,16 @@ class Dynamics(object):
         ### Cells only area and height
         self.set_vertex_state([(self.is_cell_vert, False),
                                (self.is_alive, False)])
+        area_avg = self.cells.areas.fa.mean()
         vol_avg = self.cells.vols.fa.mean()
         rho_avg = self.rhos.fa.mean()
         self.set_vertex_state()
-        
-        ### Current value for delta
-        delta_i = (vol_avg / (area0 * h_0))**(1/3.)
+
+        ### Set height and area to height0 and area0
+        scale = area0 / area_avg
+        self.scale(scale)
+        self.rho_lumen = rho_avg * scale - h_0
+        self.update_geometry()
 
         ### Optimal value for delta
         delta_o = self.find_grad_roots()
@@ -302,12 +306,9 @@ class Dynamics(object):
         self.delta_o = delta_o
         self.ground_energy = self.isotropic_energy(delta_o)
         ### Scaling
-        correction = delta_o / delta_i
-        self.scale(correction)
+        
+        self.scale(delta_o)
         self.update_geometry()
-
-        if self.__verbose__:
-            print "Scaled all the distances by a factor %.3f" %correction
         
 
     def isotropic_energy(self, delta):

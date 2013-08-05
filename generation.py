@@ -31,9 +31,19 @@ def new_generation(eptm, growth_rate=1.5, pola=False):
         phi = eptm.dsigmas.copy()
     random.seed(3)
     random.shuffle(cells)
+
     rhos = np.array([eptm.rhos[cell] for cell in cells])
     cells = np.array(cells)[rhos.argsort()[::-1]]
     cells = list(cells)
+
+
+
+    # thetas_zeds = np.array([(eptm.thetas[cell], eptm.zeds[cell])
+    #                        for cell in cells]).T
+    # indices = np.lexsort(thetas_zeds)
+    # rhos = np.array([eptm.rhos[cell] for cell in cells])
+    # cells = np.array(cells)[indices]
+    # cells = list(cells)
     while len(cells):
         mother_cell = cells.pop()
         print('dividing cell %s' %str(mother_cell))
@@ -59,6 +69,7 @@ def new_generation(eptm, growth_rate=1.5, pola=False):
         eptm.set_local_mask(mother_cell)
         eptm.cells.prefered_vol[mother_cell] *= growth_rate
         pos0, pos1 = lj.find_energy_min(eptm, tol=1e-5)
+        
         eptm.isotropic_relax()
         #rand_phi = np.random.normal(0, np.pi/8.)
         j = lj.cell_division(eptm, mother_cell,
@@ -69,7 +80,9 @@ def new_generation(eptm, growth_rate=1.5, pola=False):
         if j is not None:
             pos0, pos1 = lj.find_energy_min(eptm, tol=1e-5)
             eptm.isotropic_relax()
-            #lj.resolve_small_edges(eptm, threshold=0.25)
+            # rho_avg = eptm.rhos.a.mean()
+            # eptm.rhos.a = rho_avg
+            # eptm.update_xy()
             small_cells = [cell for cell in eptm.cells
                            if eptm.cells.areas[cell] < 1e-1]
             if len(small_cells) > 0:
@@ -83,6 +96,7 @@ def new_generation(eptm, growth_rate=1.5, pola=False):
             outfname2d = 'saved_graphs/png/tmp/generation_sz_%03i.png' % num
             lj.draw(eptm, output2d=outfname2d,
                     output3d=outfname3d)
+            
         else:
             print 'division failed'
         num += 1
@@ -100,8 +114,10 @@ def new_generation(eptm, growth_rate=1.5, pola=False):
 
     
 if __name__ == '__main__':
-    eptm = lj.Epithelium(graphXMLfile='saved_graphs/xml/initial_graph.xml',
+    #graph = gt.load_graph('saved_graphs/xml/initial_graph.xml')
+    eptm = lj.Epithelium(#graphXMLfile='saved_graphs/xml/initial_graph.xml',
                          paramfile='default/params.xml')
+
     pola = False
     eptm.isotropic_relax()
 

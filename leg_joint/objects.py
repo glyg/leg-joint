@@ -410,8 +410,26 @@ class Triangle(object):
 
     Attributes:
     ===========
+    eptm : a :class:`Epithelium` instance containing the triangle  
+    cell : the `cell` vertex forming one of the triangle's corner
+    j_edge : the junction edge forming the triangle side
+        opposing the cell vertex
+    ctoj_edges : the cell to junction edges corresponding
+        to the two other sides of the triangle
+    deltas : ndarray with shape (2, 3) containing the 2 vecors
+        :math:`(r_{\alpha i}, r_{\alpha j})`
+    rij_vect : ndarray, the :math:`r_{i j}` vector
+    cross : ndarray, the cross product between the two cell to junction edges:
+        :math:`(r_{\alpha i} \times r_{\alpha j})`
+    area : float, the triangle area
+    u_cross : ndarray, the unitary vector colinear to the cross product
     
     
+
+    Method:
+    =======
+
+    update_geometry
     '''
     def __init__(self, eptm, cell, j_edge):
         
@@ -444,7 +462,11 @@ class Triangle(object):
         self.length = self.eptm.edge_lengths[self.j_edge]
         
 class Diamond(object):
+    '''a :class:`Diamond` instance is constituted of a junction edge
+    and its two adjacent cells. It is the union of two
+    :class:`Triangle` instances.
 
+    '''
     def __init__(self, eptm, j_edge, adj_cells):
         self.j_edge = j_edge
         j_verta, j_vertb = j_edge.source(), j_edge.target()
@@ -476,23 +498,22 @@ class Cells():
         self.params = eptm.params
 
         if self.eptm.new :
-            n_sigmas, n_zeds = (self.eptm.params['n_sigmas'],
-                                self.eptm.params['n_zeds'])
+            if self.eptm.generate:
+                n_sigmas, n_zeds = (self.eptm.params['n_sigmas'],
+                                    self.eptm.params['n_zeds'])
             
-            rhos, sigmas, zeds = self._generate_rsz(n_sigmas, n_zeds)
-            rsz = rhos, sigmas, zeds
-            self.eptm.graph = self._generate_graph(rsz)
-            EpitheliumFilters.__init__(self.eptm)
-            AbstractRTZGraph.__init__(self.eptm)
-
-            self.eptm.rhos.a = rhos
-            self.eptm.zeds.a = zeds
-            self.eptm.sigmas.a = sigmas
-            self.eptm.thetas.a = sigmas/rhos
-            self.eptm.update_xy()
-
-            self.eptm.periodic_boundary_condition()
-            self.eptm.is_cell_vert.a[:] = 1
+                rhos, sigmas, zeds = self._generate_rsz(n_sigmas, n_zeds)
+                rsz = rhos, sigmas, zeds
+                self.eptm.graph = self._generate_graph(rsz)
+                EpitheliumFilters.__init__(self.eptm)
+                AbstractRTZGraph.__init__(self.eptm)
+                self.eptm.rhos.a = rhos
+                self.eptm.zeds.a = zeds
+                self.eptm.sigmas.a = sigmas
+                self.eptm.thetas.a = sigmas/rhos
+                self.eptm.update_xy()
+                self.eptm.periodic_boundary_condition()
+                self.eptm.is_cell_vert.a[:] = 1
             self._init_cell_geometry()
             self._init_cell_params()
             self.eptm.update_deltas()
@@ -643,11 +664,10 @@ class Cells():
                          for jv in cell.out_neighbours()])
         zeds = np.array([self.eptm.zeds[jv]
                          for jv in cell.out_neighbours()])
-        
         ixs = np.array([self.eptm.ixs[jv]
-                        for jv in cell.out_neighbours()])# - self.eptm.ixs[cell]
+                        for jv in cell.out_neighbours()])
         wys = np.array([self.eptm.wys[jv]
-                        for jv in cell.out_neighbours()])# - self.eptm.wys[cell]
+                        for jv in cell.out_neighbours()])
         sigmas = np.arctan2(wys, ixs) * rhos.mean()
         pos = np.vstack((sigmas, zeds)).T
         if pos.shape[0] > 0:
@@ -712,12 +732,11 @@ class ApicalJunctions():
         self.params = eptm.params
         self.adjacent_cells = self.eptm.graph.new_edge_property('object')
         if self.eptm.new :
-            self._compute_voronoi()
+            if self.eptm.generate:
+                self._compute_voronoi()
             self._init_junction_params()
         else:
             self._get_junction_params()
-            for j_edge in self:
-                self.update_adjacent(j_edge)
     
     def __iter__(self):
         

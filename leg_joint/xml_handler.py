@@ -111,54 +111,30 @@ class ParamTree(object):
         
     def change_dic(self, key, new_value, write=False,
                    back_up=False, verbose=False):
-        '''
-        Changes the Element tree and re-creates the associated dictionnary.
+        '''Changes the Element tree and re-creates the associated dictionnary.
         If write is True, re_writes the parameters files
         (older version is backed up if back_up is True)
         
-        new_value is absolute - it has units
+        new_value is dimention less : for the `line_tension`,
+        `radial_tension` and `contractility` parameters a dimentionalized 
+        value will be computed
         '''
-        if self.absolute_dic is None:
-            self.create_dic()
         a = self.root.findall('param')
         for item in a:
             if item.attrib['name'] == key:
                 item.attrib['value'] = str(new_value)
                 try:
-                    self.absolute_dic[key] = new_value
+                    self.relative_dic[key] = new_value
                 except KeyError:
                     print "Couldn't find the parameter %s" %key
-                    return 0
+                    raise
                 break
-        # try:
-        #     self.adimentionalize()
-        # except KeyError:
-        #     print 'Oooups'
-        #     raise()
 
         # FIXME! 
         if write:
             raise NotImplementedError
-            #continue
-        
-            # indent(self.root)
-            # xf = open(self.filename, 'w+')
-            # if back_up:
-            #     bck = self.filename+'.bck'
-            #     xfb = open(bck,'w+')
-            #     for line in xf:
-            #         xfb.write(line)
-            #     xfb.close()
-            #     xf.seek(0)
-            #     print "Backed up old parameter file as %s" %bck
-            # else :
-            #     print "Warning : %s changed without back up" %self.filename
-            
-            # xf.write(tostring(self.root))
-            # xf.close
-            # print "Changed  %s to %03f in file %s" %(key,
-            #                                          new_value,
-            #                                          self.filename)
         elif verbose:
             print "Warning: parameter %s changed but not written!" %key
 
+        self.dimentionalize()
+        
