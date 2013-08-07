@@ -32,11 +32,9 @@ def new_generation(eptm, growth_rate=1.5, pola=False):
     random.seed(3)
     random.shuffle(cells)
 
-    rhos = np.array([eptm.rhos[cell] for cell in cells])
-    cells = np.array(cells)[rhos.argsort()[::-1]]
-    cells = list(cells)
-
-
+    # rhos = np.array([eptm.rhos[cell] for cell in cells])
+    # cells = np.array(cells)[rhos.argsort()[::-1]]
+    # cells = list(cells)
 
     # thetas_zeds = np.array([(eptm.thetas[cell], eptm.zeds[cell])
     #                        for cell in cells]).T
@@ -104,9 +102,9 @@ def new_generation(eptm, growth_rate=1.5, pola=False):
         time_left = (elapsed / num) * (len(cells) - num)
         print str(num)+'/'+str(len(cells))
         print 'time left: %3f' % time_left
-        rhos = np.array([eptm.rhos[cell] for cell in cells])
-        cells = np.array(cells)[rhos.argsort()[::-1]]
-        cells = list(cells)
+        # rhos = np.array([eptm.rhos[cell] for cell in cells])
+        # cells = np.array(cells)[rhos.argsort()[::-1]]
+        # cells = list(cells)
     eptm.update_geometry()
     eptm.params['n_zeds'] *= 2
     eptm.params['n_sigmas'] *= 2

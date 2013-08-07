@@ -718,8 +718,12 @@ class Cells():
         jes = self.junctions[cell]
         neighbors = []
         for je in jes:
-            cell0, cell1 = self.eptm.junctions.adjacent_cells[je]
-            neighbors.append(cell0 if cell0 != cell else cell1)
+            adj = self.eptm.junctions.adjacent_cells[je]
+            if len(adj) == 2:
+                cell0, cell1 = adj
+                neighbors.append(cell0 if cell0 != cell else cell1)
+            elif len(adj) == 1:
+                neighbors.append(adj[0])
         return neighbors
         
 class ApicalJunctions():
