@@ -125,45 +125,50 @@ def type1_transition(eptm, elements, verbose=False):
     
     """
     #### Parsing arguments
-    # Cells
-    if len(elements) == 2 and eptm.is_cell_vert[elements[0]]:
-        cell1 = elements[0]
-        cell3 = elements[1]
-        j_edges1 =  eptm.cells.junctions[cell1]
-        j_edges3 =  eptm.cells.junctions[cell3]
-        try:
-            j_edgeab = [je for je in j_edges1 if je in j_edges3][0]
-        except IndexError:
-            print ("No valid junction found "
-                   "beetween cells %s and %s " % (cell1, cell3))
-            return
-        j_verta = j_edgeab.source()
-        j_vertb = j_edgeab.target()
-    # Junction vertices
-    elif len(elements) == 2 and not eptm.is_cell_vert[elements[0]]:
-        j_verta, j_vertb = elements
-        j_edgeab = eptm.graph.edge(elements)
-        if j_edgeab is None:
-            print "Invalid junction %s" % str(j_edgeab)
-            return
-        try:
-            cell1, cell3 = eptm.junctions.adjacent_cells[j_edgeab]
-        except ValueError:
-            print ("No adgacent cells found"
-                   "for junction %s" % str(j_edgeab))
-            return
+    try:
+        # Cells
+        if len(elements) == 2 and eptm.is_cell_vert[elements[0]]:
+            cell1 = elements[0]
+            cell3 = elements[1]
+            j_edges1 =  eptm.cells.junctions[cell1]
+            j_edges3 =  eptm.cells.junctions[cell3]
+            try:
+                j_edgeab = [je for je in j_edges1 if je in j_edges3][0]
+            except IndexError:
+                print ("No valid junction found "
+                       "beetween cells %s and %s " % (cell1, cell3))
+                return
+            j_verta = j_edgeab.source()
+            j_vertb = j_edgeab.target()
+        # Junction vertices
+        elif len(elements) == 2 and not eptm.is_cell_vert[elements[0]]:
+            j_verta, j_vertb = elements
+            j_edgeab = eptm.graph.edge(elements)
+            if j_edgeab is None:
+                print "Invalid junction %s" % str(j_edgeab)
+                return
+            try:
+                cell1, cell3 = eptm.junctions.adjacent_cells[j_edgeab]
+            except ValueError:
+                print ("No adgacent cells found"
+                       "for junction %s" % str(j_edgeab))
+                return
+        else:
+            raise ValueError("Invalid argument %s" % str(elements))
+
     # Junction edges
-    elif eptm.is_junction_edge(elements):
-        j_edgeab = elements
-        j_verta, j_vertb = j_edgeab.source(), j_edgeab.target()
-        try:
-            cell1, cell3 = eptm.junctions.adjacent_cells[j_edgeab]
-        except ValueError:
-            print ("No adgacent cells found"
-                   "for junction %s" % str(j_edgeab))
-            return
-    else:
-        raise ValueError("Invalid argument %s" % str(elements))
+    except TypeError:
+        if eptm.is_junction_edge[elements]:
+            j_edgeab = elements
+            j_verta, j_vertb = j_edgeab.source(), j_edgeab.target()
+            try:
+                cell1, cell3 = eptm.junctions.adjacent_cells[j_edgeab]
+            except ValueError:
+                print ("No adgacent cells found"
+                       "for junction %s" % str(j_edgeab))
+                return
+        else:
+            raise ValueError("Invalid argument %s" % str(elements))
     #### Done parsing arguments
 
     try:

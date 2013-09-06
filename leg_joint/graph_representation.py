@@ -111,15 +111,17 @@ def plot_ortho_proj(eptm, ax=None, vfilt=None,
         efilt = eptm.is_local_edge
     if ax is None:
         fig, ax = plt.subplots(1,1)
-        
+    else:
+        fig = ax.get_figure()
+    
     plot_cells_zs(eptm, ax=ax,
                   vfilt=vfilt, efilt=efilt,
                   depth_color=depth_color, **kwargs)
 
     divider = make_axes_locatable(ax)
     
-    ax_zr = divider.append_axes("top", 1., pad=0.1, sharex=ax)
-    ax_rs = divider.append_axes("right", 1., pad=0.1, sharey=ax)
+    ax_zr = divider.append_axes("top", 2., pad=0.2, sharex=ax)
+    ax_rs = divider.append_axes("right", 2., pad=0.2, sharey=ax)
     
     plot_cells_zr(eptm, ax=ax_zr,
                   vfilt=vfilt, efilt=efilt,
@@ -130,7 +132,12 @@ def plot_ortho_proj(eptm, ax=None, vfilt=None,
     plt.setp(ax_zr.get_xticklabels() + ax_rs.get_yticklabels(),
              visible=False)
     plt.draw()
-    return ax, ax_zr, ax_rs
+
+    ax_zr.set_xlabel('')
+    ax_rs.set_ylabel('')
+
+    axes = ax, ax_zr, ax_rs
+    return fig, axes
 
 
 def plot_cells_generic(eptm, xcoord, ycoord, ax=None, 
@@ -226,8 +233,6 @@ def plot_cells_rs(eptm, ax=None, c_text=False,
                             xlabel='Radius',
                             ylabel='Latitude')
     return ax
-
-
 
 def plot_cells_zs(eptm, ax=None, text=True,
                   vfilt=None, efilt=None,

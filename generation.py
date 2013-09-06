@@ -31,17 +31,6 @@ def new_generation(eptm, growth_rate=1.5, pola=False):
         phi = eptm.dsigmas.copy()
     random.seed(3)
     random.shuffle(cells)
-
-    # rhos = np.array([eptm.rhos[cell] for cell in cells])
-    # cells = np.array(cells)[rhos.argsort()[::-1]]
-    # cells = list(cells)
-
-    # thetas_zeds = np.array([(eptm.thetas[cell], eptm.zeds[cell])
-    #                        for cell in cells]).T
-    # indices = np.lexsort(thetas_zeds)
-    # rhos = np.array([eptm.rhos[cell] for cell in cells])
-    # cells = np.array(cells)[indices]
-    # cells = list(cells)
     while len(cells):
         mother_cell = cells.pop()
         print('dividing cell %s' %str(mother_cell))
@@ -71,16 +60,13 @@ def new_generation(eptm, growth_rate=1.5, pola=False):
         eptm.isotropic_relax()
         #rand_phi = np.random.normal(0, np.pi/8.)
         j = lj.cell_division(eptm, mother_cell,
-        #                     phi_division=rand_phi,
+                             #phi_division=rand_phi,
                              verbose=False)
         if pola:
             eptm.update_tensions(phi, np.pi/3)
         if j is not None:
             pos0, pos1 = lj.find_energy_min(eptm, tol=1e-5)
             eptm.isotropic_relax()
-            # rho_avg = eptm.rhos.a.mean()
-            # eptm.rhos.a = rho_avg
-            # eptm.update_xy()
             small_cells = [cell for cell in eptm.cells
                            if eptm.cells.areas[cell] < 1e-1]
             if len(small_cells) > 0:
@@ -102,9 +88,8 @@ def new_generation(eptm, growth_rate=1.5, pola=False):
         time_left = (elapsed / num) * (len(cells) - num)
         print str(num)+'/'+str(len(cells))
         print 'time left: %3f' % time_left
-        # rhos = np.array([eptm.rhos[cell] for cell in cells])
-        # cells = np.array(cells)[rhos.argsort()[::-1]]
-        # cells = list(cells)
+
+    eptm.isotropic_relax()
     eptm.update_geometry()
     eptm.params['n_zeds'] *= 2
     eptm.params['n_sigmas'] *= 2
@@ -118,12 +103,15 @@ if __name__ == '__main__':
 
     pola = False
     eptm.isotropic_relax()
-
-    # lj.running_local_optimum(eptm, tol=1e-3, pola=pola, save_to=None)
-    # if pola:
-    #     eptm.graph.save('saved_graphs/xml/initial_squeezed.xml')
-    # else:
-    #     eptm.graph.save('saved_graphs/xml/initial_graph.xml')
-    for n in range(1):
+    lj.running_local_optimum(eptm, tol=1e-3, pola=pola, save_to=None)
+    lj.draw(eptm)
+    if pola:
+        eptm.graph.save('saved_graphs/xml/initial_squeezed.xml')
+    else:
+        eptm.graph.save('saved_graphs/xml/initial_graph.xml')
+    for n in range(2):
         new_generation(eptm, pola)
+        lj.running_local_optimum(eptm, tol=1e-3, pola=pola, save_to=None)
+        eptm.isotropic_relax()
+
     eptm.graph.save('saved_graphs/xml/before_apoptosis.xml')

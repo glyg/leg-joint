@@ -269,16 +269,17 @@ class Dynamics(object):
         '''
 
         lt0 = self.params['line_tension']
-        phi.a = np.arctan2(np.sqrt(self.dixs.a**2
-                                   + self.dwys.a**2),
-                           self.dzeds.a)
-        lower = - delta_phi
+        self.update_rhotheta()
+        self.update_dsigmas()
+        phi.a = np.arctan2(np.abs(self.dzeds.a),
+                           np.abs(self.dsigmas.a))
+        lower = 0
         upper = delta_phi
         for je in self.junctions:
-            if (lower < phi[je] < upper):
-                self.junctions.line_tensions[je] = factor * lt0
-            else:
+            if phi[je] < delta_phi:
                 self.junctions.line_tensions[je] = lt0
+            else:
+                self.junctions.line_tensions[je] = lt0 / factor
 
     def isotropic_relax(self):
 
