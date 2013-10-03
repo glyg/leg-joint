@@ -178,20 +178,15 @@ class Epithelium(EpitheliumFilters,
         cell geometry (area and volume)
         '''
         
-        # Cells
-        if self.__verbose__: print ('Cells geometry update on %i vertices'
-                                    % self.graph.num_vertices())
         self.update_cells_pos()
         self.update_rhotheta()
         self.update_deltas()
         self.update_edge_lengths()
         # self.update_dsigmas()
         # Edges
-        if self.__verbose__:
-            print ('Geometry update on %i edges'
-                   % self.graph.num_edges())
         for j_edge in self.junctions:
             self.diamonds[j_edge].update_geometry()
+        # cells
         for cell in self.cells:
             self._one_cell_geom(cell)
             

@@ -109,7 +109,7 @@ if __name__ == '__main__':
         eptm.graph.save('saved_graphs/xml/initial_squeezed.xml')
     else:
         eptm.graph.save('saved_graphs/xml/initial_graph.xml')
-    for n in range(2):
+    for n in range(3):
         new_generation(eptm, pola)
         lj.running_local_optimum(eptm, tol=1e-3, pola=pola, save_to=None)
         eptm.isotropic_relax()

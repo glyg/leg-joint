@@ -33,7 +33,8 @@ def draw_polygons(eptm, coord1, coord2, colors,
     if ax is None:
         fig, ax = plt.subplots()
     for poly, color in zip(polygons, colors):
-        patch = Polygon(poly, color=color, fill=True, closed=True)
+        patch = Polygon(poly, color=color,
+                        fill=True, closed=True, alpha=0.4)
         ax.add_patch(patch)
     ax.autoscale_view()
     ax.set_aspect('equal')
@@ -102,6 +103,26 @@ def plot_active(eptm, xcoord, ycoord, ax=None):
     plt.draw()
     return ax
 
+def plot_two_panels(eptm, ax=None, vfilt=None,
+                    efilt=None, local=True,
+                    depth_color=None,
+                    **kwargs):
+    
+    if local:
+        vfilt = eptm.is_local_vert
+        efilt = eptm.is_local_edge
+    if ax is None:
+        fig, ax = plt.subplots(1,1)
+    else:
+        fig = ax.get_figure()
+    
+    plot_cells_zs(eptm, ax=ax,
+                  vfilt=vfilt, efilt=efilt,
+                  depth_color=depth_color, **kwargs)
+
+    
+
+    
 def plot_ortho_proj(eptm, ax=None, vfilt=None,
                     efilt=None, local=True,
                     depth_color=None,

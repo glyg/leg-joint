@@ -15,7 +15,7 @@ import random
 
 def p_apopto(zed, theta, z0=0., width_apopto=1.5, p0=0.95, amp=0.7):
     p = p0 * np.exp(- (zed - z0)**2 / width_apopto**2
-                    ) * ((1-amp) + amp * np.abs(np.cos(theta/2.)))
+                    ) * ((1 - amp) + amp * (1 - np.cos(theta/2)**4))
     return p
 
 def get_apoptotic_cells(eptm, seed, **kwargs):
@@ -32,7 +32,7 @@ def get_apoptotic_cells(eptm, seed, **kwargs):
     apopto_cells = np.array([cell for cell in eptm.cells
                              if is_apoptotic[cell]])
     thetas = np.array([eptm.thetas[cell] for cell in apopto_cells])
-    theta_idx = np.argsort(np.cos(thetas/2))[::-1]
+    theta_idx = np.argsort(np.cos(thetas/2))#[::-1]
     return apopto_cells.take(theta_idx)
 
 def get_sequence(apopto_cells, num_steps):
@@ -54,7 +54,7 @@ def gradual_apoptosis(eptm, apopto_cells, num_steps, pola=False, **kwargs):
     fold_cells = np.array([cell for cell in eptm.cells
                            if eptm.is_local_vert[cell]])
     thetas = np.array([eptm.thetas[cell] for cell in fold_cells])
-    theta_idx = np.argsort(np.cos(thetas/2))[::-1]
+    theta_idx = np.argsort(np.cos(thetas/2))
     fold_cells = fold_cells[theta_idx]
     eptm.set_local_mask(None)
     i = 0

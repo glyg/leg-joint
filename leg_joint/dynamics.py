@@ -290,12 +290,11 @@ class Dynamics(object):
         self.set_vertex_state([(self.is_cell_vert, False),
                                (self.is_alive, False)])
         area_avg = self.cells.areas.fa.mean()
-        vol_avg = self.cells.vols.fa.mean()
         rho_avg = self.rhos.fa.mean()
         self.set_vertex_state()
 
         ### Set height and area to height0 and area0
-        scale = area0 / area_avg
+        scale = (area0 / area_avg)**0.5
         self.scale(scale)
         self.rho_lumen = rho_avg * scale - h_0
         self.update_geometry()
