@@ -1,14 +1,20 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
+from __future__ import unicode_literals
+from __future__ import division
+from __future__ import absolute_import
+from __future__ import print_function
+
+
 import numpy as np
 
 from scipy import optimize
 
-from . import filters
+from .filters import active
 from .utils import local_subgraph
 
     
-@filters.active
+@active
 def precondition(eptm):
     '''Grabd the positions and computes the maximum displacements
     before optimisation. 
@@ -17,15 +23,15 @@ def precondition(eptm):
                       eptm.wys.fa,
                       eptm.zeds.fa]).T.flatten()
     max_disp = 2 * eptm.edge_lengths.fa.mean()
-    if eptm.__verbose__ : print ('Initial postion  has shape %s'
-                          % str(pos0.shape))
-    if eptm.__verbose__ : print ('Max displacement amplitude  : %.3f'
-                         % max_disp)
+    if eptm.__verbose__ : print('Initial postion  has shape %s'
+                                % str(pos0.shape))
+    if eptm.__verbose__ : print('Max displacement amplitude  : %.3f'
+                                % max_disp)
     bounds = np.zeros((pos0.shape[0],),
                       dtype=[('min', np.float32),
                              ('max', np.float32)])
-    if eptm.__verbose__: print ('bounds array has shape: %s'
-                         % str(bounds.shape))
+    if eptm.__verbose__: print('bounds array has shape: %s'
+                               % str(bounds.shape))
     x_bounds = np.vstack((eptm.ixs.fa - max_disp,
                           eptm.ixs.fa + max_disp)).T
     y_bounds = np.vstack((eptm.wys.fa - max_disp,
@@ -116,7 +122,7 @@ def approx_grad(eptm):
 @local_subgraph
 def check_local_grad(eptm):
     pos0, bounds = precondition(eptm)
-    if eptm.__verbose__: print "Checking gradient"
+    if eptm.__verbose__: print("Checking gradient")
 
     # grad_err = np.linalg.norm(approx_grad(eptm)
     #                           - eptm.gradient_array())

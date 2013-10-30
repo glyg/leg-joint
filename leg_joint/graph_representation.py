@@ -11,7 +11,7 @@ from matplotlib.patches import Polygon
 
 import graph_tool.all as gt
 
-import leg_joint.filters as filters
+from .filters import active
 from .optimizers import precondition, approx_grad
 from .utils import to_rhotheta
 
@@ -89,7 +89,7 @@ def plot_ortho_gradients(eptm, axes=None,
     return axes
 
 
-@filters.active
+@active
 def plot_active(eptm, xcoord, ycoord, ax=None):
     
     
@@ -374,7 +374,7 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
     #j_filt.a *= (1 - eptm.is_alive.a)
     eptm.graph.set_vertex_filter(j_filt,
                                  inverted=True)
-    if verbose: print eptm.graph.num_vertices()
+    if verbose: print(eptm.graph.num_vertices())
     vertex_red.fa = 105/256.
     vertex_green.fa = 182/256.
     vertex_blue.fa = 40/256.
@@ -431,7 +431,7 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
                          vertex_size=vertex_size,
                          vorder=vorder, eorder=eorder,
                          output=output3d)
-    if verbose: print 'saved tissue to %s' % output3d
+    if verbose: print('saved tissue to %s' % output3d)
     
     sigma = eptm.proj_sigma()
     zs = [zeds, sigma]
@@ -452,7 +452,7 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
                           vertex_size=vertex_size,
                           vorder=vorder, eorder=eorder,
                           output=output2d)
-    if verbose: print 'saved tissue to %s' % output2d
+    if verbose: print('saved tissue to %s' % output2d)
     del pmap, pmap2
     eptm.graph.set_directed(True)
 

@@ -1,11 +1,16 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from __future__ import unicode_literals
+from __future__ import division
+from __future__ import absolute_import
+from __future__ import print_function
+
 import os
+import warnings
 
 import graph_tool.all as gt
 import numpy as np
-from scipy import weave
+#from scipy import weave
 
 
 from .objects import  AbstractRTZGraph, Cells, ApicalJunctions
@@ -13,10 +18,9 @@ from .xml_handler import ParamTree
 from .dynamics import Dynamics
 
 
-from . import filters
+from .filters import active, j_edges_in, EpitheliumFilters
 from .utils import to_xy, to_rhotheta
 
-EpitheliumFilters = filters.EpitheliumFilters
 
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
@@ -101,7 +105,7 @@ class Epithelium(EpitheliumFilters,
         
         # Graph instanciation
         if graph is None and graphXMLfile is None:
-            print 'Created new graph'
+            print('Created new graph')
             self.graph = gt.Graph(directed=True)
             self.new = True
             self.generate = True
@@ -123,10 +127,10 @@ class Epithelium(EpitheliumFilters,
 
         # Cells and Junctions initialisation
         if self.__verbose__:
-            print 'Initial cells'
+            print('Initial cells')
         self.cells = Cells(self)
         if self.__verbose__:
-            print 'Initial junctions'
+            print('Initial junctions')
         self.junctions = ApicalJunctions(self)
         if self.generate:
             self.is_alive.a = 1
@@ -136,8 +140,8 @@ class Epithelium(EpitheliumFilters,
             if self.__verbose__ == True:
                 total_edges = self.graph.num_edges()
                 good_edges = efilt.a.sum()
-                print 'removing %i cell to cell edges ' % (total_edges
-                                                           - good_edges)
+                print('removing %i cell to cell edges '
+                      % (total_edges - good_edges))
             self.graph.set_edge_filter(efilt)
             self.graph.purge_edges()
             self.set_vertex_state()
@@ -147,11 +151,11 @@ class Epithelium(EpitheliumFilters,
         # Dynamical components
         Dynamics.__init__(self)
         if self.new:
-            if self.__verbose__: print 'Isotropic relaxation'
+            if self.__verbose__: print('Isotropic relaxation')
             self.isotropic_relax()
-            if self.__verbose__: print 'Periodic boundary'
+            if self.__verbose__: print('Periodic boundary')
             self.periodic_boundary_condition()
-        if self.__verbose__: print 'Update geometry'
+        if self.__verbose__: print('Update geometry')
         self.zetas = self.dzeds.copy()
         self.update_geometry()
         
@@ -228,7 +232,7 @@ class Epithelium(EpitheliumFilters,
         '''
         self._set_junction_pos(new_xyz_pos)
         
-    @filters.active
+    @active
     def _set_junction_pos(self, new_xyz_pos):
         new_xyz_pos = new_xyz_pos.flatten()
         assert len(new_xyz_pos) / 3 == self.graph.num_vertices()
@@ -287,9 +291,9 @@ class Epithelium(EpitheliumFilters,
         j_edgeab = self.graph.edge(j_verta, j_vertb)
         if j_edgeab is not None:
             if self.__verbose__:
-                print ('''Warning: previous %s to %s 
-                       edge is re-created.'''
-                       % (str(j_verta), str(j_vertb)))
+                warnings.warn('''Previous %s to %s 
+                             edge is re-created.'''
+                             % (str(j_verta), str(j_vertb)))
             self.graph.remove_edge(j_edgeab)
         j_edgeab = self.graph.add_edge(j_verta, j_vertb)
         j_edge_old = self.cells.junctions[cell0][0]
@@ -360,8 +364,8 @@ class Epithelium(EpitheliumFilters,
         if j_edgeab is None:
             j_edgeab = self.graph.edge(j_vertb, j_verta)
         if j_edgeab is None:
-            print "Warning: junction from %s to %s doesn't exist" % (
-                str(j_edgeab.source()), str(j_edgeab.target()))
+            warnings.warn("Junction from %s to %s doesn't exist"
+                         % (str(j_edgeab.source()), str(j_edgeab.target())))
             return
         self.cells.junctions[cell0].remove(j_edgeab)
         self.cells.junctions[cell1].remove(j_edgeab)
@@ -381,7 +385,7 @@ class Epithelium(EpitheliumFilters,
             if ctoj_1b is not None:
                 self.graph.remove_edge(ctoj_1b)
 
-    @filters.j_edges_in
+    @j_edges_in
     def merge_j_verts(self, jv0, jv1):
         '''Merge junction vertices `jv0` and `jv1`. Raises an error if
         those vertices are not connected
@@ -410,7 +414,7 @@ class Epithelium(EpitheliumFilters,
         vertex_trash.append(jv1)
         return vertex_trash, edge_trash
 
-    # @filters.cells_out
+    # @cells_out
     # def radial_smooth(self, smth=0.5, local=True):
     #     for v in self.graph.vertices():
     #         if not self.is_alive[v]:
@@ -426,30 +430,30 @@ class Epithelium(EpitheliumFilters,
     #     self.update_xy()
 
 
-def triangle_geometry(sz0, sz1, sz2):
-    c_code = """
-    double s0 = sz0[0];
-    double z0 = sz0[1];
-    double s1 = sz1[0];
-    double z1 = sz1[1];
-    double s2 = sz2[0];
-    double z2 = sz2[1];
+# def triangle_geometry(sz0, sz1, sz2):
+#     c_code = """
+#     double s0 = sz0[0];
+#     double z0 = sz0[1];
+#     double s1 = sz1[0];
+#     double z1 = sz1[1];
+#     double s2 = sz2[0];
+#     double z2 = sz2[1];
 
 
-    double d01 = sqrt((s0-s1) * (s0-s1) + (z1-z0) * (z1-z0));
-    double d02 = sqrt((s0-s2) * (s0-s2) + (z2-z0) * (z2-z0));
-    double d12 = sqrt((s1-s2) * (s1-s2) + (z2-z1) * (z2-z1));
-    double area012 = fabs((s1-s0) * (z2-z0) - (s2-s0) * (z1-z0));
+#     double d01 = sqrt((s0-s1) * (s0-s1) + (z1-z0) * (z1-z0));
+#     double d02 = sqrt((s0-s2) * (s0-s2) + (z2-z0) * (z2-z0));
+#     double d12 = sqrt((s1-s2) * (s1-s2) + (z2-z1) * (z2-z1));
+#     double area012 = fabs((s1-s0) * (z2-z0) - (s2-s0) * (z1-z0));
 
-    py::tuple results(4);
-    results[0] = d01;
-    results[1] = d02;
-    results[2] = d12;
-    results[3] = area012;
-    return_val = results;
+#     py::tuple results(4);
+#     results[0] = d01;
+#     results[1] = d02;
+#     results[2] = d12;
+#     results[3] = area012;
+#     return_val = results;
     
-    """
-    return weave.inline(c_code,
-                        arg_names=['sz0', 'sz1', 'sz2'],
-                        headers=['<math.h>'])
+#     """
+#     return weave.inline(c_code,
+#                         arg_names=['sz0', 'sz1', 'sz2'],
+#                         headers=['<math.h>'])
 

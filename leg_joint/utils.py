@@ -51,7 +51,7 @@ def compute_distribution(prop_u, prop_v, bins, smth=0):
 
     Huv = hist_uv, bins_u, bins_v
     
-    print '''bin width = %.3f''' % bin_wu
+    print('''bin width = %.3f''' % bin_wu)
     norm = hist_uv.sum(axis=1)
     mean_vfu = (regular_v * hist_uv).sum(axis=1) / hist_uv.sum(axis=1)
     tck_vfu = splrep(regular_u, mean_vfu, k=3, s=smth)

@@ -1,12 +1,19 @@
-#!/usr/bin/env python
+
 # -*- coding: utf-8 -*-
+
+from __future__ import unicode_literals
+from __future__ import division
+from __future__ import absolute_import
+from __future__ import print_function
+
+
 import numpy as np
 
 #from utils import compute_distribution
 #from scipy.interpolate import splev
 from scipy import optimize
 import graph_tool.all as gt
-import filters
+from .filters import cells_in, j_edges_in, active
 
 mu = 6 * np.sqrt(2. / (3 * np.sqrt(3)))
 
@@ -92,7 +99,7 @@ class Dynamics(object):
                         + radial_term.sum())
         return total_energy / self.norm_factor
 
-    @filters.cells_in
+    @cells_in
     def calc_cells_energy(self):
         contractile_term = 0.5 * self.cells.contractilities.fa * \
                            self.cells.perimeters.fa**2
@@ -100,7 +107,7 @@ class Dynamics(object):
                       * (self.cells.vols.fa - self.cells.prefered_vol.fa)**2
         return contractile_term, volume_term
         
-    @filters.j_edges_in
+    @j_edges_in
     def calc_junctions_energy(self):
         junctions_energy = self.junctions.line_tensions.fa\
                            * self.edge_lengths.fa
@@ -108,10 +115,10 @@ class Dynamics(object):
                         * (self.rhos.fa - self.rho_lumen)
         return junctions_energy, radial_energy
         
-    @filters.active
+    @active
     def gradient_array(self, gtol=1e-8):
         gradient = np.zeros(self.graph.num_vertices() * 3)
-        if self.__verbose__ : print 'Gradient shape: %s' % gradient.shape
+        if self.__verbose__ : print('Gradient shape: %s' % gradient.shape)
         gradient[::3] = self.grad_ix.fa
         gradient[1::3] = self.grad_wy.fa
         gradient[2::3] = self.grad_zed.fa 
@@ -163,7 +170,7 @@ class Dynamics(object):
             num_jverts = self.graph.num_vertices() - num_cells
             num_edges = self.is_junction_edge.a.sum()
             num_ctoj = self.is_ctoj_edge.a.sum()
-            print (
+            print(
                 '''Updating gradient for %i cells,
                 %i junctions vertices, %i junctions edges
                 and %i cell to junction edges'''

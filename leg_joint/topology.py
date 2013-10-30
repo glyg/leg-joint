@@ -4,10 +4,11 @@ import os
 import numpy as np
 import glob
 #import filters
-from graph_representation import epithelium_draw
-from optimizers import find_energy_min
 
 from datetime import datetime
+
+from .graph_representation import epithelium_draw
+from .optimizers import find_energy_min
 
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
@@ -137,8 +138,8 @@ def type1_transition(eptm, elements, verbose=False):
             try:
                 j_edgeab = [je for je in j_edges1 if je in j_edges3][0]
             except IndexError:
-                print ("No valid junction found "
-                       "beetween cells %s and %s " % (cell1, cell3))
+                print("No valid junction found "
+                      "beetween cells %s and %s " % (cell1, cell3))
                 return
             j_verta = j_edgeab.source()
             j_vertb = j_edgeab.target()
@@ -147,13 +148,13 @@ def type1_transition(eptm, elements, verbose=False):
             j_verta, j_vertb = elements
             j_edgeab = eptm.graph.edge(elements)
             if j_edgeab is None:
-                print "Invalid junction %s" % str(j_edgeab)
+                print("Invalid junction %s" % str(j_edgeab))
                 return
             try:
                 cell1, cell3 = eptm.junctions.adjacent_cells[j_edgeab]
             except ValueError:
-                print ("No adgacent cells found"
-                       "for junction %s" % str(j_edgeab))
+                print("No adgacent cells found"
+                      "for junction %s" % str(j_edgeab))
                 return
         else:
             raise ValueError("Invalid argument %s" % str(elements))
@@ -166,8 +167,8 @@ def type1_transition(eptm, elements, verbose=False):
             try:
                 cell1, cell3 = eptm.junctions.adjacent_cells[j_edgeab]
             except ValueError:
-                print ("No adgacent cells found"
-                       "for junction %s" % str(j_edgeab))
+                print("No adgacent cells found"
+                      "for junction %s" % str(j_edgeab))
                 return
         else:
             raise ValueError("Invalid argument %s" % str(elements))
@@ -226,9 +227,9 @@ def type1_transition(eptm, elements, verbose=False):
                        j_vertd, j_verte, j_vertf]
     if eptm.__verbose__ : 
         for cell, i in zip(modified_cells, [1, 2, 3, 4]):
-            print 'cell %i: %s' %(i, str(cell))
+            print('cell %i: %s' %(i, str(cell)))
         for jv, i in zip(modified_jverts, 'abcdef'):
-            print 'junction vertice %s: %s' %(i, str(jv))
+            print('junction vertice %s: %s' %(i, str(jv)))
 
     eptm.remove_junction(j_verta, j_vertb, cell1, cell3)
     eptm.remove_junction(j_verta, j_vertc, cell1, cell4)
@@ -251,12 +252,10 @@ def type1_transition(eptm, elements, verbose=False):
     if delta_t >  np.pi:
         delta_t -= 2 * np.pi
         sigma_a += 2 * np.pi * rho_a
-        print 'flip'
         flip = -1
     elif delta_t < -np.pi:
         delta_t += 2 * np.pi
         sigma_b += 2 * np.pi * rho_a
-        print 'flip'
         flip = -1
     else:
         flip = 1
@@ -305,7 +304,7 @@ def cell_division(eptm, mother_cell,
     eptm.cells.ages[daughter_cell] = 0
     eptm.cells.junctions[daughter_cell] = []
     
-    print "Cell %s is born" % str(daughter_cell)
+    print("Cell %s is born" % str(daughter_cell))
     
     junction_trash = []
     new_junctions = []
@@ -400,7 +399,7 @@ def cell_division(eptm, mother_cell,
     # eptm.graph.set_vertex_filter(None)
     # eptm.graph.set_edge_filter(None)
 
-    if eptm.__verbose__: print 'Division completed'
+    if eptm.__verbose__: print('Division completed')
     return septum
 
 @snapshot
@@ -416,7 +415,7 @@ def type3_transition(eptm, cell, reduce_edgenum=True, verbose=False):
                              for edge in j_edges])
     if len(j_edges) != 3 and reduce_edgenum:
         if verbose:
-            print ('''%i edges left''' % len(j_edges))
+            print('''%i edges left''' % len(j_edges))
         je = j_edges[edge_lengths.argmin()]
         cell1, cell3 = eptm.junctions.adjacent_cells[je]
         modified = type1_transition(eptm, (cell1, cell3),
@@ -424,7 +423,7 @@ def type3_transition(eptm, cell, reduce_edgenum=True, verbose=False):
         return 
     old_jvs = [old_jv for old_jv in cell.out_neighbours()]
     new_jv = eptm.new_vertex(old_jvs[0])
-    if verbose: print ('Cell %s removed, edge %s created'
+    if verbose: print('Cell %s removed, edge %s created'
                        % (cell, new_jv))
     edge_trash = []
     cell_neighbs = []
@@ -433,17 +432,17 @@ def type3_transition(eptm, cell, reduce_edgenum=True, verbose=False):
         for edge in old_jv.out_edges():
             if edge in j_edges: continue
             new_edge = eptm.new_j_edge(new_jv, edge.target())
-            if verbose: print 'new_j_edge %s ' %edge 
+            if verbose: print('new_j_edge %s ' %edge)
         for edge in old_jv.in_edges():
             if eptm.is_ctoj_edge[edge]:
                 cell0 = edge.source()
                 eptm.new_ctoj_edge(cell0, new_jv)
-                if verbose: print 'new_ctoj_edge %s ' %edge
+                if verbose: print('new_ctoj_edge %s ' %edge)
                 if cell0 not in cell_neighbs:
                     cell_neighbs.append(cell0)
             elif edge in j_edges: continue
             else:
-                if verbose: print 'new_j_edge %s ' %edge 
+                if verbose: print('new_j_edge %s ' %edge)
                 eptm.new_j_edge(edge.source(), new_jv)
         edge_trash.extend(old_jv.all_edges())
         eptm.is_alive[old_jv] = 0
@@ -452,7 +451,7 @@ def type3_transition(eptm, cell, reduce_edgenum=True, verbose=False):
         try:
             eptm.graph.remove_edge(edge)
         except ValueError:
-            print 'invalid edge'
+            print('invalid edge')
             continue
     eptm.set_local_mask(None)
     for n_cell in cell_neighbs:
@@ -483,7 +482,7 @@ def remove_cell(eptm, cell):
     edge_trash = ctojs
     edge_trash.extend(cell_jes)
     new_jv = eptm.new_vertex(jvs[0])
-    print 'new vertex %s' % str(new_jv)
+    print('new vertex %s' % str(new_jv))
     eptm.is_local_vert[jv] = 1
     eptm.ixs[new_jv] = eptm.ixs[cell]
     eptm.wys[new_jv] = eptm.wys[cell]
@@ -577,7 +576,7 @@ def resolve_small_edges(eptm, threshold=5e-2, vfilt=None, efilt=None):
         if (len(eptm.cells.junctions[cell0]) < 4) or (
             len(eptm.cells.junctions[cell1]) < 4):
             continue
-        print 'Type 1 transition'
+        print('Type 1 transition')
         energy0 = eptm.calc_energy()
         backup_graph = eptm.graph.copy()
         modified = type1_transition(eptm, (cell0, cell1))
@@ -585,6 +584,6 @@ def resolve_small_edges(eptm, threshold=5e-2, vfilt=None, efilt=None):
             pos0, pos1 = eptm.find_energy_min()
             energy1 = eptm.calc_energy()
             if energy0 < energy1:
-                print 'Undo transition!'
+                print('Undo transition!')
                 eptm.graph = backup_graph
         eptm.graph.set_edge_filter(None)

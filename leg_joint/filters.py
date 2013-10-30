@@ -7,11 +7,11 @@ def local(meth):
     def new_function(self, *args, **kwargs):
         prev_vstate, prev_inverted_v = self.graph.get_vertex_filter()
         prev_estate, prev_inverted_e = self.graph.get_edge_filter()
-        if self.__verbose__ : print 'filter local'
+        if self.__verbose__ : print('filter local')
         self.set_vertex_state([(self.is_local_vert, False),])
         self.set_edge_state([(self.is_local_edge, False)])
         out = meth(self, *args, **kwargs)
-        if self.__verbose__ : print 'restore from local filter'
+        if self.__verbose__ : print('restore from local filter')
         self.graph.set_vertex_filter(prev_vstate, prev_inverted_v)
         self.graph.set_edge_filter(prev_estate, prev_inverted_e)
         return out
@@ -22,11 +22,11 @@ def active(meth):
     def new_function(self, *args, **kwargs):
         prev_vstate, prev_inverted_v = self.graph.get_vertex_filter()
         prev_estate, prev_inverted_e = self.graph.get_edge_filter()
-        if self.__verbose__ : print 'filter active'
+        if self.__verbose__ : print('filter active')
         self.set_vertex_state([(self.is_active_vert, False),])
         self.set_edge_state([(self.is_active_edge, False)])
         out = meth(self, *args, **kwargs)
-        if self.__verbose__ : print 'restore from active filter'
+        if self.__verbose__ : print('restore from active filter')
         self.graph.set_vertex_filter(prev_vstate, prev_inverted_v)
         self.graph.set_edge_filter(prev_estate, prev_inverted_e)
         return out
@@ -35,13 +35,13 @@ def active(meth):
 
 def no_filter(meth):
     def new_function(self, *args, **kwargs):
-        if self.__verbose__ : print 'no filter'
+        if self.__verbose__ : print('no filter')
         prev_vstate, prev_inverted_v = self.graph.get_vertex_filter()
         prev_estate, prev_inverted_e = self.graph.get_edge_filter()
         self.graph.set_vertex_filter(None)
         self.graph.set_edge_filter(None)
         out = meth(self, *args, **kwargs)
-        if self.__verbose__ : print 'restore from no filter'
+        if self.__verbose__ : print('restore from no filter')
         self.graph.set_vertex_filter(prev_vstate, prev_inverted_v)
         self.graph.set_edge_filter(prev_estate, prev_inverted_e)
         return out
@@ -50,24 +50,24 @@ def no_filter(meth):
 def cells_in(meth):
     def new_function(self, *args, **kwargs):
         prev_vstate, prev_inverted = self.graph.get_vertex_filter()
-        if self.__verbose__ : print 'filter cells in'
+        if self.__verbose__ : print('filter cells in')
         #self.graph.set_vertex_filter(self.is_cell_vert)
         self.set_vertex_state([(self.is_cell_vert, False),
                                 (self.is_alive, False)])
         out = meth(self, *args, **kwargs)
-        if self.__verbose__ : print 'restore from cells in'
+        if self.__verbose__ : print('restore from cells in')
         self.graph.set_vertex_filter(prev_vstate, prev_inverted)
         return out
     return new_function
 
 def cells_out(meth):
     def new_function(self, *args, **kwargs):
-        if self.__verbose__ : print 'cells out'
+        if self.__verbose__ : print('cells out')
         prev_vstate, prev_inverted = self.graph.get_vertex_filter()
         self.set_vertex_state([(self.is_cell_vert, True),
                                (self.is_alive, False)])
         out = meth(self, *args, **kwargs)
-        if self.__verbose__ : print 'restore cells from cells out'
+        if self.__verbose__ : print('restore cells from cells out')
         self.graph.set_vertex_filter(prev_vstate, prev_inverted)
         return out
     return new_function
@@ -75,33 +75,33 @@ def cells_out(meth):
 def j_edges_in(meth):
     def new_function(self, *args, **kwargs):
         prev_estate, prev_inverted = self.graph.get_edge_filter()
-        if self.__verbose__ : print 'junction edges in'
+        if self.__verbose__ : print('junction edges in')
         self.set_edge_state([(self.is_junction_edge, False),])
         out = meth(self, *args, **kwargs)
         self.graph.set_edge_filter(prev_estate, prev_inverted)
-        if self.__verbose__ : print 'restore from junctions in'
+        if self.__verbose__ : print('restore from junctions in')
         return out
     return new_function
 
 def ctoj_in(meth):
     def new_function(self, *args, **kwargs):
         prev_estate, prev_inverted = self.graph.get_edge_filter()
-        if self.__verbose__ : print 'cell to junctions edges in'
+        if self.__verbose__ : print('cell to junctions edges in')
         self.set_edge_state([(self.is_ctoj_edge, False),])
         out = meth(self, *args, **kwargs)
-        if self.__verbose__ : print 'restore from cell to junctions edges in'
+        if self.__verbose__ : print('restore from cell to junctions edges in')
         self.graph.set_edge_filter(prev_estate, prev_inverted)
         return out
     return new_function
 
 def deads_in(meth):
     def new_function(self, *args, **kwargs):
-        if self.__verbose__ : print 'dead vertices in'
+        if self.__verbose__ : print('dead vertices in')
         prev_vstate, prev_inverted = self.graph.get_vertex_filter()
         self.set_vertex_state([(self.is_alive, True),
                                (self.is_alive, False)])
         out = meth(self, *args, **kwargs)
-        if self.__verbose__ : print 'restore from deads in'
+        if self.__verbose__ : print('restore from deads in')
         self.graph.set_vertex_filter(prev_vstate, prev_inverted)
         return out
     return new_function
@@ -219,7 +219,7 @@ class EpitheliumFilters(object):
             else:
                 tmp_vfilt.a *= prop.a
         if self.__verbose__:
-            print '%i vertices filtered in' % tmp_vfilt.a.sum()        
+            print('%i vertices filtered in' % tmp_vfilt.a.sum())
         self.graph.set_vertex_filter(tmp_vfilt)
 
     def set_edge_state(self,  properties=[]):
@@ -236,7 +236,8 @@ class EpitheliumFilters(object):
         for prop, inverted in properties:
             tmp_efilt.a *= (1 - prop.a) if inverted else prop.a
 
-        if self.__verbose__: print '%i edges filtered in' % tmp_efilt.a.sum()        
+        if self.__verbose__: print('%i edges filtered in'
+                                   % tmp_efilt.a.sum())
         self.graph.set_edge_filter(tmp_efilt)
 
     #### Local Masks

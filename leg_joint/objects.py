@@ -1,4 +1,9 @@
-#!/usr/bin/env python -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
+
+from __future__ import unicode_literals
+from __future__ import division
+from __future__ import absolute_import
+from __future__ import print_function
 
 """
 
@@ -6,15 +11,22 @@
 
 
 """
+
+import pyximport
+pyximport.install()
+
 
 import os
 import numpy as np
 
 import graph_tool.all as gt
-from scipy import weave, spatial
+#from scipy import weave, spatial
 from .filters import EpitheliumFilters
 from .utils import to_xy, to_rhotheta
+from .circumcircle import c_circumcircle
 from sklearn.decomposition import PCA
+
+
 
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
@@ -207,7 +219,7 @@ class AbstractRTZGraph(object):
                                    self.sigmas, sigma)
         z_matches = gt.find_vertex(self.graph,
                                    self.zeds, zed)
-        if self.__verbose__: print len(s_matches), len(z_matches)
+        if self.__verbose__: print(len(s_matches), len(z_matches))
         return [v for v in s_matches if v in z_matches][0]
         
     def periodic_boundary_condition(self):
@@ -615,8 +627,8 @@ class Cells():
         self.n_zeds = int(n_zeds)
         self.n_sigmas = int(n_sigmas)
         if self.__verbose__ :
-            print ('''Creating a %i x %i cells lattice'''
-                   % (self.n_zeds, self.n_sigmas))
+            print('''Creating a %i x %i cells lattice'''
+                  % (self.n_zeds, self.n_sigmas))
         rhos = np.ones(n_sigmas * n_zeds) * rho_c
         zt_grid = np.mgrid[:n_zeds, :n_sigmas]
         sigmas = zt_grid[1].astype('float')
@@ -799,7 +811,7 @@ class ApicalJunctions():
             self.visited_cells.append(cell)
             new_jvs, new_ctoj_edges, ndrp = self._voronoi_nodes(cell)
             n_dropped += ndrp
-        print "%i triangles were dropped" % n_dropped
+        print("%i triangles were dropped" % n_dropped)
         # Cell to junction graph
         n_jdropped = 0
         eptm.update_xy()
@@ -812,7 +824,7 @@ class ApicalJunctions():
                 continue
             new_edge, dropped = self._voronoi_edges(ctoj_edge)
             n_jdropped += dropped
-        print "%i junction edges were dropped" % n_dropped
+        print("%i junction edges were dropped" % n_dropped)
         del self.visited_cells
 
     def _voronoi_nodes(self, cell):
@@ -848,7 +860,7 @@ class ApicalJunctions():
             try:
                 theta = sigma / rho
             except ZeroDivisionError: 
-                print ('Error computing thetas')
+                print('Error computing thetas')
                 theta = 0
             # new junction vertex here
             # **directly** in the eptm graph
@@ -891,82 +903,82 @@ class ApicalJunctions():
 
 
         
-def c_circumcircle(sz0, sz1, sz2, cutoff):
+# def c_circumcircle(sz0, sz1, sz2, cutoff):
 
-    c_code = '''
-    double sigma0 = sz0[0];
-    double sigma1 = sz1[0];
-    double sigma2 = sz2[0];
+#     c_code = '''
+#     double sigma0 = sz0[0];
+#     double sigma1 = sz1[0];
+#     double sigma2 = sz2[0];
 
-    double zed0 = sz0[1];
-    double zed1 = sz1[1];
-    double zed2 = sz2[1];
+#     double zed0 = sz0[1];
+#     double zed1 = sz1[1];
+#     double zed2 = sz2[1];
 
     
-    double x1 = sigma1 - sigma0;
-    double y1 = zed1 - zed0;
-    double x2 = sigma2 - sigma0;
-    double y2 = zed2 - zed0;
+#     double x1 = sigma1 - sigma0;
+#     double y1 = zed1 - zed0;
+#     double x2 = sigma2 - sigma0;
+#     double y2 = zed2 - zed0;
 
-    double xc;
-    double yc;
+#     double xc;
+#     double yc;
 
-    if (y1*y1 < cutoff*cutoff
-        && y2*y2 > cutoff*cutoff) 
-        {
-        xc = x1 / 2.;
-        yc = (x2*x2 + y2*y2 - x2*x1)/(2*y2);
-        }
-    else if (y2*y2 < cutoff*cutoff
-             && y1*y1 > cutoff*cutoff) 
-        {
-        xc = x2 / 2.;
-        yc = (x1*x1 + y1*y1 - x1*x2)/(2*y1);
-        }
-    else if (y1*y1 + y2*y2 < cutoff*cutoff)
-        {
-        xc = 1e12;
-        yc = 1e12;
-        }
-    else
-       {
-       double a1 = -x1/y1;
-       double a2 = -x2/y2;
-       double b1 = (x1*x1 + y1*y1) / (2*y1);
-       double b2 = (x2*x2 + y2*y2) / (2*y2);
-       if ((a2 - a1) * (a2 - a1) < cutoff*cutoff)
-           {
-           xc = 1e12;
-           yc = 1e12;
-           }
-       xc = (b1 - b2) / (a2 - a1);
-       yc = a1 * xc + b1;
-       } 
-       py::tuple results(2);
-       results[0] = xc + sigma0;
-       results[1] = yc + zed0;
+#     if (y1*y1 < cutoff*cutoff
+#         && y2*y2 > cutoff*cutoff) 
+#         {
+#         xc = x1 / 2.;
+#         yc = (x2*x2 + y2*y2 - x2*x1)/(2*y2);
+#         }
+#     else if (y2*y2 < cutoff*cutoff
+#              && y1*y1 > cutoff*cutoff) 
+#         {
+#         xc = x2 / 2.;
+#         yc = (x1*x1 + y1*y1 - x1*x2)/(2*y1);
+#         }
+#     else if (y1*y1 + y2*y2 < cutoff*cutoff)
+#         {
+#         xc = 1e12;
+#         yc = 1e12;
+#         }
+#     else
+#        {
+#        double a1 = -x1/y1;
+#        double a2 = -x2/y2;
+#        double b1 = (x1*x1 + y1*y1) / (2*y1);
+#        double b2 = (x2*x2 + y2*y2) / (2*y2);
+#        if ((a2 - a1) * (a2 - a1) < cutoff*cutoff)
+#            {
+#            xc = 1e12;
+#            yc = 1e12;
+#            }
+#        xc = (b1 - b2) / (a2 - a1);
+#        yc = a1 * xc + b1;
+#        } 
+#        py::tuple results(2);
+#        results[0] = xc + sigma0;
+#        results[1] = yc + zed0;
 
-    return_val = results;
-    '''
-    return weave.inline(c_code,
-                        arg_names=['sz0', 'sz1', 'sz2', 'cutoff'],
-                        headers=['<math.h>'])
+#     return_val = results;
+#     '''
+#     return weave.inline(c_code,
+#                         arg_names=['sz0', 'sz1', 'sz2', 'cutoff'],
+#                         headers=['<math.h>'])
 
-def dist_rtz(rtz0, rtz1):
+# def dist_rtz(rtz0, rtz1):
     
-    c_code = '''
-    double r0 = rtz0[0];
-    double t0 = rtz0[1];
-    double z0 = rtz0[2];
+#     c_code = '''
+#     double r0 = rtz0[0];
+#     double t0 = rtz0[1];
+#     double z0 = rtz0[2];
 
-    double r1 = rtz1[0];
-    double t1 = rtz1[1];
-    double z1 = rtz1[2];
+#     double r1 = rtz1[0];
+#     double t1 = rtz1[1];
+#     double z1 = rtz1[2];
 
-    double dist = sqrt(r0*r0 + r1*r1 - 2*r0*r1*cos(t1 - t0) + (z1-z0)*(z1-z0));
-    return_val = dist;
-    '''
-    return weave.inline(c_code,
-                        arg_names=['rtz0', 'rtz1'],
-                        headers=['<math.h>'])
+#     double dist = sqrt(r0*r0 + r1*r1 - 2*r0*r1*cos(t1 - t0) + (z1-z0)*(z1-z0));
+#     return_val = dist;
+#     '''
+#     return weave.inline(c_code,
+#                         arg_names=['rtz0', 'rtz1'],
+#                         headers=['<math.h>'])
 
