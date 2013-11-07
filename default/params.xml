@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <parameters>
-  <param max="30" min="0" name="n_sigmas" step="1" value="29">
+  <param max="30" min="0" name="n_sigmas" step="1" value="32">
     <unit>um</unit>
     <description>Initial number of cell along sigma </description>
   </param>
-  <param max="30" min="0" name="n_zeds" step="1" value="31">
+  <param max="30" min="0" name="n_zeds" step="1" value="29">
     <unit>um</unit>
     <description>Initial number of cell along zed</description>
   </param>
@@ -28,7 +28,7 @@
     <unit>um</unit>
     <description>vertex position noise</description>
   </param>
-  <param max="10." min="0.001" name="pos_cutoff" step="0.001" value="1e-9">
+  <param max="10." min="0.001" name="pos_cutoff" step="0.001" value="0.0001">
     <unit>um</unit>
     <description>Distance cut-off </description>
   </param>

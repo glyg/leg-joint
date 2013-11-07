@@ -1,5 +1,10 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
+from __future__ import unicode_literals
+from __future__ import division
+from __future__ import absolute_import
+from __future__ import print_function
+
 
 from os import mkdir
 import numpy as np
@@ -19,7 +24,7 @@ def new_generation(eptm, growth_rate=1.5, pola=False):
     eptm.graph.set_vertex_filter(eptm.is_cell_vert)
     cells =  [cell for cell in eptm.graph.vertices()
               if eptm.is_alive[cell]]
-    print 'there are %i cells to devide' % len(cells)
+    print('there are %i cells to devide' % len(cells))
     num = 0
     eptm.graph.set_vertex_filter(None)
     t0  = time.time()
@@ -72,7 +77,7 @@ def new_generation(eptm, growth_rate=1.5, pola=False):
             if len(small_cells) > 0:
                 for small_cell in small_cells:
                     if eptm.is_alive[small_cell]:
-                        print 'removing cell %s' % str(small_cell)
+                        print('removing cell %s' % str(small_cell))
                         lj.remove_cell(eptm, small_cell)
             eptm.graph.save("saved_graphs/xml/latest.xml")
             now = datetime.now()
@@ -82,12 +87,12 @@ def new_generation(eptm, growth_rate=1.5, pola=False):
                     output3d=outfname3d)
             
         else:
-            print 'division failed'
+            print('division failed')
         num += 1
         elapsed = time.time() - t0
         time_left = (elapsed / num) * (len(cells) - num)
-        print str(num)+'/'+str(len(cells))
-        print 'time left: %3f' % time_left
+        print(str(num)+'/'+str(len(cells)))
+        print('time left: %3f' % time_left)
 
     eptm.isotropic_relax()
     eptm.update_geometry()
@@ -103,13 +108,19 @@ if __name__ == '__main__':
 
     pola = False
     eptm.isotropic_relax()
+
+    lj.draw(eptm, output2d='saved_graphs/png/initial_graph_2d.png',
+            output3d='saved_graphs/png/initial_graph_3d.png')
+
     lj.running_local_optimum(eptm, tol=1e-3, pola=pola, save_to=None)
-    lj.draw(eptm)
     if pola:
         eptm.graph.save('saved_graphs/xml/initial_squeezed.xml')
     else:
         eptm.graph.save('saved_graphs/xml/initial_graph.xml')
-    for n in range(2):
+    lj.draw(eptm, output2d='saved_graphs/png/initial_graph_2d.png',
+            output3d='saved_graphs/png/initial_graph_3d.png')
+    
+    for n in range(1):
         new_generation(eptm, pola)
         lj.running_local_optimum(eptm, tol=1e-3, pola=pola, save_to=None)
         eptm.isotropic_relax()

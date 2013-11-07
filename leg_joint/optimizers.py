@@ -39,7 +39,7 @@ def precondition(eptm):
     z_bounds = np.vstack((eptm.zeds.fa - max_disp,
                           eptm.zeds.fa + max_disp)).T
 
-    for n in range(pos0.shape[0]/3):
+    for n in range(pos0.shape[0]//3):
         bounds[3 * n] = (x_bounds[n, 0], x_bounds[n, 1])
         bounds[3 * n + 1] = (y_bounds[n, 0], y_bounds[n, 1])
         bounds[3 * n + 2] = (z_bounds[n, 0], z_bounds[n, 1])

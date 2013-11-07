@@ -357,10 +357,12 @@ class AbstractRTZGraph(object):
     def out_delta_sz(self, vertex0, vertex1 ):
         edge01 = self.graph.edge(vertex0, vertex1)
         if edge01 is not None:
-            return [self.dsigmas[edge01], self.dzeds[edge01]]
+            return np.array([self.dsigmas[edge01],
+                             self.dzeds[edge01]])
         edge10 = self.graph.edge(vertex1, vertex0)
         if edge10 is not None:
-            return [-self.dsigmas[edge10], -self.dzeds[edge10]]
+            return np.array([-self.dsigmas[edge10],
+                             -self.dzeds[edge10]])
         return
         
     def rtz_record_array(self):
@@ -848,8 +850,8 @@ class ApicalJunctions():
                 continue
             v0_sz = eptm.out_delta_sz(cell, vecino0)
             v1_sz = eptm.out_delta_sz(cell, vecino1)
-            sigma, zed = c_circumcircle([0,0], v0_sz,
-                                        v1_sz, cutoff)
+            sigma, zed = c_circumcircle(np.array([0., 0.]),
+                                        v0_sz, v1_sz, cutoff)
             sigma += eptm.sigmas[cell]
             zed += eptm.zeds[cell]
             if not np.isfinite(sigma) or sigma > 1e8:

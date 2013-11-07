@@ -30,7 +30,6 @@ PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
 tau = 2. * np.pi
 
 
-
 class Epithelium(EpitheliumFilters,
                  AbstractRTZGraph,
                  Dynamics):
@@ -89,7 +88,6 @@ class Epithelium(EpitheliumFilters,
         verbose : bool, optional
            if `True`, the simulation will output -possibly lots of-
            information on the successive operations.
-        
         """
         # Parametrisation
         if paramtree == None:
