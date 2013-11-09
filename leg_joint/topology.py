@@ -483,7 +483,7 @@ def remove_cell(eptm, cell):
     edge_trash.extend(cell_jes)
     new_jv = eptm.new_vertex(jvs[0])
     print('new vertex %s' % str(new_jv))
-    eptm.is_local_vert[jv] = 1
+    eptm.is_local_vert[new_jv] = 1
     eptm.ixs[new_jv] = eptm.ixs[cell]
     eptm.wys[new_jv] = eptm.wys[cell]
     eptm.zeds[new_jv] = eptm.zeds[cell]

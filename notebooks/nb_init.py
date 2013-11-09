@@ -20,26 +20,23 @@ def before_after(func):
         import matplotlib.pyplot as plt
         import leg_joint as lj
         #eptm.update_gradient()
-        fig, axes = plt.subplots(1,2, figsize=(12,4),
-                                 sharex=True, sharey=True)
-        subaxes = lj.plot_ortho_proj(eptm, axes[0], c_text=False, 
-                                     vfilt=eptm.is_local_vert,
-                                     efilt=eptm.is_local_edge)
-        lj.plot_ortho_gradients(eptm, subaxes, scale=1.)
+        fig, axes = plt.subplots(1,4, figsize=(12,4))
+        axes_before = lj.plot_2pannels(eptm, axes[0:2], c_text=False)
+        lj.plot_2pannels_gradients(eptm, axes_before, scale=10.)
         foutput = func(eptm, *args, **kwargs)
         #eptm.update_gradient()
-        subaxes = lj.plot_ortho_proj(eptm, axes[1], c_text=False,
-                                     vfilt=eptm.is_local_vert,
-                                     efilt=eptm.is_local_edge)
-        lj.plot_ortho_gradients(eptm, subaxes, scale=1.)
+        axes_after = lj.plot_2pannels(eptm, axes[2:], c_text=False)
+        lj.plot_2pannels_gradients(eptm, axes_after, scale=10.)
         return foutput
     return new_func
 
 @before_after
-def local_optimum(eptm, **kwargs):
+def show_optimisation(eptm, **kwargs):
     #eptm.update_gradient()
     pos0, pos1 = lj.find_energy_min(eptm, **kwargs)
     return pos0, pos1
 
 
-
+def local_optimum(*arg, **kwargs):
+    
+    return show_optimisation(*arg, **kwargs)

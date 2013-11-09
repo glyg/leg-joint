@@ -43,6 +43,58 @@ def draw_polygons(eptm, coord1, coord2, colors,
     eptm.graph.set_edge_filter(None)
     return ax
 
+def plot_2pannels_gradients(eptm, axes=None,
+                            scale=1., approx=0, **kwargs):
+    '''
+    Displays the gradients for the active vertices on top of
+    an `ortho_proj` graph
+    '''
+    if approx == 1:
+        grad_xyz = approx_grad(eptm)
+        ec = fc = 'blue'
+    else:
+        grad_xyz = eptm.gradient_array()
+        ec = fc = 'red'
+
+    grad_ixs = grad_xyz[0::3] * scale
+
+    grad_wys = grad_xyz[1::3] * scale
+
+    grad_zeds = grad_xyz[2::3] * scale
+
+    pos0, bounds = precondition(eptm)
+    rhos, thetas  = to_rhotheta(pos0[::3], pos0[1::3])
+    sigmas = thetas * eptm.rhos.a.mean()
+    grad_sigmas = (- np.sin(thetas) * grad_xyz[::3] +
+                   np.cos(thetas) * grad_xyz[1::3]) * scale
+
+    # We plot the forces, which are easier to understand
+    v_ixs = np.array([pos0[0::3], - grad_ixs]).T
+    v_wys = np.array([pos0[1::3], - grad_wys]).T
+    v_zeds = np.array([pos0[2::3], - grad_zeds]).T
+    v_sigmas = np.array([sigmas, - grad_sigmas]).T
+    
+    if axes is None:
+        ax_zs, ax_xy =  plot_2pannels(eptm, axes=None,
+                                      vfilt=eptm.is_local_vert,
+                                      efilt=eptm.is_local_edge,
+                                      **kwargs)
+        axes = ax_zs, ax_xy
+    else:
+        ax_zs, ax_xy = axes
+    x_lim = ax_zs.get_xlim()
+
+    for s, z, x, y in zip(v_sigmas, v_zeds, v_ixs, v_wys):
+        ax_xy.arrow(x[0], y[0], x[1], y[1], width=0.01,
+                    ec=ec, fc=fc, alpha=0.5)
+        ax_zs.arrow(z[0], s[0], z[1], s[1], width=0.01,
+                    ec=ec, fc=fc, alpha=0.5)
+
+    ax_zs.set_xlim(x_lim)
+    return axes
+
+
+    
 def plot_ortho_gradients(eptm, axes=None,
                          scale=1., approx=0, **kwargs):
     '''
@@ -103,24 +155,30 @@ def plot_active(eptm, xcoord, ycoord, ax=None):
     plt.draw()
     return ax
 
-def plot_two_panels(eptm, ax=None, vfilt=None,
-                    efilt=None, local=True,
-                    depth_color=None,
-                    **kwargs):
+def plot_2pannels(eptm, axes=None, vfilt=None,
+                  efilt=None, local=True,
+                  depth_color=None,
+                  **kwargs):
     
     if local:
         vfilt = eptm.is_local_vert
         efilt = eptm.is_local_edge
-    if ax is None:
-        fig, ax = plt.subplots(1,1)
+    if axes is None:
+        fig, axes = plt.subplots(1, 2)
     else:
-        fig = ax.get_figure()
-    
-    plot_cells_zs(eptm, ax=ax,
+        fig = axes[0].get_figure()
+
+    ax_zs, ax_xy = axes
+    plot_cells_zs(eptm, ax=ax_zs,
                   vfilt=vfilt, efilt=efilt,
                   depth_color=depth_color, **kwargs)
 
-    
+    x_lim = ax_zs.get_xlim()
+    plot_cells_xy(eptm, ax=ax_xy,
+                  vfilt=vfilt, efilt=efilt,
+                  depth_color=depth_color, **kwargs)
+    ax_zs.set_xlim(x_lim)
+    return axes
 
     
 def plot_ortho_proj(eptm, ax=None, vfilt=None,
@@ -141,8 +199,8 @@ def plot_ortho_proj(eptm, ax=None, vfilt=None,
 
     divider = make_axes_locatable(ax)
     
-    ax_zr = divider.append_axes("top", 2., pad=0.2, sharex=ax)
-    ax_rs = divider.append_axes("right", 2., pad=0.2, sharey=ax)
+    ax_zr = divider.append_axes("top", 2., pad=0.1, sharex=ax)
+    ax_rs = divider.append_axes("right", 2., pad=0.1, sharey=ax)
     
     plot_cells_zr(eptm, ax=ax_zr,
                   vfilt=vfilt, efilt=efilt,
@@ -152,13 +210,12 @@ def plot_ortho_proj(eptm, ax=None, vfilt=None,
                   depth_color=depth_color, **kwargs)
     plt.setp(ax_zr.get_xticklabels() + ax_rs.get_yticklabels(),
              visible=False)
-    plt.draw()
 
     ax_zr.set_xlabel('')
     ax_rs.set_ylabel('')
 
     axes = ax, ax_zr, ax_rs
-    return fig, axes
+    return axes
 
 
 def plot_cells_generic(eptm, xcoord, ycoord, ax=None, 
@@ -225,6 +282,21 @@ def plot_edges_generic(eptm, xcoord, ycoord, efilt=None,
     ax.set_aspect('equal')
     eptm.graph.set_edge_filter(None)
     return ax
+
+
+
+def plot_cells_xy(eptm, ax=None, c_text=False,
+                  vfilt=None, efilt=None, depth_color=None):
+    ixs = eptm.ixs.copy()
+    wys = eptm.wys.copy()
+    ax = plot_cells_generic(eptm, ixs, wys,
+                            ax, vfilt, efilt,
+                            c_text=c_text,
+                            depth_color=depth_color,
+                            xlabel='Posterior - Anterior',
+                            ylabel='Ventral - Dorsal')
+    return ax
+
 
     
 def plot_cells_zr(eptm, ax=None, c_text=False,

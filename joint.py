@@ -1,5 +1,9 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
+from __future__ import unicode_literals
+from __future__ import division
+from __future__ import absolute_import
+from __future__ import print_function
 
 from os import mkdir
 import numpy as np
@@ -27,7 +31,7 @@ def get_apoptotic_cells(eptm, seed, **kwargs):
         dice = np.random.random()
         if dice < p_apopto(eptm.zeds[cell], eptm.thetas[cell], **kwargs):
             is_apoptotic[cell] = 1
-    print "Number of apoptotic cells: %i" % is_apoptotic.a.sum()
+    print("Number of apoptotic cells: %i" % is_apoptotic.a.sum())
 
     apopto_cells = np.array([cell for cell in eptm.cells
                              if is_apoptotic[cell]])
@@ -47,7 +51,7 @@ def get_sequence(apopto_cells, num_steps):
 def gradual_apoptosis(eptm, apopto_cells, num_steps, pola=False, **kwargs):
 
     apopto_sequence = get_sequence(apopto_cells, num_steps)
-    print '%i steps will be performed' % (len(apopto_cells) * num_steps)
+    print('%i steps will be performed' % (len(apopto_cells) * num_steps))
     phi = eptm.dsigmas.copy()
     phi.a[:] = 0
     lj.local_slice(eptm, theta_amp=None, zed_c=0., zed_amp=1.5)

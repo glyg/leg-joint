@@ -1,5 +1,9 @@
+# -*- coding: utf-8 -*-
 
+from __future__ import unicode_literals
 from __future__ import division
+from __future__ import absolute_import
+from __future__ import print_function
 
 ## Import matplotlib here to avoid instabilities
 ## with graph-tool
@@ -15,6 +19,9 @@ from .frontier import find_circumference, create_frontier
 from .graph_representation import plot_ortho_proj, plot_ortho_gradients
 from .graph_representation import draw_polygons, plot_cells_generic
 from .graph_representation import epithelium_draw as draw
+from .graph_representation import plot_2pannels, plot_2pannels_gradients
+
+
 from .utils import local_slice
 
 from .explore_params import explore_delta_h_1D
