@@ -19,7 +19,7 @@ import random
 
 def p_apopto(zed, theta, z0=0., width_apopto=1.5, p0=0.95, amp=0.7):
     p = p0 * np.exp(- (zed - z0)**2 / width_apopto**2
-                    ) * ((1 - amp) + amp * (1 - np.cos(theta/2)**4))
+                    ) * (1  - amp * (np.cos(theta/2)**2))
     return p
 
 def get_apoptotic_cells(eptm, seed, **kwargs):
