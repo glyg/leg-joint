@@ -487,6 +487,7 @@ def remove_cell(eptm, cell):
     eptm.ixs[new_jv] = eptm.ixs[cell]
     eptm.wys[new_jv] = eptm.wys[cell]
     eptm.zeds[new_jv] = eptm.zeds[cell]
+    eptm.junctions.radial_tensions[new_jv] = 0.
     adjacent_cells = []
     for jv in jvs:
         vertex_trash.append(jv)

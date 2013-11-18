@@ -221,14 +221,15 @@ def plot_ortho_proj(eptm, ax=None, vfilt=None,
 def plot_cells_generic(eptm, xcoord, ycoord, ax=None, 
                        vfilt=None, efilt=None,
                        c_text=True, j_text=False,
-                       depth_color=None,
+                       depth_color=None, show_cells=False,
                        xlabel='', ylabel=''):
     if ax is None:
         fig, ax = plt.subplots(1,1)
     eptm.graph.set_vertex_filter(vfilt)
     for cell in eptm.cells :
-        ax.plot(xcoord[cell],
-                ycoord[cell], 'bo', alpha=0.1)
+        if show_cells:
+            ax.plot(xcoord[cell],
+                    ycoord[cell], 'bo', alpha=0.1)
         if c_text:
             ax.text(xcoord[cell], ycoord[cell], str(cell))
 
