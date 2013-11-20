@@ -1,5 +1,11 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
+from __future__ import unicode_literals
+from __future__ import division
+from __future__ import absolute_import
+from __future__ import print_function
+
+
 import os
 import numpy as np
 import glob
@@ -42,7 +48,7 @@ def snapshot(func, *args, **kwargs):
 def apoptosis(eptm, a_cell, idx=0,
               vol_reduction=0.01,
               contractility=1.,
-              radial_tension=0., save=True):
+              radial_tension=0., save=True, save_dir=''):
     '''
     Simulates an apoptosis
 
@@ -75,14 +81,14 @@ def apoptosis(eptm, a_cell, idx=0,
     tag = 'vr%.2f_ctr%.2f_rt%.2f' % (vol_reduction, contractility,
                                      radial_tension)
 
-    png_dir = os.path.join(GRAPH_SAVE_DIR, 'png', 'apopto_'+tag)
+    png_dir = os.path.join(GRAPH_SAVE_DIR, 'png', save_dir, 'apopto_'+tag)
     if not os.path.isdir(png_dir):
         os.mkdir(png_dir)
     # else:
     #     pngs = [png for png in os.listdir(png_dir) if png.endswith('png')]
     #     for png in pngs:
     #         os.remove(os.path.join(png_dir, png))
-    xml_dir = os.path.join(GRAPH_SAVE_DIR, 'xml', 'apopto_'+tag)
+    xml_dir = os.path.join(GRAPH_SAVE_DIR, 'xml', save_dir, 'apopto_'+tag)
     try:
         os.mkdir(xml_dir)
     except OSError:
@@ -487,7 +493,6 @@ def remove_cell(eptm, cell):
     eptm.ixs[new_jv] = eptm.ixs[cell]
     eptm.wys[new_jv] = eptm.wys[cell]
     eptm.zeds[new_jv] = eptm.zeds[cell]
-    eptm.junctions.radial_tensions[new_jv] = 0.
     adjacent_cells = []
     for jv in jvs:
         vertex_trash.append(jv)
