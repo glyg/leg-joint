@@ -647,7 +647,8 @@ def plot_validation(eptm):
     axes[0].errorbar(unq_degrees, avg_area, yerr=std_area, fmt='k-o')
     ylblb = axes[0].set_ylabel('Normalized cell area')
 
-    h = axes[1].hist(valid_degrees, bins=8, range=(2.5,10.5), normed=True, fc='w')
+    h = axes[1].hist(valid_degrees, bins=8, range=(2.5,10.5),
+                     normed=True, fc='w')
     axes[1].plot(exp_degrees[0, :], exp_degrees[1, :]/100., 'gs')
     xlblb = axes[1].set_xlabel('Number of sides')
     ylblb = axes[1].set_ylabel('Number of cells')

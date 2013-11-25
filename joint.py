@@ -86,23 +86,19 @@ def gradual_apoptosis(eptm, apopto_cells, num_steps, residual_tension=0.,
             eptm.junctions.radial_tensions[new_jv] = residual_tension
             if pola:
                 eptm.update_tensions(phi, np.pi / 4, 1.26**4)
-            for cell in fold_cells:
-                if not eptm.is_alive[cell]:
-                    continue
-                eptm.set_local_mask(None)
-                eptm.set_local_mask(cell)
-                lj.find_energy_min(eptm)
-                if pola:
-                    eptm.update_tensions(phi, np.pi / 4, 1.26**4)
+            # for cell in fold_cells:
+            #     if not eptm.is_alive[cell]:
+            #         continue
+            #     eptm.set_local_mask(None)
+            #     eptm.set_local_mask(cell)
+            #     lj.find_energy_min(eptm)
+            #     if pola:
+            #         eptm.update_tensions(phi, np.pi / 4, 1.26**4)
         prev_first = first
                 
     new_jv = lj.remove_cell(eptm, prev_first)
     eptm.junctions.radial_tensions[new_jv] = residual_tension
-    
-    thetas = np.linspace(0, 2*np.pi, 180) + np.pi/2
-    for n, theta in enumerate(thetas):
-        output = '../saved_graphs/png/' %n
-        lj.draw(eptm, d_theta=theta, output3d=output_nt)
+    lj.running_local_optimum(eptm, tol=1e-6)
 
 
 
@@ -124,20 +120,18 @@ if __name__ == '__main__':
     import sys
     args = [np.float(arg) if '.' in arg else np.int(arg)
             for arg in sys.argv[1:]]
-    if len(args) != 5:
+    if len(args) != 4:
         print("""Usage:
               You need to provide the values for 5 parameters: 
-              python joint.py p1 p2 p3 p4 p5
+              python joint.py p1 p2 p3 p4
               with the following meaning:
-              p1 : seed for the random process
-              p2 : number of steps to complete apoptosis
-              p3 : volume reduction of the cell at each step
-              p4 : contractility multiplication at each steps 
-              p5 : radial tension
+              p1 : number of steps to complete apoptosis
+              p2 : volume reduction of the cell at each step
+              p3 : contractility multiplication at each steps 
+              p4 : radial tension
               """ )
         raise ValueError('Bad number of parameters')
-    (seed, num_steps, vol_reduction, contractility, radial_tension) = args
-
+    (num_steps, vol_reduction, contractility, radial_tension) = args
 
     conditions = {'ectopic': {'width_apopto':100,
                               'p0': 0.02,
@@ -186,17 +180,19 @@ if __name__ == '__main__':
                                'seed': 6}}
 
     for cond, params in conditions.items():
+        print('**************'
+              'Starting %s'
+              '**************' % cond)
         eptm = lj.Epithelium(
-            graphXMLfile='../saved_graphs/xml/before_apoptosis.xml',#
-            paramfile='../default/params.xml')
+            graphXMLfile='saved_graphs/xml/before_apoptosis.xml',#
+            paramfile='default/params.xml')
         eptm.isotropic_relax()
         
         apopto_cells = get_apoptotic_cells(eptm,
                                            seed=params['seed'],
                                            width_apopto=params['width_apopto'],
                                            p0=params['p0'],
-                                           amp=params['amp'],
-                                           save_dir=cond)
+                                           amp=params['amp'])
         
         gradual_apoptosis(eptm, apopto_cells, num_steps,
                           fold_width=params['width_apopto'],
