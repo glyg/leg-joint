@@ -22,16 +22,43 @@ def p_apopto(zed, theta, z0=0., width_apopto=1.5, p0=0.95, amp=0.7):
                     ) * (1  - amp * (np.cos(theta/2)**2))
     return p
 
-def get_apoptotic_cells(eptm, seed, random=True, gamma=1, **kwargs):
+def get_apoptotic_cells(eptm, seed=42, random=True, gamma=1,
+                        n_cells=1, **kwargs):
     ''' '''
+
+    
     is_apoptotic = eptm.is_alive.copy()
     is_apoptotic.a[:] = 0
     np.random.seed(seed)
-    for cell in eptm.cells:
-        dice = np.random.random()
-        if dice < p_apopto(eptm.zeds[cell], eptm.thetas[cell], **kwargs):
+    if random:
+        for cell in eptm.cells:
+            dice = np.random.random()
+            if dice < p_apopto(eptm.zeds[cell], eptm.thetas[cell], **kwargs):
+                is_apoptotic[cell] = 1
+        n_cells = is_apoptotic.a.sum()
+    else:
+        eptm.update_rhotheta()
+        thetas_in = np.linspace(0, 2*np.pi,
+                                num=n_cells,
+                                endpoint=False)
+        thetas_out = ventral_enhance(thetas_in, gamma) - np.pi
+        sigmas_out = thetas_out * eptm.rhos.a.mean()
+        zeds_out = np.random.normal(0,
+                                    scale=kwargs['width_apopto'],
+                                    size=n_cells)
+        #eptm.graph.set_vertex_filter(eptm.is_cell_vert)
+        for sigma, zed in zip(sigmas_out, zeds_out):
+            vfilt = eptm.is_cell_vert.copy()
+            vfilt.a -= is_apoptotic.a
+            eptm.graph.set_vertex_filter(vfilt)
+            cell = eptm.closest_vert(sigma, zed)
+            # while is_apoptotic[cell]:
+            #     zed += np.random.normal(**kwargs['width_apopto'])
             is_apoptotic[cell] = 1
-    print("Number of apoptotic cells: %i" % is_apoptotic.a.sum())
+        eptm.graph.set_vertex_filter(None)
+
+    n_cells = is_apoptotic.a.sum()
+    print("Number of apoptotic cells: %i" % n_cells)
 
     apopto_cells = np.array([cell for cell in eptm.cells
                              if is_apoptotic[cell]])
@@ -39,6 +66,19 @@ def get_apoptotic_cells(eptm, seed, random=True, gamma=1, **kwargs):
     theta_idx = np.argsort(np.cos(thetas/2))#[::-1]
     return apopto_cells.take(theta_idx)
 
+def ventral_enhance(thetas_in, gamma=1):
+    
+    thetas_in = np.atleast_1d(thetas_in)
+    thetas_out = np.zeros_like(thetas_in)
+    gamma_low = lambda x, gamma: np.pi * (x / np.pi)**gamma
+    gamma_high = lambda x, gamma: np.pi * (2 - (2 - x / np.pi)**(gamma)) 
+    thetas_out[thetas_in <= np.pi] = gamma_low(thetas_in[thetas_in <= np.pi],
+                                               gamma)
+    thetas_out[thetas_in > np.pi] = gamma_high(thetas_in[thetas_in > np.pi],
+                                               gamma)
+    return thetas_out
+    
+    
 def get_sequence(apopto_cells, num_steps):
     apopto_sequence = []
     num_cells = apopto_cells.size
