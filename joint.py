@@ -22,7 +22,7 @@ def p_apopto(zed, theta, z0=0., width_apopto=1.5, p0=0.95, amp=0.7):
                     ) * (1  - amp * (np.cos(theta/2)**2))
     return p
 
-def get_apoptotic_cells(eptm, seed, **kwargs):
+def get_apoptotic_cells(eptm, seed, random=True, gamma=1, **kwargs):
     ''' '''
     is_apoptotic = eptm.is_alive.copy()
     is_apoptotic.a[:] = 0
