@@ -25,7 +25,6 @@ def p_apopto(zed, theta, z0=0., width_apopto=1.5, p0=0.95, amp=0.7):
 def get_apoptotic_cells(eptm, seed=42, random=True, gamma=1,
                         n_cells=1, **kwargs):
     ''' '''
-
     
     is_apoptotic = eptm.is_alive.copy()
     is_apoptotic.a[:] = 0
@@ -173,26 +172,26 @@ if __name__ == '__main__':
         raise ValueError('Bad number of parameters')
     (num_steps, vol_reduction, contractility, radial_tension) = args
 
-    conditions = {'ectopic': {'width_apopto':100,
-                              'p0': 0.02,
-                              'amp': 0.,
-                              'residual_tension': 0.,
-                              'seed': 0},
-                  'no_theta_bias': {'width_apopto':1.8,
-                                    'p0': 0.6,
-                                    'amp': 0.,
-                                    'residual_tension': 0.,
-                                    'seed': 3},
+    conditions = {# 'ectopic': {'width_apopto':100,
+                  #             'p0': 0.02,
+                  #             'amp': 0.,
+                  #             'residual_tension': 0.,
+                  #             'seed': 0},
+                  # 'no_theta_bias': {'width_apopto':1.8,
+                  #                   'p0': 0.6,
+                  #                   'amp': 0.,
+                  #                   'residual_tension': 0.,
+                  #                   'seed': 3},
                   'theta_bias': {'width_apopto':1.8,
                                  'p0': 0.75,
                                  'amp': 0.4,
                                  'residual_tension': 0.,
                                  'seed': 3},
-                  'residual_tension': {'width_apopto':1.8,
-                                       'p0': 0.75,
-                                       'amp': 0.4,
-                                       'residual_tension': 1.,
-                                       'seed': 3},
+                  # 'residual_tension': {'width_apopto':1.8,
+                  #                      'p0': 0.75,
+                  #                      'amp': 0.4,
+                  #                      'residual_tension': 1.,
+                  #                      'seed': 3},
                   '05_cells': {'width_apopto':1.8,
                                'residual_tension': 0.,
                                'p0': 0.1,
@@ -228,22 +227,42 @@ if __name__ == '__main__':
             paramfile='default/params.xml')
         eptm.isotropic_relax()
         
-        apopto_cells = get_apoptotic_cells(eptm,
-                                           seed=params['seed'],
-                                           width_apopto=params['width_apopto'],
-                                           p0=params['p0'],
-                                           amp=params['amp'])
+        apopto_cells_rnd = get_apoptotic_cells(eptm,
+                                               seed=params['seed'],
+                                               width_apopto=params['width_apopto'],
+                                               p0=params['p0'],
+                                               amp=params['amp'])
+
+        save_dir='random_{0}'.format(cond)
         
-        gradual_apoptosis(eptm, apopto_cells, num_steps,
+        gradual_apoptosis(eptm, apopto_cells_rnd, num_steps,
                           fold_width=params['width_apopto'],
                           residual_tension=params['residual_tension'],
                           vol_reduction=vol_reduction,
                           contractility=contractility,
                           radial_tension=radial_tension,
-                          save_dir=cond,
+                          save_dir=save_dir,
                           pola=False)
-        thetas = np.linspace(0, 2*np.pi, 180) + np.pi/2
+        
+    for n_cells in [5, 10, 15, 20, 25]:
+        for gamma in [1, 1.2, 1.4, 2.]:
+            
+            eptm = lj.Epithelium(
+                graphXMLfile='saved_graphs/xml/before_apoptosis.xml',#
+                paramfile='default/params.xml')
+            eptm.isotropic_relax()
+        
+            apopto_cells_reg = get_apoptotic_cells(eptm, random=False,
+                                                   gamma=gamma, n_cells=n_cells,
+                                                   width_apopto=2)
 
-        for n, theta in enumerate(thetas):
-            output= 'saved_graphs/png/%s/angle_%03i.png' % (cond, n)
-            lj.draw(eptm, d_theta=theta, output3d=output)
+            save_dir='regular_{0:02}cells_gamma_{1:2.2}'.format(n_cells, gamma)
+            gradual_apoptosis(eptm, apopto_cells_reg, num_steps,
+                              fold_width=params['width_apopto'],
+                              residual_tension=params['residual_tension'],
+                              vol_reduction=vol_reduction,
+                              contractility=contractility,
+                              radial_tension=radial_tension,
+                              save_dir=save_dir,
+                              pola=False)
+            
