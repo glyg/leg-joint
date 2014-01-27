@@ -81,18 +81,25 @@ def apoptosis(eptm, a_cell, idx=0,
     tag = 'vr%.2f_ctr%.2f_rt%.2f' % (vol_reduction, contractility,
                                      radial_tension)
 
-    png_dir = os.path.join(GRAPH_SAVE_DIR, 'png', save_dir, 'apopto_'+tag)
+    png_up_dir = os.path.join(GRAPH_SAVE_DIR, 'png', save_dir)
+    if not os.path.isdir(png_up_dir):
+        os.mkdir(png_up_dir)
+
+    png_dir = os.path.join(png_up_dir, 'apopto_'+tag)
     if not os.path.isdir(png_dir):
         os.mkdir(png_dir)
     # else:
     #     pngs = [png for png in os.listdir(png_dir) if png.endswith('png')]
     #     for png in pngs:
     #         os.remove(os.path.join(png_dir, png))
-    xml_dir = os.path.join(GRAPH_SAVE_DIR, 'xml', save_dir, 'apopto_'+tag)
-    try:
+    xml_up_dir = os.path.join(GRAPH_SAVE_DIR, 'xml', save_dir)
+    if not os.path.isdir(xml_up_dir):
+        os.mkdir(xml_up_dir)
+
+    xml_dir = os.path.join(xml_up_dir, 'apopto_'+tag)
+    if not os.path.isdir(xml_dir):
         os.mkdir(xml_dir)
-    except OSError:
-        pass
+
     if save:
         out2d = os.path.join(png_dir, 'apopto_2d_%04i.png' % idx)
         out3d = os.path.join(png_dir, 'apopto_3d_%04i.png' % idx)

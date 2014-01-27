@@ -113,7 +113,4 @@ def local_subgraph(meth):
         return out
     return new_function
 
-
-
-    
     
