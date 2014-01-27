@@ -89,7 +89,8 @@ def get_sequence(apopto_cells, num_steps):
     return apopto_sequence
 
 def gradual_apoptosis(eptm, apopto_cells, num_steps, residual_tension=0.,
-                      fold_width=1.8, pola=False, **kwargs):
+                      fold_width=1.8, pola=False, tension_increase=None,
+                      **kwargs):
 
     apopto_sequence = get_sequence(apopto_cells, num_steps)
     print('%i steps will be performed' % (len(apopto_cells) * num_steps))
@@ -126,6 +127,8 @@ def gradual_apoptosis(eptm, apopto_cells, num_steps, residual_tension=0.,
             eptm.junctions.radial_tensions[new_jv] = residual_tension
             if pola:
                 eptm.update_tensions(phi, np.pi / 4, 1.26**4)
+            if tension_increase is not None:
+                lj.enhance_tension(eptm, new_jv, tension_increase=2.)
             # for cell in fold_cells:
             #     if not eptm.is_alive[cell]:
             #         continue
@@ -139,9 +142,6 @@ def gradual_apoptosis(eptm, apopto_cells, num_steps, residual_tension=0.,
     new_jv = lj.remove_cell(eptm, prev_first)
     eptm.junctions.radial_tensions[new_jv] = residual_tension
     lj.running_local_optimum(eptm, tol=1e-6)
-
-
-
     
 def show_distribution(eptm):
     lj.local_slice(eptm, zed_amp=2., theta_amp=None)

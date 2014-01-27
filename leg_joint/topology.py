@@ -100,6 +100,15 @@ def apoptosis(eptm, a_cell, idx=0,
         eptm.graph.save(out_xml)
         epithelium_draw(eptm, output2d=out2d, output3d=out3d, d_theta=np.pi/2)
 
+def enhance_tension(eptm, j_vert, tension_increase):
+
+    for edge in j_vert.all_edges():
+        if eptm.is_junction_edge[edge]:
+            eptm.junctions.line_tensions[edge] *= tension_increase
+        else:
+            eptm.set_local_mask(edge.source())
+    
+        
 @snapshot
 def type1_transition(eptm, elements, verbose=False):
     """

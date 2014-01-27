@@ -14,7 +14,7 @@ from .optimizers import find_energy_min, isotropic_optimum, running_local_optimu
 from .optimizers import approx_grad, check_local_grad
 from .topology import cell_division, type1_transition
 from .topology import type3_transition, apoptosis
-from .topology import remove_cell, resolve_small_edges
+from .topology import remove_cell, resolve_small_edges, enhance_tension
 from .frontier import find_circumference, create_frontier
 from .graph_representation import plot_ortho_proj, plot_ortho_gradients
 from .graph_representation import draw_polygons, plot_cells_generic
