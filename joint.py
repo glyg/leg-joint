@@ -252,44 +252,37 @@ if __name__ == '__main__':
         }
 
     for cond, params in conditions.items():
-        print('**************'
-              'Starting %s'
-              '**************' % cond)
-        eptm = lj.Epithelium(
-            graphXMLfile='saved_graphs/xml/before_apoptosis.xml',#
-            paramfile='default/params.xml')
-        eptm.isotropic_relax()
-        seed, apopto_cells_rnd = specific_apopto_cells_number(params['n_cells'], eptm, 
-                                                              width_apopto=params['width_apopto'],
-                                                              p0=params['p0'],
-                                                              amp=params['amp'])
-
-        # apopto_cells_rnd = get_apoptotic_cells(eptm,
-        #                                        seed=params['seed'],
-        #                                        width_apopto=params['width_apopto'],
-        #                                        p0=params['p0'],
-        #                                        amp=params['amp'])
-        save_dir='random_{0}_apical_tension'.format(cond)
+        # print('**************'
+        #       'Starting %s'
+        #       '**************' % cond)
+        # eptm = lj.Epithelium(
+        #     graphXMLfile='saved_graphs/xml/before_apoptosis.xml',#
+        #     paramfile='default/params.xml')
+        # eptm.isotropic_relax()
+        # seed, apopto_cells_rnd = specific_apopto_cells_number(params['n_cells'], eptm, 
+        #                                                       width_apopto=params['width_apopto'],
+        #                                                       p0=params['p0'],
+        #                                                       amp=params['amp'])
+        # save_dir='random_{0}_apical_tension'.format(cond)
         
-        fig, ax = plt.subplots(figsize=(2.5, 2.5))
-        for cell in apopto_cells_rnd:
-            ax.plot(eptm.wys[cell], eptm.ixs[cell], 'ko', alpha=0.7)
-            ax.set_title('Sequence of apoptoses around the joint')
-        ax.set_aspect('equal')
-        fig.savefig('doc/imgs/repartition'+save_dir+'.svg')
-        plt.close(fig)
-        gradual_apoptosis(eptm, apopto_cells_rnd, num_steps,
-                          fold_width=params['width_apopto'],
-                          residual_tension=params['residual_tension'],
-                          tension_increase=params['tension_increase'],
-                          vol_reduction=vol_reduction,
-                          contractility=contractility,
-                          radial_tension=radial_tension,
-                          save_dir=save_dir,
-                          pola=False)
+        # fig, ax = plt.subplots(figsize=(2.5, 2.5))
+        # for cell in apopto_cells_rnd:
+        #     ax.plot(eptm.wys[cell], eptm.ixs[cell], 'ko', alpha=0.7)
+        #     ax.set_title('Sequence of apoptoses around the joint')
+        # ax.set_aspect('equal')
+        # fig.savefig('doc/imgs/repartition'+save_dir+'.svg')
+        # plt.close(fig)
+        # gradual_apoptosis(eptm, apopto_cells_rnd, num_steps,
+        #                   fold_width=params['width_apopto'],
+        #                   residual_tension=params['residual_tension'],
+        #                   tension_increase=params['tension_increase'],
+        #                   vol_reduction=vol_reduction,
+        #                   contractility=contractility,
+        #                   radial_tension=radial_tension,
+        #                   save_dir=save_dir,
+        #                   pola=False)
         ### Without tension increase
 
-        
         params['residual_tension'] = 0.
         
         eptm = lj.Epithelium(
@@ -300,14 +293,7 @@ if __name__ == '__main__':
                                                               width_apopto=params['width_apopto'],
                                                               p0=params['p0'],
                                                               amp=params['amp'])
-
-        # apopto_cells_rnd = get_apoptotic_cells(eptm,
-        #                                        seed=params['seed'],
-        #                                        width_apopto=params['width_apopto'],
-        #                                        p0=params['p0'],
-        #                                        amp=params['amp'])
         save_dir='random_{0}'.format(cond)
-        
         fig, ax = plt.subplots(figsize=(2.5, 2.5))
         for cell in apopto_cells_rnd:
             ax.plot(eptm.wys[cell], eptm.ixs[cell], 'ko', alpha=0.7)
@@ -324,8 +310,6 @@ if __name__ == '__main__':
                           radial_tension=radial_tension,
                           save_dir=save_dir,
                           pola=False)
-
-        
     params = {'width_apopto':1.8,
               'residual_tension': 0.,
               'tension_increase': 2.,
@@ -334,17 +318,15 @@ if __name__ == '__main__':
               'seed': 2}
         
     for n_cells in [5, 10, 20, 30]:
-    #     for gamma in [1, 1.2, 2.]:
-            
         eptm = lj.Epithelium(
-            graphXMLfile='saved_graphs/xml/before_apoptosis.xml',#
+            graphXMLfile='saved_graphs/xml/before_apoptosis.xml',
             paramfile='default/params.xml')
         eptm.isotropic_relax()
         gamma = 1
         apopto_cells_reg = get_apoptotic_cells(eptm, random=False,
                                                gamma=gamma, n_cells=n_cells,
                                                width_apopto=2)
-        save_dir='regular_{}cells_gamma_{}'.format(n_cells, gamma)
+        save_dir='regular_{}_cells_tension_increase'.format(n_cells)
 
         fig, ax = plt.subplots(figsize=(2.5, 2.5))
         for cell in apopto_cells_reg:
@@ -357,7 +339,7 @@ if __name__ == '__main__':
         gradual_apoptosis(eptm, apopto_cells_reg, num_steps,
                           fold_width=params['width_apopto'],
                           residual_tension=params['residual_tension'],
-                          tension_increase=params['tension_increase'],                          
+                          tension_increase=params['tension_increase'],
                           vol_reduction=vol_reduction,
                           contractility=contractility,
                           radial_tension=radial_tension,
