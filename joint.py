@@ -171,6 +171,8 @@ def specific_apopto_cells_number(num_cells, *args, **kwargs):
         if n_iter > 100:
             raise RuntimeError('''Number of trials to high, 
                                Try changing the parameters''')
+
+        kwargs['p0'] *= num_cells / 10
         apopto_cells = get_apoptotic_cells(*args, seed=seed, **kwargs )
         n_apopto = len(apopto_cells)
     
@@ -226,7 +228,7 @@ if __name__ == '__main__':
 
     ## Making chunks
     n_cores = 3
-    chunk_size = grid_size // n_cores
+    chunk_size = grid_size // (2 * n_cores)
     start = core_num * chunk_size
     stop = (core_num + 1) * chunk_size - 1
     
