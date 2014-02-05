@@ -88,24 +88,21 @@ def apoptosis(eptm, a_cell, idx=0,
     png_dir = os.path.join(png_up_dir, 'apopto_'+tag)
     if not os.path.isdir(png_dir):
         os.mkdir(png_dir)
-    # else:
-    #     pngs = [png for png in os.listdir(png_dir) if png.endswith('png')]
-    #     for png in pngs:
-    #         os.remove(os.path.join(png_dir, png))
-    xml_up_dir = os.path.join(GRAPH_SAVE_DIR, 'xml', save_dir)
-    if not os.path.isdir(xml_up_dir):
-        os.mkdir(xml_up_dir)
-
-    xml_dir = os.path.join(xml_up_dir, 'apopto_'+tag)
-    if not os.path.isdir(xml_dir):
-        os.mkdir(xml_dir)
+    out2d = os.path.join(png_dir, 'apopto_2d_%04i.png' % idx)
+    out3d = os.path.join(png_dir, 'apopto_3d_%04i.png' % idx)
+    epithelium_draw(eptm, output2d=out2d, output3d=out3d, d_theta=np.pi/2)
 
     if save:
-        out2d = os.path.join(png_dir, 'apopto_2d_%04i.png' % idx)
-        out3d = os.path.join(png_dir, 'apopto_3d_%04i.png' % idx)
+        xml_up_dir = os.path.join(GRAPH_SAVE_DIR, 'xml', save_dir)
+        if not os.path.isdir(xml_up_dir):
+            os.mkdir(xml_up_dir)
+
+        xml_dir = os.path.join(xml_up_dir, 'apopto_'+tag)
+        if not os.path.isdir(xml_dir):
+            os.mkdir(xml_dir)
+
         out_xml = os.path.join(xml_dir, 'apopto_%04i.xml' % idx)
         eptm.graph.save(out_xml)
-        epithelium_draw(eptm, output2d=out2d, output3d=out3d, d_theta=np.pi/2)
 
 def enhance_tension(eptm, j_vert, tension_increase):
 

@@ -6,6 +6,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 from os import mkdir
+import os
 import numpy as np
 # Import mpltlib before graph-tool to
 # avoid Gtk seg fault (don't ask why)
@@ -13,9 +14,16 @@ import matplotlib.pyplot as plt
 import graph_tool.all as gt     # 
 import time
 from datetime import datetime
+import random
+import logging
+
+
+CURRENT_DIR = os.path.dirname(__file__)
+ROOT_DIR = os.path.dirname(CURRENT_DIR)
+GRAPH_SAVE_DIR = os.path.join(ROOT_DIR, 'saved_graphs')
+
 
 import leg_joint as lj
-import random
 
 def p_apopto(zed, theta, z0=0., width_apopto=1.5, p0=0.95, amp=0.7):
     p = p0 * np.exp(- (zed - z0)**2 / width_apopto**2
@@ -88,7 +96,7 @@ def get_sequence(apopto_cells, num_steps):
         apopto_sequence.append(apopto_cells[start:stop])
     return apopto_sequence
 
-def gradual_apoptosis(eptm, apopto_cells, num_steps, residual_tension=0.,
+def gradual_apoptosis(eptm, apopto_cells, num_steps=10, residual_tension=0.,
                       fold_width=1.8, pola=False, tension_increase=None,
                       **kwargs):
 
@@ -149,8 +157,9 @@ def gradual_apoptosis(eptm, apopto_cells, num_steps, residual_tension=0.,
         prev_first = first
                 
     new_jv = lj.remove_cell(eptm, prev_first)
+
     eptm.junctions.radial_tensions[new_jv] = residual_tension
-    #lj.running_local_optimum(eptm, tol=1e-6)
+    # lj.running_local_optimum(eptm, tol=1e-6)
 
 def specific_apopto_cells_number(num_cells, *args, **kwargs):
     n_apopto = 0
@@ -168,6 +177,7 @@ def specific_apopto_cells_number(num_cells, *args, **kwargs):
     return seed, apopto_cells
     
 def show_distribution(eptm):
+
     lj.local_slice(eptm, zed_amp=2., theta_amp=None)
     axes = lj.plot_edges_generic(eptm, eptm.zeds, eptm.wys, ctoj=False)#,
                                  #efilt=eptm.is_local_edge)
@@ -183,142 +193,135 @@ def show_distribution(eptm):
 if __name__ == '__main__':
 
     import sys
-    args = [np.float(arg) if '.' in arg else np.int(arg)
-            for arg in sys.argv[1:]]
-    if len(args) != 4:
-        print("""Usage:
-              You need to provide the values for 5 parameters: 
-              python joint.py p1 p2 p3 p4
-              with the following meaning:
-              p1 : number of steps to complete apoptosis
-              p2 : volume reduction of the cell at each step
-              p3 : contractility multiplication at each steps 
-              p4 : radial tension
-              """ )
-        raise ValueError('Bad number of parameters')
-    (num_steps, vol_reduction, contractility, radial_tension) = args
+    try:
+        assert(len(sys.argv[1]) == 1)
+        core_num = int(sys.argv[1])
+    except:
+        """Usage: python joint.py core_num"""
+    
+    
+    ### Those will be the same across all simulations ran
+    fixed_params =  {'width_apopto':1.8,
+                     'residual_tension': 0.,
+                     'p0': 0.1,
+                     'amp': 0.4,
+                     'num_steps': 10.,
+                     'vol_reduction':0.8,
+                     'contractility': 1.0} # Constant contractility
 
-    conditions = {# 'ectopic': {'width_apopto':100,
-                  #             'p0': 0.02,
-                  #             'amp': 0.,
-                  #             'residual_tension': 0.,
-                  #             'seed': 0},
-                  # 'no_theta_bias': {'width_apopto':1.8,
-                  #                   'p0': 0.6,
-                  #                   'amp': 0.,
-                  #                   'residual_tension': 0.,
-                  #                   'seed': 3},
-                  # 'residual_tension': {'width_apopto':1.8,
-                  #                      'p0': 0.75,
-                  #                      'amp': 0.4,
-                  #                      'residual_tension': 1.,
-                  #                      'seed': 3},
-                  '05_cells': {'width_apopto':1.8,
-                               'residual_tension': 0.,
-                               'p0': 0.1,
-                               'amp': 0.4,
-                               'n_cells': 5,
-                               'tension_increase': 2.},
-                  '10_cells': {'width_apopto':1.8,
-                               'residual_tension': 0.,
-                               'p0': 0.2,
-                               'amp': 0.4,
-                               'n_cells': 10,
-                               'tension_increase': 2.},
-                  # '15_cells': {'width_apopto':1.8,
-                  #              'residual_tension': 0.,
-                  #              'p0': 0.4,
-                  #              'amp': 0.4,
-                  #              'n_cells': 15,
-                  #              'tension_increase': 2.},
-                  '20_cells': {'width_apopto':1.8,
-                               'residual_tension': 0.,
-                               'p0': 0.5,
-                               'amp': 0.4,
-                               'n_cells': 20,
-                               'tension_increase': 2.},
-                  # '25_cells': {'width_apopto':1.8,
-                  #              'residual_tension': 0.,
-                  #              'p0': 0.6,
-                  #              'amp': 0.4,
-                  #              'n_cells': 25,
-                  #              'tension_increase': 2.},
-                  '30_cells': {'width_apopto':1.8,
-                               'p0': 0.7,
-                               'amp': 0.4,
-                               'residual_tension': 0.,
-                               'n_cells': 30,
-                               'tension_increase': 2.}
-        }
+    ### Those will change
+    grid_params = {'n_cells': [30, 5, 10, 20],
+                  'tension_increase': [1., 2., 1.2],
+                  'radial_tension': [0., 0.2, 0.1],
+                  'ventral_bias':[1, 0]}
 
-    for cond, params in conditions.items():
+    grid_size = (len(grid_params['n_cells']) * len(grid_params['tension_increase'])
+                 * len(grid_params['radial_tension']) * 2)
+    total_apoptoses = grid_size * np.sum(grid_params['n_cells'])
+    total_steps = total_apoptoses * fixed_params['num_steps']
+    
+    print('Total number of simulations: %i' % grid_size)
+    print('Total number of apoptoses: %i' % total_apoptoses)
+    print('Total number of apoptoses: %i' % total_steps)
 
+    ## Making chunks
+    n_cores = 3
+    chunk_size = grid_size // n_cores
+    start = core_num * chunk_size
+    stop = (core_num + 1) * chunk_size - 1
+    
+    grid_elements = []
+    for n_cells in grid_params['n_cells']:
+        for radial_tension in grid_params['radial_tension']:
+            for tension_increase in grid_params['radial_tension']:
+                grid_elements.append((n_cells, tension_increase,
+                                      radial_tension))
+    apopto_seq_kws = {'width_apopto':fixed_params['width_apopto'],
+                      'p0':fixed_params['p0'],
+                      'amp':fixed_params['amp']}
+    gradual_apopto_kws = {'num_steps':fixed_params['num_steps'],
+                          'fold_width':fixed_params['width_apopto'],
+                          'residual_tension':fixed_params['residual_tension'],
+                          'vol_reduction':fixed_params['vol_reduction'],
+                          'contractility':fixed_params['contractility'],
+                          'pola':False}
+    print(len(grid_elements))
+    
+    xml_dir = os.path.join(os.path.join(GRAPH_SAVE_DIR, 'xml'))
+    if not os.path.isdir(xml_dir):
+        raise(IOError, 'Directory %s not found ' % xml_dir )
 
-        # print('**************'
-        #       'Starting %s'
-        #       '**************' % cond)
-        ### Without tension increase
+    print(start, stop)
+    for params in grid_elements[start:stop]:
 
-        params['tension_increase'] = 1.
+        n_cells, tension_increase, radial_tension = params
+
+        ## Ventral bias
+        
+        identifier = 'N_{}_TI_{}_RT_{}_VB'.format(n_cells,
+                                                  tension_increase,
+                                                  radial_tension)
+        with open('core_num_%i.log' % core_num, 'w+') as log_txt:
+            log_txt.write('starting %s\n' % identifier)
         
         eptm = lj.Epithelium(
-            graphXMLfile='saved_graphs/xml/before_apoptosis.xml',#
+            graphXMLfile='saved_graphs/xml/before_apoptosis.xml',
             paramfile='default/params.xml')
-        eptm.isotropic_relax()
-        seed, apopto_cells_rnd = specific_apopto_cells_number(params['n_cells'], eptm, 
-                                                              width_apopto=params['width_apopto'],
-                                                              p0=params['p0'],
-                                                              amp=params['amp'])
-        save_dir='random_{0}'.format(cond)
+        seed, apopto_cells_rnd = specific_apopto_cells_number(n_cells, eptm,
+                                                              **apopto_seq_kws)
         fig, ax = plt.subplots(figsize=(2.5, 2.5))
         for cell in apopto_cells_rnd:
             ax.plot(eptm.wys[cell], eptm.ixs[cell], 'ko', alpha=0.7)
             ax.set_title('Sequence of apoptoses around the joint')
         ax.set_aspect('equal')
-        fig.savefig('doc/imgs/repartition'+save_dir+'.svg')
+        fig.savefig('doc/imgs/repartition'+identifier+'.svg')
         plt.close(fig)
-        gradual_apoptosis(eptm, apopto_cells_rnd, num_steps,
-                          fold_width=params['width_apopto'],
-                          residual_tension=params['residual_tension'],
-                          tension_increase=params['tension_increase'],
-                          vol_reduction=vol_reduction,
-                          contractility=contractility,
+        gradual_apoptosis(eptm, apopto_cells_rnd,
+                          tension_increase=tension_increase,
                           radial_tension=radial_tension,
-                          save_dir=save_dir,
-                          pola=False)
-    params = {'width_apopto':1.8,
-              'residual_tension': 0.,
-              'tension_increase': 2.,
-              'p0': 0.5,
-              'amp': 0.4,
-              'seed': 2}
+                          save_dir=identifier,
+                          **gradual_apopto_kws)
+        out_xml = os.path.join(xml_dir, 'apopto_%s.xml' % identifier)
+        eptm.graph.save(out_xml)
+
+        with open('core_num_%i.log' % core_num, 'w+') as log_txt:
+            log_txt.write('done %s\n' % identifier)
+
         
-    for n_cells in [5, 10, 20, 30]:
-        eptm = lj.Epithelium(
-            graphXMLfile='saved_graphs/xml/before_apoptosis.xml',
-            paramfile='default/params.xml')
-        eptm.isotropic_relax()
-        gamma = 1
-        apopto_cells_reg = get_apoptotic_cells(eptm, random=False,
-                                               gamma=gamma, n_cells=n_cells,
-                                               width_apopto=2)
-        save_dir='regular_{}_cells_tension_increase'.format(n_cells)
+        ## No ventral bias
 
-        fig, ax = plt.subplots(figsize=(2.5, 2.5))
-        for cell in apopto_cells_reg:
-            ax.plot(eptm.wys[cell], eptm.ixs[cell], 'ko', alpha=0.7)
-            ax.set_title('Sequence of apoptoses around the joint')
-        ax.set_aspect('equal')
-        fig.savefig('doc/imgs/repartition'+save_dir+'.svg')
-        plt.close(fig)
+        identifier = 'N_{}_TI_{}_RT_{}_RG'.format(n_cells,
+                                                  tension_increase,
+                                                  radial_tension)
+        
+        if tension_increase==2. and radial_tension in (0, 0.2):
+            with open('core_num_%i.log' % core_num, 'w+') as log_txt:
+                log_txt.write('starting %s\n' % identifier)
 
-        gradual_apoptosis(eptm, apopto_cells_reg, num_steps,
-                          fold_width=params['width_apopto'],
-                          residual_tension=params['residual_tension'],
-                          tension_increase=params['tension_increase'],
-                          vol_reduction=vol_reduction,
-                          contractility=contractility,
-                          radial_tension=radial_tension,
-                          save_dir=save_dir,
-                          pola=False)
+            eptm = lj.Epithelium(
+                graphXMLfile='saved_graphs/xml/before_apoptosis.xml',
+                paramfile='default/params.xml')
+            apopto_cells_reg = get_apoptotic_cells(eptm, random=False,
+                                                   gamma=1, n_cells=n_cells,
+                                                   width_apopto=2)
+
+            fig, ax = plt.subplots(figsize=(2.5, 2.5))
+            for cell in apopto_cells_reg:
+                ax.plot(eptm.wys[cell], eptm.ixs[cell], 'ko', alpha=0.7)
+                ax.set_title('Sequence of apoptoses around the joint')
+            ax.set_aspect('equal')
+            fig.savefig('doc/imgs/repartition'+identifier+'.svg')
+            plt.close(fig)
+
+            gradual_apoptosis(eptm, apopto_cells_reg,
+                              tension_increase=tension_increase,
+                              radial_tension=radial_tension,
+                              save_dir=identifier,
+                              **gradual_apopto_kws)
+
+            out_xml = os.path.join(xml_dir, 'apopto_%s.xml' % identifier)
+            eptm.graph.save(out_xml)
+    
+            with open('core_num_%i.log' % core_num, 'w+') as log_txt:
+                log_txt.write('done %s\n' % identifier)
             
