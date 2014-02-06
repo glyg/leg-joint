@@ -60,13 +60,11 @@ def get_apoptotic_cells(eptm, seed=42, random=True, gamma=1,
             vfilt.a -= is_apoptotic.a
             eptm.graph.set_vertex_filter(vfilt)
             cell = eptm.closest_vert(sigma, zed)
-            # while is_apoptotic[cell]:
-            #     zed += np.random.normal(**kwargs['width_apopto'])
             is_apoptotic[cell] = 1
         eptm.graph.set_vertex_filter(None)
 
     n_cells = is_apoptotic.a.sum()
-    print("Number of apoptotic cells: %i" % n_cells)
+    #print("Number of apoptotic cells: %i" % n_cells)
 
     apopto_cells = np.array([cell for cell in eptm.cells
                              if is_apoptotic[cell]])
@@ -74,19 +72,40 @@ def get_apoptotic_cells(eptm, seed=42, random=True, gamma=1,
     theta_idx = np.argsort(np.cos(thetas/2))#[::-1]
     return apopto_cells.take(theta_idx)
 
-def ventral_enhance(thetas_in, gamma=1):
+def specific_apopto_cells_number(eptm, num_cells, **kwargs):
+    n_apopto = 0
+    n_iter = 0
+    seed = 10
+    eptm.set_local_mask(None)
+    lj.local_slice(eptm, zed_amp=kwargs['width_apopto'], theta_amp=2*np.pi)
+    eptm.graph.set_vertex_filter(eptm.is_local_vert)
+    fold_cells = np.array([cell for cell in eptm.cells])
     
-    thetas_in = np.atleast_1d(thetas_in)
-    thetas_out = np.zeros_like(thetas_in)
-    gamma_low = lambda x, gamma: np.pi * (x / np.pi)**gamma
-    gamma_high = lambda x, gamma: np.pi * (2 - (2 - x / np.pi)**(gamma)) 
-    thetas_out[thetas_in <= np.pi] = gamma_low(thetas_in[thetas_in <= np.pi],
-                                               gamma)
-    thetas_out[thetas_in > np.pi] = gamma_high(thetas_in[thetas_in > np.pi],
-                                               gamma)
-    return thetas_out
+    while n_apopto != num_cells:
+        seed += 1
+        n_iter += 1
+        if n_iter > 100:
+            raise RuntimeError('''Number of trials to high, 
+                               Try changing the parameters''')
+        apopto_cells = get_apoptotic_cells2(num_cells, fold_cells, seed=seed, **kwargs)
+        n_apopto = len(apopto_cells)
+    print('Iterated %i times' % n_iter)
+    return apopto_cells, seed
+
+def get_apoptotic_cells2(num_cells, fold_cells,  seed=42, **kwargs):
     
-    
+    total_cells = len(fold_cells)
+    all_probas = np.array([p_apopto(eptm.zeds[cell],
+                                    eptm.thetas[cell],
+                                    **kwargs)
+                           for cell in fold_cells])
+    all_probas *=  num_cells /  all_probas.sum()
+    np.random.seed(seed)
+    dices = np.random.random(size=all_probas.size)
+    apopto_cells = fold_cells[all_probas > dices]
+    eptm.graph.set_vertex_filter(None)
+    return apopto_cells
+
 def get_sequence(apopto_cells, num_steps):
     apopto_sequence = []
     num_cells = apopto_cells.size
@@ -95,7 +114,7 @@ def get_sequence(apopto_cells, num_steps):
         stop = min(k + num_steps, num_cells)
         apopto_sequence.append(apopto_cells[start:stop])
     return apopto_sequence
-
+    
 def gradual_apoptosis(eptm, apopto_cells, num_steps=10, residual_tension=0.,
                       fold_width=1.8, pola=False, tension_increase=None,
                       **kwargs):
@@ -161,22 +180,6 @@ def gradual_apoptosis(eptm, apopto_cells, num_steps=10, residual_tension=0.,
     eptm.junctions.radial_tensions[new_jv] = residual_tension
     # lj.running_local_optimum(eptm, tol=1e-6)
 
-def specific_apopto_cells_number(num_cells, *args, **kwargs):
-    n_apopto = 0
-    n_iter = 0
-    seed = 0
-    while n_apopto != num_cells:
-        seed += 1
-        n_iter += 1
-        if n_iter > 100:
-            raise RuntimeError('''Number of trials to high, 
-                               Try changing the parameters''')
-
-        kwargs['p0'] *= num_cells / 10
-        apopto_cells = get_apoptotic_cells(*args, seed=seed, **kwargs )
-        n_apopto = len(apopto_cells)
-    
-    return seed, apopto_cells
     
 def show_distribution(eptm):
 
@@ -190,7 +193,42 @@ def show_distribution(eptm):
             alpha = 0.3 + 0.7 * (eptm.ixs[cell] - x_min)/(x_max - x_min)
             axes.plot(eptm.zeds[cell], eptm.wys[cell], 'ro', alpha=alpha)
     return axes
-            
+
+def ventral_enhance(thetas_in, gamma=1):
+    ''' '''
+    thetas_in = np.atleast_1d(thetas_in)
+    thetas_out = np.zeros_like(thetas_in)
+    gamma_low = lambda x, gamma: np.pi * (x / np.pi)**gamma
+    gamma_high = lambda x, gamma: np.pi * (2 - (2 - x / np.pi)**(gamma)) 
+    thetas_out[thetas_in <= np.pi] = gamma_low(thetas_in[thetas_in <= np.pi],
+                                               gamma)
+    thetas_out[thetas_in > np.pi] = gamma_high(thetas_in[thetas_in > np.pi],
+                                               gamma)
+    return thetas_out
+
+### Those will be the same across all simulations ran
+fixed_params =  {'width_apopto':1.8,
+                 'residual_tension': 0.,
+                 'p0': 0.1,
+                 'amp': 0.4,
+                 'num_steps': 10.,
+                 'vol_reduction':0.8,
+                 'contractility': 1.0} # Constant contractility
+
+### Those will change
+grid_params = {'n_cells': [30, 5, 10, 20],
+              'tension_increase': [1., 2., 1.2],
+              'radial_tension': [0., 0.2, 0.1],
+              'ventral_bias':[1, 0]}
+
+grid_size = (len(grid_params['n_cells']) * len(grid_params['tension_increase'])
+             * len(grid_params['radial_tension']) * 2)
+total_apoptoses = grid_size * np.sum(grid_params['n_cells'])
+total_steps = total_apoptoses * fixed_params['num_steps']
+
+print('Total number of simulations: %i' % grid_size)
+print('Total number of apoptoses: %i' % total_apoptoses)
+print('Total number of apoptoses: %i' % total_steps)
     
 if __name__ == '__main__':
 
@@ -200,34 +238,9 @@ if __name__ == '__main__':
         core_num = int(sys.argv[1])
     except:
         """Usage: python joint.py core_num"""
-    
-    
-    ### Those will be the same across all simulations ran
-    fixed_params =  {'width_apopto':1.8,
-                     'residual_tension': 0.,
-                     'p0': 0.1,
-                     'amp': 0.4,
-                     'num_steps': 10.,
-                     'vol_reduction':0.8,
-                     'contractility': 1.0} # Constant contractility
-
-    ### Those will change
-    grid_params = {'n_cells': [30, 5, 10, 20],
-                  'tension_increase': [1., 2., 1.2],
-                  'radial_tension': [0., 0.2, 0.1],
-                  'ventral_bias':[1, 0]}
-
-    grid_size = (len(grid_params['n_cells']) * len(grid_params['tension_increase'])
-                 * len(grid_params['radial_tension']) * 2)
-    total_apoptoses = grid_size * np.sum(grid_params['n_cells'])
-    total_steps = total_apoptoses * fixed_params['num_steps']
-    
-    print('Total number of simulations: %i' % grid_size)
-    print('Total number of apoptoses: %i' % total_apoptoses)
-    print('Total number of apoptoses: %i' % total_steps)
 
     ## Making chunks
-    n_cores = 3
+    n_cores = 6
     chunk_size = grid_size // (2 * n_cores)
     start = core_num * chunk_size
     stop = (core_num + 1) * chunk_size - 1
@@ -239,7 +252,6 @@ if __name__ == '__main__':
                 grid_elements.append((n_cells, tension_increase,
                                       radial_tension))
     apopto_seq_kws = {'width_apopto':fixed_params['width_apopto'],
-                      'p0':fixed_params['p0'],
                       'amp':fixed_params['amp']}
     gradual_apopto_kws = {'num_steps':fixed_params['num_steps'],
                           'fold_width':fixed_params['width_apopto'],
@@ -269,7 +281,7 @@ if __name__ == '__main__':
         eptm = lj.Epithelium(
             graphXMLfile='saved_graphs/xml/before_apoptosis.xml',
             paramfile='default/params.xml')
-        seed, apopto_cells_rnd = specific_apopto_cells_number(n_cells, eptm,
+        apopto_cells_rnd, seed = specific_apopto_cells_number(eptm, n_cells,
                                                               **apopto_seq_kws)
         fig, ax = plt.subplots(figsize=(2.5, 2.5))
         for cell in apopto_cells_rnd:
