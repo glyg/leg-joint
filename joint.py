@@ -72,10 +72,9 @@ def get_apoptotic_cells(eptm, seed=42, random=True, gamma=1,
     theta_idx = np.argsort(np.cos(thetas/2))#[::-1]
     return apopto_cells.take(theta_idx)
 
-def specific_apopto_cells_number(eptm, num_cells, **kwargs):
+def specific_apopto_cells_number(eptm, num_cells, seed=10, **kwargs):
     n_apopto = 0
     n_iter = 0
-    seed = 10
     eptm.set_local_mask(None)
     lj.local_slice(eptm, zed_amp=kwargs['width_apopto'], theta_amp=2*np.pi)
     eptm.graph.set_vertex_filter(eptm.is_local_vert)
@@ -84,15 +83,17 @@ def specific_apopto_cells_number(eptm, num_cells, **kwargs):
     while n_apopto != num_cells:
         seed += 1
         n_iter += 1
-        if n_iter > 100:
+        if n_iter > 1000:
             raise RuntimeError('''Number of trials to high, 
                                Try changing the parameters''')
-        apopto_cells = get_apoptotic_cells2(num_cells, fold_cells, seed=seed, **kwargs)
+        apopto_cells = get_apoptotic_cells2(eptm, num_cells,
+                                            fold_cells, seed=seed, **kwargs)
         n_apopto = len(apopto_cells)
     print('Iterated %i times' % n_iter)
     return apopto_cells, seed
 
-def get_apoptotic_cells2(num_cells, fold_cells,  seed=42, **kwargs):
+def get_apoptotic_cells2(eptm, num_cells, fold_cells,
+                         seed=42, **kwargs):
     
     total_cells = len(fold_cells)
     all_probas = np.array([p_apopto(eptm.zeds[cell],
