@@ -12,6 +12,7 @@ import glob
 #import filters
 
 from datetime import datetime
+import graph_tool.all as gt
 
 from .graph_representation import epithelium_draw
 from .optimizers import find_energy_min
@@ -21,10 +22,83 @@ ROOT_DIR = os.path.dirname(CURRENT_DIR)
 GRAPH_SAVE_DIR = os.path.join(ROOT_DIR, 'saved_graphs')
 
 
-__all__ = ['apoptosis', 'type1_transition',
-           'type3_transition', 'remove_cell']
+__all__ = ['type1_transition',
+           'type3_transition', 'remove_cell',
+           'find_rosettes',
+           'solve_rosette',
+           'solve_all_rosettes']
 
+def find_rosettes(eptm):
+    eptm.graph.set_vertex_filter(eptm.is_cell_vert,
+                                 inverted=True)
+    total = eptm.graph.degree_property_map('total')
+    eptm.graph.set_vertex_filter(None)
+    return gt.find_vertex_range(eptm.graph, total, (4, 20))
+    
+def solve_all_rosettes(eptm, **kwargs):
+    
+    rosettes = find_rosettes(eptm)
+    print('solving %i rosettes' %len(rosettes))
+    new_jvs = []
+    while len(rosettes):
+        for central_vert in rosettes:
+            new_jv  = solve_rosette(eptm, central_vert, **kwargs)
+            new_jvs.append(new_jv)
+        rosettes = find_rosettes(eptm)
+    return new_jvs
 
+def solve_rosette(eptm, central_vert, tension_increase=1.):
+    cells = [cell for cell in central_vert.in_neighbours()
+             if eptm.is_cell_vert[cell]]
+    if len(cells) == 3:
+        print('Allready OK')
+        return None
+    eptm.set_local_mask(None)
+    j_edges = [je for je in central_vert.all_edges()
+               if eptm.is_junction_edge[je]]
+    j_verts = [je.source() if je.source() != central_vert else je.target()
+               for je in j_edges]
+    #print(len(j_verts))
+    rel_thetas = np.array([eptm.thetas[jv] - eptm.thetas[central_vert]
+                           for jv in j_verts])
+    rel_thetas[rel_thetas > np.pi] -= 2 * np.pi
+    rel_thetas[rel_thetas < -np.pi] += 2 * np.pi
+    upper_jvs = [jv for jv in j_verts 
+                 if rel_thetas[j_verts.index(jv)] > 0]
+    lower_jvs = [jv for jv in j_verts 
+                 if rel_thetas[j_verts.index(jv)] < 0]
+    split_cells = []
+    for cell in cells:
+        jvs = set(jv for jv in cell.out_neighbours())
+        upper = set(upper_jvs)
+        lower = set(lower_jvs)
+        if len(jvs & upper) and len(jvs & lower):
+            split_cells.append(cell)
+    if not len(split_cells) == 2:
+        raise ValueError()
+    new_jv = eptm.new_vertex(central_vert)
+    eptm.zeds[new_jv] += 0.1
+    eptm.zeds[central_vert] -= 0.1
+    to_remove = [(central_vert, jv) + 
+                  tuple(eptm.junctions.adjacent_cells[
+                      eptm.any_edge(central_vert, jv)])
+                  for jv in upper_jvs]
+    to_add = [(new_jv, jv) + 
+              tuple(eptm.junctions.adjacent_cells[
+                  eptm.any_edge(central_vert, jv)])
+              for jv in upper_jvs]
+    to_add.append((central_vert, new_jv) + tuple(split_cells))
+    for junc in to_remove:
+        eptm.remove_junction(*junc)
+    # for junc in to_add:
+    #     eptm.add_junction(*junc)
+    #     new_edge = eptm.graph.edge(*junc[:2])
+    #     enhance_tension(eptm, new_edge, tension_increase)
+    eptm.set_local_mask(None)
+    for cell in cells:
+        eptm.set_local_mask(cell, wider=True)
+    eptm.reset_topology(local=True)
+    return new_jv
 
 def snapshot(func, *args, **kwargs):
     def new_func(eptm, *args, **kwargs):
@@ -45,73 +119,6 @@ def snapshot(func, *args, **kwargs):
     return new_func
 
 
-def apoptosis(eptm, a_cell, idx=0,
-              vol_reduction=0.01,
-              contractility=1.,
-              radial_tension=0., save=True, save_dir=''):
-    '''
-    Simulates an apoptosis
-
-    Parameters:
-    -----------
-
-    eptm:  ::class:`Epithelium` instance
-
-    a_cell: the cell vertex of `eptm` to kill
-
-    idx: int, optional, identifier used for saving
-
-    vol_reduction: float, the relative reduction of the
-        the cell's equilibrium volume
-
-    contractility: float, the relative increase in cell contractility
-
-    radial_tension: float, the increase of apical basal tension
-    '''
-    eptm.set_local_mask(None)
-    eptm.set_local_mask(a_cell, wider=True)
-    
-    eptm.cells.prefered_vol[a_cell] *= vol_reduction
-    eptm.cells.contractilities[a_cell] *= contractility
-    mean_lt = np.array([eptm.junctions.line_tensions[je]
-                        for je in eptm.cells.junctions[a_cell]]).mean()
-    for jv in a_cell.out_neighbours():
-        eptm.junctions.radial_tensions[jv] += radial_tension * mean_lt
-    find_energy_min(eptm, tol=1e-4)
-    tag = 'vr%.2f_ctr%.2f_rt%.2f' % (vol_reduction, contractility,
-                                     radial_tension)
-
-    png_up_dir = os.path.join(GRAPH_SAVE_DIR, 'png', save_dir)
-    if not os.path.isdir(png_up_dir):
-        os.mkdir(png_up_dir)
-
-    png_dir = os.path.join(png_up_dir, 'apopto_'+tag)
-    if not os.path.isdir(png_dir):
-        os.mkdir(png_dir)
-    out2d = os.path.join(png_dir, 'apopto_2d_%04i.png' % idx)
-    out3d = os.path.join(png_dir, 'apopto_3d_%04i.png' % idx)
-    epithelium_draw(eptm, output2d=out2d, output3d=out3d, d_theta=np.pi/2)
-
-    if save:
-        xml_up_dir = os.path.join(GRAPH_SAVE_DIR, 'xml', save_dir)
-        if not os.path.isdir(xml_up_dir):
-            os.mkdir(xml_up_dir)
-
-        xml_dir = os.path.join(xml_up_dir, 'apopto_'+tag)
-        if not os.path.isdir(xml_dir):
-            os.mkdir(xml_dir)
-
-        out_xml = os.path.join(xml_dir, 'apopto_%04i.xml' % idx)
-        eptm.graph.save(out_xml)
-
-def enhance_tension(eptm, j_vert, tension_increase):
-
-    for edge in j_vert.all_edges():
-        if eptm.is_junction_edge[edge]:
-            eptm.junctions.line_tensions[edge] *= tension_increase
-        else:
-            eptm.set_local_mask(edge.source())
-    
         
 @snapshot
 def type1_transition(eptm, elements, verbose=False):

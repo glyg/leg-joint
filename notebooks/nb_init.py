@@ -3,6 +3,7 @@
 
 import matplotlib.pyplot as plt
 import IPython.core.display as disp
+import json
 
 import sys, os
 curdir = os.path.abspath(os.path.curdir)
