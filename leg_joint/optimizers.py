@@ -55,7 +55,6 @@ def find_energy_min(eptm, method='fmin_l_bfgs_b',
     pos0, bounds = precondition(eptm)
     output = 0
     if method == 'fmin_l_bfgs_b':
-        # On my box, machine precision is 10^-19, so
         ## I set `factr` to 1e11 to avoid too long computation
         output = optimize.fmin_l_bfgs_b(opt_energy,
                                         pos0.flatten(),
@@ -63,7 +62,7 @@ def find_energy_min(eptm, method='fmin_l_bfgs_b',
                                         #approx_grad=approx_grad,
                                         bounds=bounds.flatten(),
                                         args=(eptm,),
-                                        factr=1e11,
+                                        factr=1e8,
                                         m=10,
                                         pgtol=tol,
                                         epsilon=epsilon,

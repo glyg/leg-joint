@@ -307,7 +307,7 @@ def type1_transition(eptm, elements, verbose=False):
     eptm.set_local_mask(cell1)
     eptm.set_local_mask(cell3)
     eptm.update_xy()
-    eptm.reset_topology()
+    eptm.reset_topology(local=True)
     return modified_cells, modified_jverts
 
 

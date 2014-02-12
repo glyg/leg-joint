@@ -1,6 +1,29 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from graph_tool import Graph, GraphView
+import numpy as np
+
+def local_slice(eptm, theta_c=0, theta_amp=np.pi/24, 
+                zed_c=0, zed_amp=None):
+    if theta_amp is None:
+        theta_min = eptm.thetas.a.min()
+        theta_max = eptm.thetas.a.max()
+    else:
+        theta_min = theta_c - theta_amp
+        theta_max = theta_c + theta_amp
+    if zed_amp is None:
+        zed_min = eptm.zeds.a.min()
+        zed_max = eptm.zeds.a.max()
+    else:
+        zed_min = zed_c - zed_amp
+        zed_max = zed_c + zed_amp
+        
+    slice_cells = [cell for cell in eptm.cells
+                   if (theta_min < eptm.thetas[cell] < theta_max)
+                   and (zed_min < eptm.zeds[cell] < zed_max)]
+    eptm.set_local_mask(None)
+    for cell in slice_cells:
+        eptm.set_local_mask(cell)
 
 #####  Decorators
 def local(meth):

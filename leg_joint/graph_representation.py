@@ -29,7 +29,7 @@ def draw_polygons(eptm, coord1, coord2, colors,
     eptm.graph.set_vertex_filter(None)
     eptm.graph.set_edge_filter(None)
 
-    colors = plt.cm.jet(colors)
+    colors = plt.cm.Reds(colors)
     if ax is None:
         fig, ax = plt.subplots()
     for poly, color in zip(polygons, colors):
@@ -157,7 +157,7 @@ def plot_active(eptm, xcoord, ycoord, ax=None):
 
 def plot_2pannels(eptm, axes=None, vfilt=None,
                   efilt=None, local=True,
-                  depth_color=None,
+                  depth_color=None, cell_colors=None,
                   **kwargs):
     
     if local:
@@ -172,12 +172,31 @@ def plot_2pannels(eptm, axes=None, vfilt=None,
     plot_cells_zs(eptm, ax=ax_zs,
                   vfilt=vfilt, efilt=efilt,
                   depth_color=depth_color, **kwargs)
-
+    
+    
     x_lim = ax_zs.get_xlim()
     plot_cells_xy(eptm, ax=ax_xy,
                   vfilt=vfilt, efilt=efilt,
                   depth_color=depth_color, **kwargs)
     ax_zs.set_xlim(x_lim)
+
+    if cell_colors is not None:
+        draw_polygons(eptm,
+                      eptm.zeds,
+                      eptm.proj_sigma(),
+                      cell_colors,
+                      vfilt=eptm.is_local_vert,
+                      efilt=eptm.is_local_edge,
+                      ax=ax_zs)
+        draw_polygons(eptm,
+                      eptm.ixs,
+                      eptm.wys,
+                      cell_colors,
+                      vfilt=eptm.is_local_vert,
+                      efilt=eptm.is_local_edge,
+                      ax=ax_xy)
+
+
     return axes
 
     

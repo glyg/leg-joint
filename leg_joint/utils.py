@@ -2,30 +2,9 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
+
 from scipy.interpolate import splrep, splev
 
-
-def local_slice(eptm, theta_c=0, theta_amp=np.pi/24, 
-                zed_c=0, zed_amp=None):
-    if theta_amp is None:
-        theta_min = eptm.thetas.a.min()
-        theta_max = eptm.thetas.a.max()
-    else:
-        theta_min = theta_c - theta_amp
-        theta_max = theta_c + theta_amp
-    if zed_amp is None:
-        zed_min = eptm.zeds.a.min()
-        zed_max = eptm.zeds.a.max()
-    else:
-        zed_min = zed_c - zed_amp
-        zed_max = zed_c + zed_amp
-        
-    slice_cells = [cell for cell in eptm.cells
-                   if (theta_min < eptm.thetas[cell] < theta_max)
-                   and (zed_min < eptm.zeds[cell] < zed_max)]
-    eptm.set_local_mask(None)
-    for cell in slice_cells:
-        eptm.set_local_mask(cell)
 
 def to_xy(rho, theta):
     x = rho * np.cos(theta)
@@ -36,8 +15,6 @@ def to_rhotheta(x, y):
     rho = np.hypot(x, y)
     theta = np.arctan2(y, x)
     return rho, theta
-
-
     
 def compute_distribution(prop_u, prop_v, bins, smth=0):
     
@@ -56,7 +33,6 @@ def compute_distribution(prop_u, prop_v, bins, smth=0):
     mean_vfu = (regular_v * hist_uv).sum(axis=1) / hist_uv.sum(axis=1)
     tck_vfu = splrep(regular_u, mean_vfu, k=3, s=smth)
     return tck_vfu, Huv
-
 
 def _local_subgraph(meth):
     def new_function(eptm, *args, **kwargs):
