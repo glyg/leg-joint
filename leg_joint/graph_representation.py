@@ -14,9 +14,79 @@ import graph_tool.all as gt
 from .filters import active
 from .optimizers import precondition, approx_grad
 from .utils import to_rhotheta
-
 FLOAT = np.dtype('float32')
 
+CURRENT_DIR = os.path.dirname(__file__)
+ROOT_DIR = os.path.dirname(CURRENT_DIR)
+GRAPH_SAVE_DIR = os.path.join(ROOT_DIR, 'saved_graphs')
+
+
+
+def png_snapshot(func, *args, **kwargs):
+    def new_func(eptm, *args, **kwargs):
+        out = func(eptm, *args, **kwargs)
+        png_dir = eptm.paths['png']
+        outfname2d = os.path.join(png_dir, 'eptm2d_%04i.png'
+                                  % eptm.stamp)
+        outfname3d = os.path.join(png_dir, 'eptm3d_%04i.png'
+                                  % eptm.stamp)
+        epithelium_draw(eptm, output2d=outfname2d, output3d=outfname3d)
+        return out
+    return new_func
+
+def local_svg_snapshot(func, *args, **kwargs):
+    def new_func(eptm, *args, **kwargs):
+        out = func(eptm, *args, **kwargs)
+        svg_dir = eptm.paths['svg']
+        outfname = os.path.join(svg_dir, 'local_%05i.svg'
+                                % eptm.stamp)
+        ax_zs, ax_xy = plot_2pannels(eptm, c_text=False)
+        fig = ax_zs.get_figure()
+        fig.savefig(outfname)
+        plt.close(fig)
+        return out
+    return new_func
+
+def average_rho(eptm, bin_width=10):
+
+    eptm.update_rhotheta()
+    zeds = eptm.zeds.a
+    rhos = eptm.rhos.a
+    rhos = rhos[np.argsort(zeds)]
+    zeds = np.sort(zeds)
+    
+    rhos_cliped = rhos[: -(rhos.size % bin_width)]
+    rhos_cliped = rhos_cliped.reshape((rhos_cliped.size // bin_width, bin_width))
+    rhos_avg = rhos_cliped.mean(axis=1)
+    rhos_max = rhos_cliped.max(axis=1)
+    rhos_min = rhos_cliped.min(axis=1)
+    
+    zeds_cliped = zeds[: -(zeds.size % bin_width)]
+    zeds_cliped = zeds_cliped.reshape((zeds_cliped.size // bin_width, bin_width))
+    zeds_avg = zeds_cliped.mean(axis=1)
+    
+    return zeds_avg, rhos_avg, rhos_max, rhos_min
+
+def plot_avg_rho(eptm, bin_width, ax=None, retall=False, ls='r-'):
+    
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(12,4))
+    else:
+        fig = ax.get_figure()
+    zeds_avg, rhos_avg, rhos_max, rhos_min = average_rho(eptm, bin_width)
+    
+    ax.fill_between(zeds_avg,
+                    rhos_max,
+                    rhos_min,
+                    facecolor='0.5', edgecolor='0.9')
+    ax.plot(zeds_avg, rhos_avg, ls, lw=2, alpha=0.7)
+    ax.set_aspect('equal')
+    max_zed = ax.get_ylim()[1]
+    ax.set_ylim(0, max_zed)
+    if not retall:
+        return ax
+    return ax, (zeds_avg, rhos_avg, rhos_max, rhos_min)
+    
 def draw_polygons(eptm, coord1, coord2, colors,
                   vfilt=None, efilt=None, ax=None):
     eptm.graph.set_vertex_filter(vfilt)
@@ -264,15 +334,14 @@ def plot_cells_generic(eptm, xcoord, ycoord, ax=None,
 def plot_edges_generic(eptm, xcoord, ycoord, efilt=None,
                        ax=None, j_text=False,
                        depth_color=None, **kwargs):
-    edge_width = eptm.junctions.line_tensions.copy()
     if ax is None:
         fig, ax = plt.subplots(1,1)
         
     eptm.graph.set_edge_filter(efilt)
     eptm.graph.set_vertex_filter(None)
-    edge_width.fa = 2. * (eptm.junctions.line_tensions.fa
-                          / eptm.junctions.line_tensions.fa.mean())**0.5
-
+    # edge_width = eptm.junctions.line_tensions.copy()
+    # edge_width.fa = 2. * (eptm.junctions.line_tensions.fa
+    #                       / eptm.junctions.line_tensions.fa.mean())**0.5
     if depth_color is not None:
         depth_cmap = plt.cm.jet(depth_color.fa)
         edge_red = depth_color.copy()
@@ -291,10 +360,10 @@ def plot_edges_generic(eptm, xcoord, ycoord, efilt=None,
             if depth_color is not None:
                 c = [edge_red[edge], edge_green[edge], edge_blue[edge]]
                 ax.plot(ixs, wys, '-', c=c,
-                        lw=edge_width[edge],
+                        # lw=edge_width[edge],
                         alpha=0.4, **kwargs)
             else:
-                ax.plot(ixs, wys, 'g-', lw=edge_width[edge],
+                ax.plot(ixs, wys, 'g-', lw=1, #edge_width[edge],
                         alpha=0.4, **kwargs)
         # else:
         #     ax.plot(ixs, wys, 'k-', lw=1.,
@@ -364,6 +433,9 @@ def plot_cells_zs(eptm, ax=None, text=True,
     return ax
 
 def sfdp_draw(graph, output="lattice_3d.pdf"):
+    '''
+    Deprecated
+    '''
     output = os.path.join('saved_graph/pdf', output)
     sfdp_pos = gt.graph_draw(graph,
                              pos=gt.sfdp_layout(graph,
@@ -379,6 +451,9 @@ def sfdp_draw(graph, output="lattice_3d.pdf"):
 def pseudo3d_draw(graph, rtz, output="lattice_3d.pdf",
                   z_angle=0.12, theta_rot=0.1,
                   RGB=(0.8, 0.1, 0.), **kwargs):
+    '''
+    Deprecated
+    '''
     rhos, thetas, zeds = rtz
     thetas += theta_rot
     output = os.path.join('saved_graph/pdf', output)
@@ -413,7 +488,7 @@ def pseudo3d_draw(graph, rtz, output="lattice_3d.pdf",
     del pmap
     return pseudo3d_pos
     
-def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
+def epithelium_draw(eptm, z_angle=0.15, d_theta=np.pi/4,
                     output3d="tissue_3d.pdf",
                     output2d='tissue_sz.pdf', verbose=False):
 
@@ -480,8 +555,9 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=0.1,
     edge_red.fa = cmap[:, 0] #105/256.
     edge_green.fa = cmap[:, 1] #201/256.
     edge_blue.fa = cmap[:, 2] #40/256.
-    edge_width.fa = 2. * (eptm.junctions.line_tensions.fa /
-                          eptm.junctions.line_tensions.fa.mean())**0.5
+    edge_width.fa[:] = 1 
+    # edge_width.fa = 2. * (eptm.junctions.line_tensions.fa /
+    #                       eptm.junctions.line_tensions.fa.mean())**0.5
     eptm.graph.set_edge_filter(None)
 
     ### Cell vertices

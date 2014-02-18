@@ -9,8 +9,8 @@ import os
 import numpy as np 
 
 from .filters import local_slice
-from .topology import remove_cell, solve_all_rosettes
-from .graph_representation import epithelium_draw
+from .topology import remove_cell, solve_rosette, find_rosettes
+from .graph_representation import epithelium_draw, png_snapshot, local_svg_snapshot
 
 from .optimizers import find_energy_min
 from .topology import type1_transition
@@ -27,7 +27,8 @@ This module contains all the apoptosis specific files.
 '''
 
 
-
+@local_svg_snapshot
+@png_snapshot
 def apoptosis_step(eptm, a_cell,
                    vol_reduction=0.01,
                    contractility=1.,
@@ -56,7 +57,7 @@ def apoptosis_step(eptm, a_cell,
         for jv in a_cell.out_neighbours():
             eptm.junctions.radial_tensions[jv] += radial_tension * mean_lt
     find_energy_min(eptm)
-
+    
 def get_apoptotic_cells(eptm, **kwargs):
     '''Returns the specified number of apoptotic cells around the joint. 
     
@@ -191,16 +192,9 @@ def _ventral_enhance(thetas_in, gamma=1):
                                                gamma)
     return thetas_out
 
+@local_svg_snapshot
+@png_snapshot
 def post_apoptosis(eptm, a_cell, fold_cells, mode='shorter', **kwargs):
-
-    # for cell in fold_cells:
-    #     if not eptm.is_alive[cell]:
-    #         continue
-    #     eptm.set_local_mask(None)
-    #     eptm.set_local_mask(cell)
-    #     lj.find_energy_min(eptm)
-    #     if pola:
-    #         eptm.update_tensions(phi, np.pi / 4, 1.26**4)
 
     eptm.set_local_mask(None)
     neighbours = eptm.cells.get_neighbor_cells(a_cell)
@@ -248,6 +242,28 @@ def post_apoptosis(eptm, a_cell, fold_cells, mode='shorter', **kwargs):
         find_energy_min(eptm)
 
 
+def solve_all_rosettes(eptm, **kwargs):
+    
+    rosettes = find_rosettes(eptm)
+    print('solving %i rosettes' %len(rosettes))
+    new_jvs = []
+    while len(rosettes):
+        for central_vert in rosettes:
+            new_jv  = solve_rosette_opt(eptm, central_vert, **kwargs)
+            new_jvs.append(new_jv)
+        rosettes = find_rosettes(eptm)
+    return new_jvs
+
+@local_svg_snapshot
+@png_snapshot
+def solve_rosette_opt(eptm, central_vert, **kwargs):
+
+    new_jv  = solve_rosette(eptm, central_vert, **kwargs)
+    find_energy_min(eptm)
+    return new_jv
+        
+@local_svg_snapshot
+@png_snapshot
 def type1_at_shorter(eptm, local_edges):
     
     edge_lengths = np.array([eptm.edge_lengths[je] 
@@ -255,8 +271,8 @@ def type1_at_shorter(eptm, local_edges):
     shorter_edge = local_edges[np.argmin(edge_lengths)]
     modified_cells, modified_jverts = type1_transition(eptm,
                                                        shorter_edge)
-    eptm.set_local_mask(modified_cells[0])
-    eptm.set_local_mask(modified_cells[1])
+    eptm.set_local_mask(modified_cells[0], wider=True)
+    eptm.set_local_mask(modified_cells[1], wider=True)
     out = find_energy_min(eptm)
     return modified_cells, modified_jverts
 
@@ -266,54 +282,30 @@ def increase_contractility(eptm, cells, contractility_increase):
         eptm.cells.contractilities[cell] *= contractility_increase 
         
 def increase_tension(eptm, edges, tension_increase):
-
     for edge in edges:
-        if eptm.is_junction_edge[edge]:
-            eptm.junctions.line_tensions[edge] *= tension_increase
+        eptm.junctions.line_tensions[edge] *= tension_increase
 
+@local_svg_snapshot
+@png_snapshot
 def gradual_apoptosis(eptm, seq_kwargs,
-                      apopto_kwargs, post_kwargs,
-                      basepath='', save_pngs=True):
+                      apopto_kwargs, post_kwargs):
     
-    apopto_cells, fold_cells, apopto_sequence = get_apoptotic_cells(eptm, **seq_kwargs)
-    eptm.set_local_mask(None)
-    i = 0
-    prev_first = apopto_cells[0]
-
-    def to_png(i):
-        png_dir = os.path.join(GRAPH_SAVE_DIR, 'png',
-                               basepath)
-        if not os.path.isdir(png_dir):
-            os.mkdir(png_dir)
-        fname_png_3d = os.path.join(png_dir,
-                                    'apopto_3d_%04i.png' %i)
-        fname_png_2d = os.path.join(GRAPH_SAVE_DIR,'png',
-                                    basepath,
-                                    'apopto_2d_%04i.png' %i)
-        epithelium_draw(eptm, d_theta=0, z_angle=-0.15,
-                        output3d=fname_png_3d,
-                        output2d=fname_png_2d)
+    (apopto_cells, fold_cells,
+     apopto_sequence) = get_apoptotic_cells(eptm, **seq_kwargs)
     prev_first = apopto_cells[0]
     for sub_sequence in apopto_sequence:
         for a_cell in sub_sequence:
-            i += 1
             apoptosis_step(eptm, a_cell, **apopto_kwargs)
-            if save_pngs:
-                to_png(i)
             first = sub_sequence[0]
             if first != prev_first:
-                i+=1
                 post_apoptosis(eptm, prev_first,
                                fold_cells, **post_kwargs)
-                if save_pngs:
-                    to_png(i)
             prev_first = first
-
-    i+=1
     post_apoptosis(eptm, prev_first,
-                   fold_cells, **post_kwargs)
-    if save_pngs:
-        to_png(i)
+                   fold_cells, mode='shorter',
+                   **post_kwargs)
+    xml_name = os.path.join(eptm.paths['xml'], 'after_apopto.xml')
+    eptm.graph.save(xml_name)
     # lj.running_local_optimum(eptm, tol=1e-6)
 
     

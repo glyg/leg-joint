@@ -25,6 +25,7 @@ from .utils import to_xy, to_rhotheta
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
+GRAPH_SAVE_DIR = os.path.join(ROOT_DIR, 'saved_graphs')
 
 # See [the tau manifesto](http://tauday.com/tau-manifesto)
 tau = 2. * np.pi
@@ -63,7 +64,7 @@ class Epithelium(EpitheliumFilters,
 
     """
 
-    def __init__(self, graphXMLfile=None,
+    def __init__(self, graphXMLfile=None, identifier=0,
                  paramtree=None,
                  paramfile=PARAMFILE,
                  graph=None, verbose=False, **params):
@@ -100,6 +101,8 @@ class Epithelium(EpitheliumFilters,
             except KeyError:
                 pass
         self.params = self.paramtree.absolute_dic
+        self.identifier = identifier
+        self.stamp = 0
         
         # Graph instanciation
         if graph is None and graphXMLfile is None:
@@ -145,6 +148,7 @@ class Epithelium(EpitheliumFilters,
             self.set_vertex_state()
             self.set_edge_state()
 
+        self._init_paths()
         self.reset_topology(local=False)
         # Dynamical components
         Dynamics.__init__(self)
@@ -162,16 +166,33 @@ class Epithelium(EpitheliumFilters,
         num_edges = self.is_junction_edge.a.sum()
         str1 = ['Epithelium with %i cells and %i junction edges' % (num_cells,
                                                                     num_edges)]
-        str1.append('Vertex Properties:\n'
-                    '==================')
-        for key in sorted(self.graph.vertex_properties.keys()):
-            str1.append('    * %s' % key)
-        str1.append('Edge Properties:\n'
-                    '================')
-        for key in sorted(self.graph.edge_properties.keys()):
-            str1.append('    * %s' % key)
+        # str1.append('Vertex Properties:\n'
+        #             '==================')
+        # for key in sorted(self.graph.vertex_properties.keys()):
+        #     str1.append('    * %s' % key)
+        # str1.append('Edge Properties:\n'
+        #             '================')
+        # for key in sorted(self.graph.edge_properties.keys()):
+        #     str1.append('    * %s' % key)
+
+        str1.append('Identifier : %s' % self.identifier)
+        str1.append('Directory : %s' % self.save_dir)
         return '\n'.join(str1)
 
+    def _init_paths(self):
+
+        self.save_dir = os.path.join(GRAPH_SAVE_DIR, self.identifier)
+        self.paths = {'root': os.path.abspath(self.save_dir)}
+        if not os.path.isdir(self.save_dir):
+            os.mkdir(self.save_dir)
+        for filetype in ['png', 'xml', 'pdf', 'svg']:
+            subdir = os.path.join(self.save_dir, filetype)
+            if not os.path.isdir(subdir):
+                os.mkdir(subdir)
+            self.paths[filetype] = os.path.abspath(subdir)
+            
+
+        
         
     def update_geometry(self):
         '''

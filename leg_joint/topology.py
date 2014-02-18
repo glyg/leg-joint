@@ -14,7 +14,7 @@ import glob
 from datetime import datetime
 import graph_tool.all as gt
 
-from .graph_representation import epithelium_draw
+from .graph_representation import epithelium_draw, png_snapshot, local_svg_snapshot
 from .optimizers import find_energy_min
 
 CURRENT_DIR = os.path.dirname(__file__)
@@ -25,8 +25,7 @@ GRAPH_SAVE_DIR = os.path.join(ROOT_DIR, 'saved_graphs')
 __all__ = ['type1_transition',
            'type3_transition', 'remove_cell',
            'find_rosettes',
-           'solve_rosette',
-           'solve_all_rosettes']
+           'solve_rosette']
 
 def find_rosettes(eptm):
     eptm.graph.set_vertex_filter(eptm.is_cell_vert,
@@ -35,18 +34,7 @@ def find_rosettes(eptm):
     eptm.graph.set_vertex_filter(None)
     return gt.find_vertex_range(eptm.graph, total, (4, 20))
     
-def solve_all_rosettes(eptm, **kwargs):
     
-    rosettes = find_rosettes(eptm)
-    print('solving %i rosettes' %len(rosettes))
-    new_jvs = []
-    while len(rosettes):
-        for central_vert in rosettes:
-            new_jv  = solve_rosette(eptm, central_vert, **kwargs)
-            new_jvs.append(new_jv)
-        rosettes = find_rosettes(eptm)
-    return new_jvs
-
 def solve_rosette(eptm, central_vert, tension_increase=1.):
     cells = [cell for cell in central_vert.in_neighbours()
              if eptm.is_cell_vert[cell]]
@@ -90,37 +78,27 @@ def solve_rosette(eptm, central_vert, tension_increase=1.):
     to_add.append((central_vert, new_jv) + tuple(split_cells))
     for junc in to_remove:
         eptm.remove_junction(*junc)
-    # for junc in to_add:
-    #     eptm.add_junction(*junc)
-    #     new_edge = eptm.graph.edge(*junc[:2])
-    #     enhance_tension(eptm, new_edge, tension_increase)
     eptm.set_local_mask(None)
     for cell in cells:
         eptm.set_local_mask(cell, wider=True)
     eptm.reset_topology(local=True)
     return new_jv
 
-def snapshot(func, *args, **kwargs):
+def xml_snapshot(func, *args, **kwargs):
     def new_func(eptm, *args, **kwargs):
         out = func(eptm, *args, **kwargs)
-        now = datetime.now()
+        
         xml_save = os.path.join(GRAPH_SAVE_DIR,
-                                'xml', 'tmp',
-                                'eptm_%s.xml' % now.isoformat())
+                                eptm.identifier,
+                                'xml'
+                                'eptm_%04i.xml' % eptm.stamp)
         eptm.graph.save(xml_save)
-        # outfname2d = os.path.join(GRAPH_SAVE_DIR,
-        #                           'png', 'tmp',
-        #                           'eptm2d_%s.png' % now.isoformat())
-        # outfname3d = os.path.join(GRAPH_SAVE_DIR,
-        #                           'png', 'tmp',
-        #                           'eptm3d_%s.png' % now.isoformat())
-        # epithelium_draw(eptm, output2d=outfname2d, output3d=outfname3d)
         return out
     return new_func
 
 
         
-@snapshot
+#@snapshot
 def type1_transition(eptm, elements, verbose=False):
     """
     Type one transition (see the definition in
@@ -311,7 +289,7 @@ def type1_transition(eptm, elements, verbose=False):
     return modified_cells, modified_jverts
 
 
-@snapshot
+#@snapshot
 def cell_division(eptm, mother_cell,
                   phi_division=None,
                   verbose=False):
@@ -428,7 +406,7 @@ def cell_division(eptm, mother_cell,
     if eptm.__verbose__: print('Division completed')
     return septum
 
-@snapshot
+#@snapshot
 def type3_transition(eptm, cell, reduce_edgenum=True, verbose=False):
     """
     
@@ -552,6 +530,9 @@ def remove_cell(eptm, cell):
     eptm.update_geometry()
     eptm.set_local_mask(None)
     return new_jv
+
+
+### TODO : The function bellow is outdated
     
 def resolve_small_edges(eptm, threshold=5e-2, vfilt=None, efilt=None):
     # Collapse 3 sided cells

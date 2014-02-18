@@ -29,38 +29,34 @@ Parameter management utilities
 '''
 
 
-def get_param(key, fixed_params, grid_params, index, mode='fixed'):
+def get_param(key, params, index):
     '''
-    Returns the corresponding paramter value in either `fixed_params` 
-    or `grid_params` dictionaries. If it's from the grid parameters,
-    the value  at position `index` is returned
-    
-    If mode is set to 'fixed', `fixed_params` will be
-    searched first (the default), it it'set to grid, the opposite will happen.
+    Returns the corresponding paramter value at position `index`
+    if the valuie is a list or the value itself
     
     Parameters:
     ===========
     
     key: a dictionary key (usually a string)
-    fixed_params: a dictionnary containing a single value per key
-    grid_params: a dictionnary containing sequences of values per key
-    mode: {'fixed' | 'grid'} default 'fixed', dictionnary to search first
-    
+    params: a dictionnary of dictonnaries
+    index: int: the position of the value
     '''
-    if mode == 'fixed':
-        if fixed_params.get(key) is None:
-            values = grid_params.get(key)
-            if values is not None:
-                return values[index]
-        return fixed_params.get(key)
-    elif mode == 'grid':
-        values = grid_params.get(key)
-        if values is None:
-            return fixed_params.get(key)
-        else:
-            return values[index]
+    for sub_params in params.values():
+        if not key in sub_params:
+            continue
+        try:
+            return sub_params[key][index]
+        except TypeError:
+            return sub_params[key]
     
-def get_grid_indices(grid_params):
+def get_grid_indices(params):
+
+    grid_params = {}
+    for sub_params in params.values():
+        grid_params.update({key: val
+                            for key, val in sub_params.items()
+                            if type(val) is list
+                            or type(val) is np.ndarray})
     if not len(grid_params):
         return None
     grid_indices = np.meshgrid(*(np.arange(len(values))
@@ -71,36 +67,25 @@ def get_grid_indices(grid_params):
                     in zip(grid_params.keys(), grid_indices)}
     return grid_indices
 
-def get_all_kwds(index, fixed_params, grid_params,
-                 grid_indices, seq_keys,
-                 apopto_keys, post_keys):
+def get_kwargs(index, params):
 
-    if grid_indices is  None:
-        seq_kwds = {key: fixed_params[key]
-                    for key in seq_keys}
-        apopto_kwds = {key: fixed_params[key]
-                    for key in apopto_keys}
-        post_kwds = {key: fixed_params[key]
-                    for key in post_keys}
-        return seq_kwds, apopto_kwds, post_kwds
-
-    def get_keys(keys):
+    grid_indices = get_grid_indices(params)
+    if grid_indices is None:
+        return params
+    def get_sub_dict(sub_params):
         target = {}
-        for key in keys:
+        for key in sub_params.keys():
             try:
+                print(key, grid_indices[key][index])
                 param_index = grid_indices[key][index]
             except KeyError:
                 param_index = 0
-            target[key] = get_param(key,
-                                    fixed_params,
-                                    grid_params,
-                                    index=param_index, mode='fixed')
+            target[key] = get_param(key, params,
+                                    index=param_index)
         return target
-    seq_kwds = get_keys(seq_keys)
-    apopto_kwds = get_keys(apopto_keys)
-    post_kwds = get_keys(post_keys)
 
-    return seq_kwds, apopto_kwds, post_kwds
+    return {sub_key: get_sub_dict(sub_params)
+            for sub_key, sub_params in params.items()}
 
 def dump_json(all_kwds, index, save_dir):
     

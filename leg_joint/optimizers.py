@@ -46,6 +46,7 @@ def precondition(eptm):
 
     return pos0, bounds
 
+
 @local_subgraph
 def find_energy_min(eptm, method='fmin_l_bfgs_b',
                     tol=1e-8, approx_grad=0, epsilon=1e-8):
@@ -53,6 +54,7 @@ def find_energy_min(eptm, method='fmin_l_bfgs_b',
     Performs the energy minimisation
     '''
     pos0, bounds = precondition(eptm)
+    eptm.stamp += 1
     output = 0
     if method == 'fmin_l_bfgs_b':
         ## I set `factr` to 1e11 to avoid too long computation
@@ -62,7 +64,7 @@ def find_energy_min(eptm, method='fmin_l_bfgs_b',
                                         #approx_grad=approx_grad,
                                         bounds=bounds.flatten(),
                                         args=(eptm,),
-                                        factr=1e8,
+                                        factr=1e10,
                                         m=10,
                                         pgtol=tol,
                                         epsilon=epsilon,
@@ -84,11 +86,6 @@ def find_energy_min(eptm, method='fmin_l_bfgs_b',
                                    avextol=tol,
                                    retall=True,
                                    maxiter=100)# ,
-                                   # callback=opt_callback)
-        # except:
-        #     eptm.set_new_pos(pos0)
-        #     eptm.graph.set_vertex_filter(None)
-        #     output = 0
 
     elif method=='fmin_tnc':
         output = optimize.fmin_tnc(opt_energy,

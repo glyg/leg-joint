@@ -15,21 +15,17 @@ from .optimizers import approx_grad, check_local_grad
 from .topology import cell_division, type1_transition
 from .topology import type3_transition
 from .topology import remove_cell, resolve_small_edges
-from .topology import solve_all_rosettes
 from .frontier import find_circumference, create_frontier
 from .apoptosis import gradual_apoptosis, get_apoptotic_cells, apoptosis_step, post_apoptosis
+from .apoptosis import solve_all_rosettes
 from .graph_representation import plot_ortho_proj, plot_ortho_gradients
 from .graph_representation import draw_polygons, plot_cells_generic
 from .graph_representation import epithelium_draw as draw
 from .graph_representation import plot_2pannels, plot_2pannels_gradients
-from .explore_params import get_all_kwds, get_grid_indices, dump_json
+from .explore_params import get_kwargs, get_grid_indices, dump_json
 
 from .filters import local_slice
 
 from .explore_params import explore_delta_h_1D
-
-
-
-
 
 
