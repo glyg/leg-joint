@@ -555,9 +555,9 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=np.pi/4,
     edge_red.fa = cmap[:, 0] #105/256.
     edge_green.fa = cmap[:, 1] #201/256.
     edge_blue.fa = cmap[:, 2] #40/256.
-    edge_width.fa[:] = 1 
-    # edge_width.fa = 2. * (eptm.junctions.line_tensions.fa /
-    #                       eptm.junctions.line_tensions.fa.mean())**0.5
+    #edge_width.fa[:] = 1.
+    edge_width.fa = 2. * (eptm.junctions.line_tensions.fa /
+                          eptm.junctions.line_tensions.fa.mean())**0.5
     eptm.graph.set_edge_filter(None)
 
     ### Cell vertices

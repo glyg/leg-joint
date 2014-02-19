@@ -140,7 +140,7 @@ def random_apoptotic_cells(eptm, num_cells, fold_cells, seed, proba_kwargs):
     dices = np.random.random(size=all_probas.size)
     apopto_cells = fold_cells[all_probas > dices]
     thetas = np.array([eptm.thetas[cell] for cell in apopto_cells])
-    theta_idx = np.argsort(np.cos(thetas/2))#[::-1]
+    theta_idx = np.argsort(np.cos(thetas/2)**2)#[::-1]
     return apopto_cells.take(theta_idx)
 
 def _apopto_pdf(zed, theta, z0=0., width_apopto=1.5, amp=0.4):
@@ -177,7 +177,7 @@ def regular_apoptotic_cells(eptm, num_cells, gamma=1, width_apopto=1.8):
     apopto_cells = np.array([cell for cell in eptm.cells
                              if is_apoptotic[cell]])
     thetas = np.array([eptm.thetas[cell] for cell in apopto_cells])
-    theta_idx = np.argsort(np.cos(thetas/2))#[::-1]
+    theta_idx = np.argsort(np.cos(thetas/2)**2)#[::-1]
     return apopto_cells.take(theta_idx)
 
 def _ventral_enhance(thetas_in, gamma=1):
@@ -220,18 +220,17 @@ def post_apoptosis(eptm, a_cell, fold_cells, mode='shorter', **kwargs):
             new_edges.extend([je for je in eptm.cells.junctions[neighbour]
                               if (not je in new_edges)
                               and eptm.is_junction_edge[je]])
-    print(len(new_edges))
-    if  kwargs.get('residual_ab_tension') is not None:
-        for jv in new_jvs:
-            eptm.junctions.radial_tensions[jv] = kwargs['residual_ab_tension']
+    # if  kwargs.get('residual_ab_tension') is not None:
+    #     for jv in new_jvs:
+    #         eptm.junctions.radial_tensions[jv] = kwargs['residual_ab_tension']
 
-    if  kwargs.get('tension_increase') is not None:
-        increase_tension(eptm, new_edges,
-                         kwargs['tension_increase'])
+    # if  kwargs.get('tension_increase') is not None:
+    #     increase_tension(eptm, new_edges,
+    #                      kwargs['tension_increase'])
 
-    if  kwargs.get('contractility_increase') is not None:
-        increase_contractility(eptm, neighbours,
-                               kwargs['contractility_increase'])
+    # if  kwargs.get('contractility_increase') is not None:
+    #     increase_contractility(eptm, neighbours,
+    #                            kwargs['contractility_increase'])
     
     np.random.shuffle(fold_cells)
     for cell in fold_cells:
@@ -275,16 +274,52 @@ def type1_at_shorter(eptm, local_edges):
     eptm.set_local_mask(modified_cells[1], wider=True)
     out = find_energy_min(eptm)
     return modified_cells, modified_jverts
-
         
-def increase_contractility(eptm, cells, contractility_increase):
-    for cell in cells:
-        eptm.cells.contractilities[cell] *= contractility_increase 
+# def increase_contractility(eptm, cells, contractility_increase):
+#     for cell in cells:
+#         eptm.cells.contractilities[cell] *= contractility_increase 
         
-def increase_tension(eptm, edges, tension_increase):
-    for edge in edges:
-        eptm.junctions.line_tensions[edge] *= tension_increase
+# def increase_tension(eptm, edges, tension_increase):
+#     for edge in edges:
+#         eptm.junctions.line_tensions[edge] *= tension_increase
 
+def tension_increase(t, theta, tau, max_ti=2.):
+    delay = tau * np.sin(theta/2)**2
+    exp = np.exp(-(t - delay) / tau)
+    increase = 1 + max_ti * (1 - exp)
+    return increase.clip(1, 1+max_ti)
+
+def find_ring_jes(eptm, ring_width):
+
+    eptm.set_local_mask(None)
+    local_slice(eptm, theta_amp=2*np.pi,
+                zed_amp=ring_width)
+
+    is_ring = eptm.is_junction_edge.copy()
+    is_ring.a[:] = 0
+
+    for cell in eptm.cells.local_cells():
+        for je in eptm.cells.junctions[cell]:
+            n0, n1 = eptm.junctions.adjacent_cells[je]
+            if not (eptm.is_local_vert[n0]
+                    and eptm.is_local_vert[n1]):
+                is_ring[je] = 1
+
+    for cell in eptm.cells.local_cells():
+        are_rings = np.array([is_ring[je] for je
+                              in eptm.cells.junctions[cell]])
+        if np.any(are_rings):
+            eptm.is_local_vert[cell] = 0
+
+    for cell in eptm.cells.local_cells():
+        for je in eptm.cells.junctions[cell]:
+            n0, n1 = eptm.junctions.adjacent_cells[je]
+            if not (eptm.is_local_vert[n0]
+                    and eptm.is_local_vert[n1]):
+                is_ring[je] = 1
+    
+    return is_ring
+    
 @local_svg_snapshot
 @png_snapshot
 def gradual_apoptosis(eptm, seq_kwargs,
@@ -292,8 +327,18 @@ def gradual_apoptosis(eptm, seq_kwargs,
     
     (apopto_cells, fold_cells,
      apopto_sequence) = get_apoptotic_cells(eptm, **seq_kwargs)
+    is_ring = find_ring_jes(eptm, seq_kwargs['width_apopto'])
+    ring_jes = np.array([je for je in eptm.junctions if is_ring[je]])
+    je_thetas = np.array([min(eptm.thetas[je.source()],
+                              eptm.thetas[je.target()])
+                          for je in ring_jes])
+    ring_jes = ring_jes.take(np.argsort(np.cos(je_thetas/2)))
+    seq_len = len(apopto_sequence)
+    tau = seq_len / 3.
+    tension0 = eptm.junctions.line_tensions[ring_jes[0]]
+    
     prev_first = apopto_cells[0]
-    for sub_sequence in apopto_sequence:
+    for n, sub_sequence in enumerate(apopto_sequence):
         for a_cell in sub_sequence:
             apoptosis_step(eptm, a_cell, **apopto_kwargs)
             first = sub_sequence[0]
@@ -301,6 +346,12 @@ def gradual_apoptosis(eptm, seq_kwargs,
                 post_apoptosis(eptm, prev_first,
                                fold_cells, **post_kwargs)
             prev_first = first
+        for theta, je in zip(je_thetas, ring_jes):
+            ti = tension_increase(n, theta, tau, max_ti=2)
+            try:
+                eptm.junctions.line_tensions[je] = tension0 * ti
+            except ValueError:
+                pass
     post_apoptosis(eptm, prev_first,
                    fold_cells, mode='shorter',
                    **post_kwargs)
