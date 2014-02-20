@@ -289,6 +289,12 @@ def tension_increase(t, theta, tau, max_ti=2.):
     increase = 1 + max_ti * (1 - exp)
     return increase.clip(1, 1+max_ti)
 
+def contractility_increase(t, theta, tau, max_ci=2.):
+    delay = tau * np.sin(theta/2)**2
+    exp = np.exp(-(t - delay) / tau)
+    increase = 1 + (max_ci - 1) * (1 - exp)
+    return increase.clip(1, max_ci)
+
 def find_ring_jes(eptm, ring_width):
 
     eptm.set_local_mask(None)
@@ -336,6 +342,8 @@ def gradual_apoptosis(eptm, seq_kwargs,
     seq_len = len(apopto_sequence)
     tau = seq_len / 3.
     tension0 = eptm.junctions.line_tensions[ring_jes[0]]
+    contractility0 = eptm.cells.contractilities[apopto_cells[0]]
+    
     
     prev_first = apopto_cells[0]
     for n, sub_sequence in enumerate(apopto_sequence):
@@ -346,10 +354,13 @@ def gradual_apoptosis(eptm, seq_kwargs,
                 post_apoptosis(eptm, prev_first,
                                fold_cells, **post_kwargs)
             prev_first = first
-        for theta, je in zip(je_thetas, ring_jes):
-            ti = tension_increase(n, theta, tau, max_ti=2)
+        for cell in fold_cells:
+            ci = contractility_increase(n, eptm.thetas[cell], tau, max_ci=3)
+            # ti = tension_increase(n, theta, tau, max_ti=2)
+            # try:
+            #     eptm.junctions.line_tensions[je] = tension0 * ti
             try:
-                eptm.junctions.line_tensions[je] = tension0 * ti
+                eptm.cells.contractilities[cell] = contractility0 * ci
             except ValueError:
                 pass
     post_apoptosis(eptm, prev_first,

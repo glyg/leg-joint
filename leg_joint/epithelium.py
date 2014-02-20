@@ -64,7 +64,7 @@ class Epithelium(EpitheliumFilters,
 
     """
 
-    def __init__(self, graphXMLfile=None, identifier=0,
+    def __init__(self, graphXMLfile=None, identifier='0',
                  paramtree=None,
                  paramfile=PARAMFILE,
                  graph=None, verbose=False, **params):

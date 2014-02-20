@@ -95,16 +95,17 @@ def draw_polygons(eptm, coord1, coord2, colors,
                 for cell in eptm.cells if eptm.is_alive[cell]]
     colors = np.array([colors[cell] for cell in eptm.cells
                        if eptm.is_alive[cell]])
+    colors -= colors.min()
     colors /= colors.max()
     eptm.graph.set_vertex_filter(None)
     eptm.graph.set_edge_filter(None)
 
-    colors = plt.cm.Reds(colors)
+    colors = plt.cm.jet(colors)
     if ax is None:
         fig, ax = plt.subplots()
     for poly, color in zip(polygons, colors):
         patch = Polygon(poly, color=color,
-                        fill=True, closed=True, alpha=0.4)
+                        fill=True, closed=True, alpha=0.8)
         ax.add_patch(patch)
     ax.autoscale_view()
     ax.set_aspect('equal')
