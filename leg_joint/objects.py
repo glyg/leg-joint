@@ -26,12 +26,12 @@ from .utils import to_xy, to_rhotheta
 from .circumcircle import c_circumcircle
 from sklearn.decomposition import PCA
 
-
-
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
 tau = 2 * np.pi
+
+
 
 class AbstractRTZGraph(object):
     '''
@@ -157,7 +157,6 @@ class AbstractRTZGraph(object):
         self.graph.edge_properties["u_dixs"] = self.u_dixs
         self.u_dwys = self.graph.new_edge_property('float')
         self.graph.edge_properties["u_dwys"] = self.u_dwys
-        
 
     def _get_edge_geometry(self):
         '''
@@ -179,7 +178,6 @@ class AbstractRTZGraph(object):
         self.u_drhos = self.graph.edge_properties["u_drhos"]
         self.u_dixs = self.graph.edge_properties["u_dixs"]
         self.u_dwys = self.graph.edge_properties["u_dwys"]
-
         
     def scale(self, scaling_factor):
         '''Multiply all the distances by a factor `scaling_factor`

@@ -7,10 +7,12 @@ from __future__ import print_function
 
 import os
 import numpy as np 
+import graph_tool.all as gt
 
 from .filters import local_slice
 from .topology import remove_cell, solve_rosette, find_rosettes
-from .graph_representation import epithelium_draw, png_snapshot, local_svg_snapshot
+from .graph_representation import png_snapshot
+from .epithelium import hdf_snapshot
 
 from .optimizers import find_energy_min
 from .topology import type1_transition
@@ -27,7 +29,7 @@ This module contains all the apoptosis specific files.
 '''
 
 
-@local_svg_snapshot
+@hdf_snapshot
 @png_snapshot
 def apoptosis_step(eptm, a_cell,
                    vol_reduction=0.01,
@@ -192,7 +194,7 @@ def _ventral_enhance(thetas_in, gamma=1):
                                                gamma)
     return thetas_out
 
-@local_svg_snapshot
+@hdf_snapshot
 @png_snapshot
 def post_apoptosis(eptm, a_cell, fold_cells, mode='shorter', **kwargs):
 
@@ -253,7 +255,7 @@ def solve_all_rosettes(eptm, **kwargs):
         rosettes = find_rosettes(eptm)
     return new_jvs
 
-@local_svg_snapshot
+@hdf_snapshot
 @png_snapshot
 def solve_rosette_opt(eptm, central_vert, **kwargs):
 
@@ -261,7 +263,7 @@ def solve_rosette_opt(eptm, central_vert, **kwargs):
     find_energy_min(eptm)
     return new_jv
         
-@local_svg_snapshot
+@hdf_snapshot
 @png_snapshot
 def type1_at_shorter(eptm, local_edges):
     
@@ -325,24 +327,34 @@ def find_ring_jes(eptm, ring_width):
                 is_ring[je] = 1
     
     return is_ring
-    
-@local_svg_snapshot
+
+def induce_contractility(eptm, cells, a_cell, max_c, rate, span=1):
+    """
+    """
+    for cell in cells:
+        dist = gt.shortest_distance(eptm.graph,
+                                    source=a_cell, target=cell) / 2.
+        increase = rate * np.exp(- dist / span)
+        new_c = eptm.cells.contractility[cell] * increase
+        eptm.cells.contractility[cell] = min(new_c, max_c)
+        
+@hdf_snapshot
 @png_snapshot
 def gradual_apoptosis(eptm, seq_kwargs,
                       apopto_kwargs, post_kwargs):
     
     (apopto_cells, fold_cells,
      apopto_sequence) = get_apoptotic_cells(eptm, **seq_kwargs)
-    is_ring = find_ring_jes(eptm, seq_kwargs['width_apopto'])
-    ring_jes = np.array([je for je in eptm.junctions if is_ring[je]])
-    je_thetas = np.array([min(eptm.thetas[je.source()],
-                              eptm.thetas[je.target()])
-                          for je in ring_jes])
-    ring_jes = ring_jes.take(np.argsort(np.cos(je_thetas/2)))
-    seq_len = len(apopto_sequence)
-    tau = seq_len / 3.
-    tension0 = eptm.junctions.line_tensions[ring_jes[0]]
-    contractility0 = eptm.cells.contractilities[apopto_cells[0]]
+    # is_ring = find_ring_jes(eptm, seq_kwargs['width_apopto'])
+    # ring_jes = np.array([je for je in eptm.junctions if is_ring[je]])
+    # je_thetas = np.array([min(eptm.thetas[je.source()],
+    #                           eptm.thetas[je.target()])
+    #                       for je in ring_jes])
+    # ring_jes = ring_jes.take(np.argsort(np.cos(je_thetas/2)))
+    # seq_len = len(apopto_sequence)
+    # tau = seq_len / 3.
+    # tension0 = eptm.junctions.line_tensions[ring_jes[0]]
+    # contractility0 = eptm.cells.contractilities[apopto_cells[0]]
     
     
     prev_first = apopto_cells[0]
@@ -354,15 +366,15 @@ def gradual_apoptosis(eptm, seq_kwargs,
                 post_apoptosis(eptm, prev_first,
                                fold_cells, **post_kwargs)
             prev_first = first
-        for cell in fold_cells:
-            ci = contractility_increase(n, eptm.thetas[cell], tau, max_ci=3)
-            # ti = tension_increase(n, theta, tau, max_ti=2)
-            # try:
-            #     eptm.junctions.line_tensions[je] = tension0 * ti
-            try:
-                eptm.cells.contractilities[cell] = contractility0 * ci
-            except ValueError:
-                pass
+        # for cell in fold_cells:
+        #     ci = contractility_increase(n, eptm.thetas[cell], tau, max_ci=3)
+        #     # ti = tension_increase(n, theta, tau, max_ti=2)
+        #     # try:
+        #     #     eptm.junctions.line_tensions[je] = tension0 * ti
+        #     try:
+        #         eptm.cells.contractilities[cell] = contractility0 * ci
+        #     except ValueError:
+        #         pass
     post_apoptosis(eptm, prev_first,
                    fold_cells, mode='shorter',
                    **post_kwargs)
@@ -371,7 +383,7 @@ def gradual_apoptosis(eptm, seq_kwargs,
     # lj.running_local_optimum(eptm, tol=1e-6)
 
     
-def show_distribution(eptm):
+def show_death_pattern(eptm):
 
     from .graph_representation import plot_edges_generic
     

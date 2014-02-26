@@ -88,9 +88,7 @@ def xml_snapshot(func, *args, **kwargs):
     def new_func(eptm, *args, **kwargs):
         out = func(eptm, *args, **kwargs)
         
-        xml_save = os.path.join(GRAPH_SAVE_DIR,
-                                eptm.identifier,
-                                'xml'
+        xml_save = os.path.join(eptm.paths['xml'],
                                 'eptm_%04i.xml' % eptm.stamp)
         eptm.graph.save(xml_save)
         return out
@@ -106,7 +104,7 @@ def type1_transition(eptm, elements, verbose=False):
     Suppplementary figure S1)
 
     In ASCII art (letters represent junctions and number represent cells):
-
+    
     e 2 d                  
      \ /         e  d        e  2  d  
       b           \/          \   /

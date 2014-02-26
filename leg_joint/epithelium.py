@@ -11,7 +11,7 @@ import warnings
 import graph_tool.all as gt
 import numpy as np
 #from scipy import weave
-
+import hdfgraph
 
 from .objects import  AbstractRTZGraph, Cells, ApicalJunctions
 from .xml_handler import ParamTree
@@ -162,10 +162,12 @@ class Epithelium(EpitheliumFilters,
         self.update_geometry()
         
     def __str__(self):
-        num_cells = self.is_cell_vert.a.sum()
-        num_edges = self.is_junction_edge.a.sum()
-        str1 = ['Epithelium with %i cells and %i junction edges' % (num_cells,
-                                                                    num_edges)]
+        num_cells = self.is_cell_vert.fa.sum()
+        num_edges = self.is_junction_edge.fa.sum()
+        str1 = ['<Epithelium with %i cells and %i junction edges'
+                'at %s>'
+                % (num_cells,
+                   num_edges, hex(id(self)))]
         # str1.append('Vertex Properties:\n'
         #             '==================')
         # for key in sorted(self.graph.vertex_properties.keys()):
@@ -180,20 +182,42 @@ class Epithelium(EpitheliumFilters,
         return '\n'.join(str1)
 
     def _init_paths(self):
+        '''Creates the paths where graphs will be saved.
 
+        The root directory is stored as a string in the
+        `self.save_dir` attribute and the created paths are stored in
+        the `self.paths` dictionnary.
+
+        `self.paths` contains the following keys:
+        
+        * 'png', 'pdf', 'svg' are paths to _directories_ where
+           graph representations will be stored.
+
+        * 'xml' is a directory for static views of the epithelium graph,
+           stored in graphML
+
+        * 'hdf' is a path to a _file_ containing the graph stored in a
+        `.h5` file through the `hdfstore` module (see the module doc
+        for more details).
+
+        '''
         self.save_dir = os.path.join(GRAPH_SAVE_DIR, self.identifier)
         self.paths = {'root': os.path.abspath(self.save_dir)}
         if not os.path.isdir(self.save_dir):
             os.mkdir(self.save_dir)
-        for filetype in ['png', 'xml', 'pdf', 'svg']:
+        for filetype in ['png', 'pdf', 'svg', 'xml']:
             subdir = os.path.join(self.save_dir, filetype)
             if not os.path.isdir(subdir):
                 os.mkdir(subdir)
             self.paths[filetype] = os.path.abspath(subdir)
+        
+        for filetype in ['xml',  'hdf']:
+            filname = os.path.join(self.save_dir, filetype)
+            if not os.path.isdir(subdir):
+                os.mkdir(subdir)
+            self.paths[filetype] = os.path.abspath(subdir)
             
-
-        
-        
+            
     def update_geometry(self):
         '''
         Computes cell positions (at the geometrical center
@@ -287,10 +311,6 @@ class Epithelium(EpitheliumFilters,
             for j_edge in self.junctions:
                 self.junctions.update_adjacent(j_edge)
             
-        # #self.update_cells_pos()
-        # self.update_geometry()
-        # self.update_gradient()
-
     def add_junction(self, j_verta, j_vertb, cell0, cell1):
         '''Adds a junction to the epithelium, creating a junction edge
         between `j_verta` and `j_vertb`, cell to junction edges
@@ -433,46 +453,28 @@ class Epithelium(EpitheliumFilters,
         vertex_trash.append(jv1)
         return vertex_trash, edge_trash
 
-    # @cells_out
-    # def radial_smooth(self, smth=0.5, local=True):
-    #     for v in self.graph.vertices():
-    #         if not self.is_alive[v]:
-    #             continue
-    #         if not self.is_local_vert[v] and local:
-    #             continue
-    #         n_rhos = np.array([self.rhos[nv]
-    #                            for nv in v.all_neighbours()])
-    #         n_rhos = n_rhos.take(np.isfinite(n_rhos))
-    #         if n_rhos.size > 0:
-    #             self.rhos[v] = ((1. - smth) * self.rhos[v]
-    #                             + smth * n_rhos.mean())
-    #     self.update_xy()
 
+def hdf_snapshot(func, *args, **kwargs):
+    '''
+    Decorator for :class:`Epithelium` objects that store
+    the object's graph in an HDF5 file, by appending the
+    :class:`gt.Graph` PropertyMaps values, indexed by the
+    :class:`Epithelium` `stamp` attribute.
+    '''
+    def new_func(self, *args, **kwargs):
+        prev_vstate, prev_inverted_v = self.graph.get_vertex_filter()
+        prev_estate, prev_inverted_e = self.graph.get_edge_filter()
 
-# def triangle_geometry(sz0, sz1, sz2):
-#     c_code = """
-#     double s0 = sz0[0];
-#     double z0 = sz0[1];
-#     double s1 = sz1[0];
-#     double z1 = sz1[1];
-#     double s2 = sz2[0];
-#     double z2 = sz2[1];
+        out = func(self, *args, **kwargs)
+        self.graph.set_vertex_filter(None)
+        self.graph.set_edge_filter(None)
 
-
-#     double d01 = sqrt((s0-s1) * (s0-s1) + (z1-z0) * (z1-z0));
-#     double d02 = sqrt((s0-s2) * (s0-s2) + (z2-z0) * (z2-z0));
-#     double d12 = sqrt((s1-s2) * (s1-s2) + (z2-z1) * (z2-z1));
-#     double area012 = fabs((s1-s0) * (z2-z0) - (s2-s0) * (z1-z0));
-
-#     py::tuple results(4);
-#     results[0] = d01;
-#     results[1] = d02;
-#     results[2] = d12;
-#     results[3] = area012;
-#     return_val = results;
-    
-#     """
-#     return weave.inline(c_code,
-#                         arg_names=['sz0', 'sz1', 'sz2'],
-#                         headers=['<math.h>'])
+        store = self.paths['hdf'] 
+        hdfgraph.graph_to_hdf(self.graph, store,
+                              stamp=self.stamp,
+                              reset=False)
+        self.graph.set_vertex_filter(prev_vstate, prev_inverted_v)
+        self.graph.set_edge_filter(prev_estate, prev_inverted_e)
+        return out
+    return new_func
 
