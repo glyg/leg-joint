@@ -9,7 +9,7 @@ import os
 import numpy as np 
 import graph_tool.all as gt
 
-from .filters import local_slice
+from .filters import local_slice, focus_on_cell
 from .topology import remove_cell, solve_rosette, find_rosettes
 from .graph_representation import png_snapshot
 from .epithelium import hdf_snapshot
@@ -197,11 +197,16 @@ def _ventral_enhance(thetas_in, gamma=1):
 @hdf_snapshot
 @png_snapshot
 def post_apoptosis(eptm, a_cell, fold_cells, mode='shorter', **kwargs):
-
+    try:
+        induce_contractility(eptm, a_cell,
+                             max_ci=kwargs['max_ci'],
+                             rate_ci=kwargs['rate_ci'],
+                             span=kwargs['span_ci'])
+    except KeyError:
+        pass
     eptm.set_local_mask(None)
     neighbours = eptm.cells.get_neighbor_cells(a_cell)
     new_edges = []
-    
     if mode == 'rosette':
         new_jv = remove_cell(eptm, a_cell)
         new_jvs = solve_all_rosettes(eptm)
@@ -216,12 +221,12 @@ def post_apoptosis(eptm, a_cell, fold_cells, mode='shorter', **kwargs):
             modified_cells, modified_jverts = type1_at_shorter(eptm,
                                                                a_cell_edges)
             a_cell_edges = eptm.cells.junctions[a_cell]
-
+            for neighbour in neighbours:
+                new_edges.extend([je for je in eptm.cells.junctions[neighbour]
+                                  if (not je in new_edges)
+                                  and eptm.is_junction_edge[je]])
         new_jv = remove_cell(eptm, a_cell)
-        for neighbour in neighbours:
-            new_edges.extend([je for je in eptm.cells.junctions[neighbour]
-                              if (not je in new_edges)
-                              and eptm.is_junction_edge[je]])
+
     # if  kwargs.get('residual_ab_tension') is not None:
     #     for jv in new_jvs:
     #         eptm.junctions.radial_tensions[jv] = kwargs['residual_ab_tension']
@@ -328,16 +333,21 @@ def find_ring_jes(eptm, ring_width):
     
     return is_ring
 
-def induce_contractility(eptm, cells, a_cell, max_c, rate, span=1):
+def induce_contractility(eptm, a_cell, max_ci, rate_ci, span=1):
     """
     """
-    for cell in cells:
+    
+    focus_on_cell(eptm, a_cell, radius=3*span)
+    c0 = eptm.params['contractility']
+    eptm.graph.set_directed(False)
+    for cell in eptm.cells.local_cells():
         dist = gt.shortest_distance(eptm.graph,
                                     source=a_cell, target=cell) / 2.
-        increase = rate * np.exp(- dist / span)
-        new_c = eptm.cells.contractility[cell] * increase
-        eptm.cells.contractility[cell] = min(new_c, max_c)
-        
+        increase = 1 + (rate_ci - 1) * np.exp((1 - dist) / span)
+        new_c = eptm.cells.contractilities[cell] * increase
+        eptm.cells.contractilities[cell] = min(new_c, max_ci*c0)
+    eptm.graph.set_directed(True)
+    
 @hdf_snapshot
 @png_snapshot
 def gradual_apoptosis(eptm, seq_kwargs,

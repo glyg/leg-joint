@@ -704,27 +704,20 @@ class Cells():
 
     def polygon(self, cell, coord1, coord2):
 
-        ixs = self.eptm.ixs
-        wys = self.eptm.wys
-        zeds = self.eptm.zeds
+        self.eptm.update_dsigmas()
 
-        c_x, c_y, c_z =  ixs[cell], wys[cell], zeds[cell]
+        rel_sz = np.array([[self.eptm.dsigmas[ctoj],
+                            self.eptm.dzeds[ctoj]]
+                           for ctoj in cell.out_edges()])
 
-        j_xx = np.array([ixs[jv] for jv in cell.out_neighbours()])
-        j_yy = np.array([wys[jv] for jv in cell.out_neighbours()])
-        j_zz = np.array([zeds[jv] for jv in cell.out_neighbours()])
-        rel_xx = j_xx - c_x
-        rel_yy = j_yy - c_y
-        rel_zz = j_zz - c_z
-        rel_ss = np.arctan2(rel_yy, rel_xx) * np.hypot(rel_yy, rel_xx)
-        phis = np.arctan2(rel_zz, rel_ss)
+        phis = np.arctan2(rel_sz[:, 0], rel_sz[:, 1])
         indices = np.argsort(phis)
 
-        u = np.array([coord1[je] for je in cell.out_neighbours()])
-        v = np.array([coord2[je] for je in cell.out_neighbours()])
-        uv = np.vstack((u[indices], v[indices])).T
+        uv = np.array([[coord1[je],
+                        coord2[je]]
+                       for je in cell.out_neighbours()])
+        uv = uv[indices]
         return uv, indices
-
 
     def get_neighbor_cells(self, cell):
         jes = self.junctions[cell]

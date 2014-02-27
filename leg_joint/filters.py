@@ -5,6 +5,9 @@ import numpy as np
 
 def local_slice(eptm, theta_c=0, theta_amp=np.pi/24, 
                 zed_c=0, zed_amp=None):
+    ''' Mark as local a 'slice' of the epithelium, with
+    zed = zed_c +/- zed_amp and theta = theta_c +/- theta_amp
+    '''
     if theta_amp is None:
         theta_min = eptm.thetas.a.min()
         theta_max = eptm.thetas.a.max()
@@ -25,6 +28,15 @@ def local_slice(eptm, theta_c=0, theta_amp=np.pi/24,
     for cell in slice_cells:
         eptm.set_local_mask(cell)
 
+def focus_on_cell(eptm, cell, radius):
+
+    theta_c = eptm.thetas[cell]
+    theta_amp = radius / eptm.rhos[cell]
+    zed_c = eptm.zeds[cell]
+    zed_amp = radius
+    local_slice(eptm, theta_c, theta_amp, 
+                zed_c, zed_amp)
+        
 #####  Decorators
 def local(meth):
     def new_function(self, *args, **kwargs):

@@ -88,26 +88,25 @@ def plot_avg_rho(eptm, bin_width, ax=None, retall=False, ls='r-'):
     return ax, (zeds_avg, rhos_avg, rhos_max, rhos_min)
     
 def draw_polygons(eptm, coord1, coord2, colors,
-                  vfilt=None, efilt=None, ax=None):
+                  vfilt=None, ax=None, **kwargs):
+
     eptm.graph.set_vertex_filter(vfilt)
-    eptm.graph.set_edge_filter(efilt)
     polygons = [eptm.cells.polygon(cell, coord1, coord2)[0]
                 for cell in eptm.cells if eptm.is_alive[cell]]
     colors = np.array([colors[cell] for cell in eptm.cells
                        if eptm.is_alive[cell]])
     colors -= colors.min()
     colors /= colors.max()
-    eptm.graph.set_vertex_filter(None)
-    eptm.graph.set_edge_filter(None)
-
     colors = plt.cm.jet(colors)
+    eptm.graph.set_vertex_filter(None)
+
     if ax is None:
         fig, ax = plt.subplots()
     for poly, color in zip(polygons, colors):
         patch = Polygon(poly, color=color,
-                        fill=True, closed=True, alpha=0.8)
+                        fill=True, closed=True, **kwargs)
         ax.add_patch(patch)
-    ax.autoscale_view()
+    #ax.autoscale_view()
     ax.set_aspect('equal')
 
     eptm.graph.set_vertex_filter(None)
@@ -214,67 +213,56 @@ def plot_ortho_gradients(eptm, axes=None,
 
 @active
 def plot_active(eptm, xcoord, ycoord, ax=None):
-    
-    
+    '''
+    '''
     xs = xcoord.fa
     ys = ycoord.fa
     if ax is None:
-        ax =  plot_cells_generic(eptm, xcoord, ycoord, ax=None,
+        ax =  plot_edges_generic(eptm, xcoord, ycoord, ax=None,
                                  vfilt=eptm.is_local_vert,
                                  efilt=eptm.is_local_edge)
+        
     ax.plot(xs, ys, 'ro', alpha=0.5, ms=8)
     plt.draw()
     return ax
 
-def plot_2pannels(eptm, axes=None, vfilt=None,
-                  efilt=None, local=True,
-                  depth_color=None, cell_colors=None,
-                  **kwargs):
-    
-    if local:
-        vfilt = eptm.is_local_vert
-        efilt = eptm.is_local_edge
+def plot_2pannels(eptm, axes=None,
+                  edge_kwargs={}, cell_kwargs={}):
     if axes is None:
         fig, axes = plt.subplots(1, 2)
-    else:
-        fig = axes[0].get_figure()
-
-    ax_zs, ax_xy = axes
-    plot_cells_zs(eptm, ax=ax_zs,
-                  vfilt=vfilt, efilt=efilt,
-                  depth_color=depth_color, **kwargs)
+    xy_coords = ((eptm.zeds, eptm.proj_sigma()), (eptm.ixs, eptm.wys))
+    axes = plot_pannels(eptm, xy_coords,
+                        axes,
+                        local=True,
+                        edge_kwargs=edge_kwargs,
+                        cell_kwargs=cell_kwargs)
+    return axes
     
+def plot_pannels(eptm, xy_coords,
+                 axes,
+                 local=True,
+                 edge_kwargs={}, cell_kwargs={}):
     
-    x_lim = ax_zs.get_xlim()
-    plot_cells_xy(eptm, ax=ax_xy,
-                  vfilt=vfilt, efilt=efilt,
-                  depth_color=depth_color, **kwargs)
-    ax_zs.set_xlim(x_lim)
-
-    if cell_colors is not None:
-        draw_polygons(eptm,
-                      eptm.zeds,
-                      eptm.proj_sigma(),
-                      cell_colors,
-                      vfilt=eptm.is_local_vert,
-                      efilt=eptm.is_local_edge,
-                      ax=ax_zs)
-        draw_polygons(eptm,
-                      eptm.ixs,
-                      eptm.wys,
-                      cell_colors,
-                      vfilt=eptm.is_local_vert,
-                      efilt=eptm.is_local_edge,
-                      ax=ax_xy)
-
-
+    if not (len(axes) == len(xy_coords)):
+        raise ValueError('the `xy_coords` and `axes` arguments'
+                         ' should have the same length')
+    
+    if local:
+        cell_kwargs['vfilt'] = eptm.is_local_vert
+        edge_kwargs['efilt'] = eptm.is_local_edge
+    if axes is None:
+        fig, axes = plt.subplots(1, 2)
+    for pannel_coords, pannel_ax in zip(xy_coords, axes):
+        xcoord, ycoord = pannel_coords
+        plot_eptm_generic(eptm, xcoord, ycoord,
+                          ax=pannel_ax, local=local,
+                          edge_kwargs=edge_kwargs,
+                          cell_kwargs=cell_kwargs)
     return axes
 
     
-def plot_ortho_proj(eptm, ax=None, vfilt=None,
-                    efilt=None, local=True,
-                    depth_color=None,
-                    **kwargs):
+def plot_ortho_proj(eptm, ax=None, local=True,
+                    edge_kwargs={}, cell_kwargs={}):
     if local:
         vfilt = eptm.is_local_vert
         efilt = eptm.is_local_edge
@@ -283,21 +271,30 @@ def plot_ortho_proj(eptm, ax=None, vfilt=None,
     else:
         fig = ax.get_figure()
     
-    plot_cells_zs(eptm, ax=ax,
-                  vfilt=vfilt, efilt=efilt,
-                  depth_color=depth_color, **kwargs)
+    plot_eptm_generic(eptm, eptm.zeds,
+                      eptm.proj_sigma(),
+                      ax=ax,
+                      cell_kwargs=cell_kwargs,
+                      edge_kwargs=edge_kwargs)
 
     divider = make_axes_locatable(ax)
     
     ax_zr = divider.append_axes("top", 2., pad=0.1, sharex=ax)
+    plot_eptm_generic(eptm, eptm.zeds,
+                      eptm.rhos,
+                      ax=ax_zr,
+                      cell_kwargs=cell_kwargs,
+                      edge_kwargs=edge_kwargs)
+
     ax_rs = divider.append_axes("right", 2., pad=0.1, sharey=ax)
-    
-    plot_cells_zr(eptm, ax=ax_zr,
-                  vfilt=vfilt, efilt=efilt,
-                  depth_color=depth_color, **kwargs)
-    plot_cells_rs(eptm, ax=ax_rs,
-                  vfilt=vfilt, efilt=efilt,
-                  depth_color=depth_color, **kwargs)
+    plot_eptm_generic(eptm,
+                      eptm.rhos,
+                      eptm.proj_sigma(),
+                      ax=ax_rs,
+                      cell_kwargs=cell_kwargs,
+                      edge_kwargs=edge_kwargs)
+
+
     plt.setp(ax_zr.get_xticklabels() + ax_rs.get_yticklabels(),
              visible=False)
 
@@ -307,34 +304,46 @@ def plot_ortho_proj(eptm, ax=None, vfilt=None,
     axes = ax, ax_zr, ax_rs
     return axes
 
+def plot_eptm_generic(eptm, xcoord, ycoord,
+                      ax=None, local=True,
+                      edge_kwargs={}, cell_kwargs={}):
 
+    if ax is None:
+        fig, ax = plt.subplots()
+    
+    if local:
+        cell_kwargs['vfilt'] = eptm.is_local_vert
+        edge_kwargs['efilt'] = eptm.is_local_edge
+
+    plot_cells_generic(eptm, xcoord,
+                       ycoord,
+                       ax=ax,
+                       **cell_kwargs)
+    plot_edges_generic(eptm, xcoord,
+                       ycoord,
+                       ax=ax,
+                       **edge_kwargs)
+    return ax
+    
 def plot_cells_generic(eptm, xcoord, ycoord, ax=None, 
-                       vfilt=None, efilt=None,
-                       c_text=True, j_text=False,
-                       depth_color=None, show_cells=False,
-                       xlabel='', ylabel=''):
+                       vfilt=None, c_text=False,
+                       cell_colors=None, **kwargs):
     if ax is None:
         fig, ax = plt.subplots(1,1)
     eptm.graph.set_vertex_filter(vfilt)
-    for cell in eptm.cells :
-        if show_cells:
-            ax.plot(xcoord[cell],
-                    ycoord[cell], 'bo', alpha=0.1)
-        if c_text:
+    if c_text:
+        for cell in eptm.cells :
             ax.text(xcoord[cell], ycoord[cell], str(cell))
-
-        
+    if cell_colors is not None:
+        draw_polygons(eptm, xcoord,
+                      ycoord,
+                      cell_colors, ax=ax, vfilt=vfilt, **kwargs)
     eptm.graph.set_vertex_filter(None)
-    ax = plot_edges_generic(eptm, xcoord, ycoord,
-                            efilt, ax, j_text=j_text,
-                            depth_color=depth_color)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
     return ax
 
 def plot_edges_generic(eptm, xcoord, ycoord, efilt=None,
                        ax=None, j_text=False,
-                       depth_color=None, **kwargs):
+                       edge_color=None, **kwargs):
     if ax is None:
         fig, ax = plt.subplots(1,1)
         
@@ -343,29 +352,26 @@ def plot_edges_generic(eptm, xcoord, ycoord, efilt=None,
     # edge_width = eptm.junctions.line_tensions.copy()
     # edge_width.fa = 2. * (eptm.junctions.line_tensions.fa
     #                       / eptm.junctions.line_tensions.fa.mean())**0.5
-    if depth_color is not None:
-        depth_cmap = plt.cm.jet(depth_color.fa)
-        edge_red = depth_color.copy()
+    if edge_color is not None:
+        depth_cmap = plt.cm.jet(edge_color.fa)
+        edge_red = edge_color.copy()
         edge_red.fa = depth_cmap[:, 0]
-        edge_green = depth_color.copy()
+        edge_green = edge_color.copy()
         edge_green.fa = depth_cmap[:, 1]
-        edge_blue = depth_color.copy()
+        edge_blue = edge_color.copy()
         edge_blue.fa = depth_cmap[:, 2]
-
+        
     for edge in eptm.graph.edges():
-        ixs = (xcoord[edge.source()],
-               xcoord[edge.target()])
-        wys = (ycoord[edge.source()],
-               ycoord[edge.target()])
         if eptm.is_junction_edge[edge]:
-            if depth_color is not None:
+            ixs = (xcoord[edge.source()],
+                   xcoord[edge.target()])
+            wys = (ycoord[edge.source()],
+                   ycoord[edge.target()])
+            if edge_color is not None:
                 c = [edge_red[edge], edge_green[edge], edge_blue[edge]]
-                ax.plot(ixs, wys, '-', c=c,
-                        # lw=edge_width[edge],
-                        alpha=0.4, **kwargs)
+                ax.plot(ixs, wys, '-', c=c, **kwargs)
             else:
-                ax.plot(ixs, wys, 'g-', lw=1, #edge_width[edge],
-                        alpha=0.4, **kwargs)
+                ax.plot(ixs, wys, '-', **kwargs)
         # else:
         #     ax.plot(ixs, wys, 'k-', lw=1.,
         #             alpha=0.2, **kwargs)
@@ -373,65 +379,6 @@ def plot_edges_generic(eptm, xcoord, ycoord, efilt=None,
     eptm.graph.set_edge_filter(None)
     return ax
 
-
-
-def plot_cells_xy(eptm, ax=None, c_text=False,
-                  vfilt=None, efilt=None, depth_color=None):
-    ixs = eptm.ixs.copy()
-    wys = eptm.wys.copy()
-    ax = plot_cells_generic(eptm, ixs, wys,
-                            ax, vfilt, efilt,
-                            c_text=c_text,
-                            depth_color=depth_color,
-                            xlabel='Posterior - Anterior',
-                            ylabel='Ventral - Dorsal')
-    return ax
-
-
-    
-def plot_cells_zr(eptm, ax=None, c_text=False,
-                  vfilt=None, efilt=None, depth_color=None):
-    zeds = eptm.zeds.copy()
-    rhos = eptm.rhos.copy()
-    ax = plot_cells_generic(eptm, zeds, rhos,
-                            ax, vfilt, efilt,
-                            c_text=c_text,
-                            depth_color=depth_color,
-                            xlabel='Proximal - distal',
-                            ylabel='Radius')
-    return ax
-
-def plot_cells_rs(eptm, ax=None, c_text=False,
-                  vfilt=None, efilt=None, depth_color=None):
-    rhos = eptm.rhos.copy()
-    sigmas = eptm.proj_sigma()
-    eptm.update_dsigmas()
-    if efilt is not None:
-        efilt = efilt.copy()
-        efilt.a *= (1 - eptm.at_boundary.a)
-    ax = plot_cells_generic(eptm, rhos, sigmas,
-                            ax, vfilt, efilt,
-                            c_text=c_text,
-                            depth_color=depth_color, 
-                            xlabel='Radius',
-                            ylabel='Latitude')
-    return ax
-
-def plot_cells_zs(eptm, ax=None, text=True,
-                  vfilt=None, efilt=None,
-                  c_text=True, j_text=False, depth_color=None):
-    sigmas = eptm.proj_sigma()
-    zeds = eptm.zeds.copy()
-    eptm.update_dsigmas()
-    if efilt is not None:
-        efilt = efilt.copy()
-        efilt.a *= (1 - eptm.at_boundary.a)
-    ax = plot_cells_generic(eptm, zeds, sigmas,
-                            ax, vfilt, efilt, c_text,
-                            depth_color=depth_color,
-                            xlabel='Proximo distal',
-                            ylabel='Latitude')
-    return ax
 
 def sfdp_draw(graph, output="lattice_3d.pdf"):
     '''

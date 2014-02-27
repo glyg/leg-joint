@@ -211,12 +211,9 @@ class Epithelium(EpitheliumFilters,
                 os.mkdir(subdir)
             self.paths[filetype] = os.path.abspath(subdir)
         
-        for filetype in ['xml',  'hdf']:
-            filname = os.path.join(self.save_dir, filetype)
-            if not os.path.isdir(subdir):
-                os.mkdir(subdir)
-            self.paths[filetype] = os.path.abspath(subdir)
-            
+        store = os.path.join(self.save_dir,
+                             'eptm_%s.h5' % self.identifier)
+        self.paths['hdf'] = os.path.abspath(store)
             
     def update_geometry(self):
         '''
