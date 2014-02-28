@@ -4,6 +4,7 @@ saved_graphs/xml/tmp/*
 saved_graphs/pdf/tmp/*
 saved_graphs/png/tmp/*
 saved_graphs/png/apopto_vr*
+notebooks/.ipynb_checkpoints
 
 iterate.dat
 *.py[co]
@@ -40,6 +41,6 @@ pip-log.txt
 .ropeproject
 
 #Sphinx
-_build
-_static
-_templates
+doc/build
+doc/source/_static
+doc/source/_templates
