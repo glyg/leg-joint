@@ -7,11 +7,18 @@ from __future__ import print_function
 
 import os
 import warnings
+import datetime
+import json
+import logging
+log = logging.getLogger(__name__)
+
 
 import graph_tool.all as gt
 import numpy as np
 #from scipy import weave
 import hdfgraph
+
+
 
 from .objects import  AbstractRTZGraph, Cells, ApicalJunctions
 from .xml_handler import ParamTree
@@ -101,12 +108,12 @@ class Epithelium(EpitheliumFilters,
             except KeyError:
                 pass
         self.params = self.paramtree.absolute_dic
-        self.identifier = identifier
+        self.set_identifier(identifier)
         self.stamp = 0
         
         # Graph instanciation
         if graph is None and graphXMLfile is None:
-            print('Created new graph')
+            log.info('Created new graph')
             self.graph = gt.Graph(directed=True)
             self.new = True
             self.generate = True
@@ -127,11 +134,9 @@ class Epithelium(EpitheliumFilters,
         self.diamonds = self.graph.new_edge_property('object')
 
         # Cells and Junctions initialisation
-        if self.__verbose__:
-            print('Initial cells')
+        log.info('Initial cells')
         self.cells = Cells(self)
-        if self.__verbose__:
-            print('Initial junctions')
+        log.info('Initial junctions')
         self.junctions = ApicalJunctions(self)
         if self.generate:
             self.is_alive.a = 1
@@ -141,7 +146,7 @@ class Epithelium(EpitheliumFilters,
             if self.__verbose__ == True:
                 total_edges = self.graph.num_edges()
                 good_edges = efilt.a.sum()
-                print('removing %i cell to cell edges '
+                log.info('removing %i cell to cell edges '
                       % (total_edges - good_edges))
             self.graph.set_edge_filter(efilt)
             self.graph.purge_edges()
@@ -153,21 +158,20 @@ class Epithelium(EpitheliumFilters,
         # Dynamical components
         Dynamics.__init__(self)
         if self.new:
-            if self.__verbose__: print('Isotropic relaxation')
+            log.info('Isotropic relaxation')
             self.isotropic_relax()
-            if self.__verbose__: print('Periodic boundary')
+            log.info('Periodic boundary')
             self.periodic_boundary_condition()
-        if self.__verbose__: print('Update geometry')
-        self.zetas = self.dzeds.copy()
+        log.info('Update geometry')
         self.update_geometry()
         
     def __str__(self):
+        
         num_cells = self.is_cell_vert.fa.sum()
         num_edges = self.is_junction_edge.fa.sum()
         str1 = ['<Epithelium with %i cells and %i junction edges'
-                'at %s>'
-                % (num_cells,
-                   num_edges, hex(id(self)))]
+                ' at %s>'
+                % (num_cells, num_edges, hex(id(self)))]
         # str1.append('Vertex Properties:\n'
         #             '==================')
         # for key in sorted(self.graph.vertex_properties.keys()):
@@ -181,6 +185,23 @@ class Epithelium(EpitheliumFilters,
         str1.append('Directory : %s' % self.save_dir)
         return '\n'.join(str1)
 
+    def set_identifier(self, identifier=''):
+
+        if not hasattr(self, 'identifier'):
+            now = datetime.datetime.isoformat(
+                datetime.datetime.utcnow())
+            time_tag = '_'.join(now.split(':')).split('.')[0]
+            self.identifier = '_'.join((identifier, time_tag))
+        
+    def dump_json(self, parameters):
+
+        json_name = os.path.join(self.save_dir,
+                                 'params_%s.json' % self.identifier)
+        with open(json_name, 'w+') as json_file:
+            json.dump(parameters, json_file, sort_keys=True)
+            log.info('Wrote %s' % os.path.abspath(json_name))
+
+        
     def _init_paths(self):
         '''Creates the paths where graphs will be saved.
 
@@ -196,7 +217,7 @@ class Epithelium(EpitheliumFilters,
         * 'xml' is a directory for static views of the epithelium graph,
            stored in graphML
 
-        * 'hdf' is a path to a _file_ containing the graph stored in a
+        * 'hdf' is a path to a *file* containing the graph stored in a
         `.h5` file through the `hdfstore` module (see the module doc
         for more details).
 
@@ -241,8 +262,7 @@ class Epithelium(EpitheliumFilters,
         if len(j_edges) < 3:
             if not self.is_alive[cell]:
                 return
-            if self.__verbose__:
-                print('''Two edges ain't enough to compute
+            log.error('''Two edges ain't enough to compute
                       area for cell %s''' % cell)
             self.cells.vols[cell] = self.cells.prefered_vol[cell]
             self.cells.perimeters[cell] = 0.

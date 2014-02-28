@@ -71,8 +71,9 @@ def get_apoptotic_cells(eptm, **kwargs):
     num_cells: `int`, the number of cells seed: `int` passed to the
         random number generator
 
-    distribution: {'random' | 'regular'}: the apoptotic cells
-        distribution around the joint
+    random: {True | False}: the apoptotic cells
+        distribution around the joint, wether random with
+        ventral bias (if True) or regular (if False)
     
     **kwargs are passed to the functions `random_apoptotic cells`
         and `regular_apoptotic_cells`
@@ -83,7 +84,6 @@ def get_apoptotic_cells(eptm, **kwargs):
     random_apoptotic_cells, regular_apoptotic_cells
 
     '''
-    distribution = kwargs['distribution']
     num_cells = kwargs['num_cells']
     seed = kwargs['seed']
     num_steps = kwargs['num_steps']
@@ -100,10 +100,10 @@ def get_apoptotic_cells(eptm, **kwargs):
     fold_cells = np.array([cell for cell in eptm.cells])
     eptm.graph.set_vertex_filter(None)
     
-    if distribution == 'regular':
+    if not kwargs['random']:
         apopto_cells = regular_apoptotic_cells(eptm, num_cells,
                                                **regular_kwargs)        
-    elif distribution == 'random':
+    else:
         while n_apopto != num_cells:
             seed += 1
             n_iter += 1
@@ -355,18 +355,6 @@ def gradual_apoptosis(eptm, seq_kwargs,
     
     (apopto_cells, fold_cells,
      apopto_sequence) = get_apoptotic_cells(eptm, **seq_kwargs)
-    # is_ring = find_ring_jes(eptm, seq_kwargs['width_apopto'])
-    # ring_jes = np.array([je for je in eptm.junctions if is_ring[je]])
-    # je_thetas = np.array([min(eptm.thetas[je.source()],
-    #                           eptm.thetas[je.target()])
-    #                       for je in ring_jes])
-    # ring_jes = ring_jes.take(np.argsort(np.cos(je_thetas/2)))
-    # seq_len = len(apopto_sequence)
-    # tau = seq_len / 3.
-    # tension0 = eptm.junctions.line_tensions[ring_jes[0]]
-    # contractility0 = eptm.cells.contractilities[apopto_cells[0]]
-    
-    
     prev_first = apopto_cells[0]
     for n, sub_sequence in enumerate(apopto_sequence):
         for a_cell in sub_sequence:
@@ -376,17 +364,8 @@ def gradual_apoptosis(eptm, seq_kwargs,
                 post_apoptosis(eptm, prev_first,
                                fold_cells, **post_kwargs)
             prev_first = first
-        # for cell in fold_cells:
-        #     ci = contractility_increase(n, eptm.thetas[cell], tau, max_ci=3)
-        #     # ti = tension_increase(n, theta, tau, max_ti=2)
-        #     # try:
-        #     #     eptm.junctions.line_tensions[je] = tension0 * ti
-        #     try:
-        #         eptm.cells.contractilities[cell] = contractility0 * ci
-        #     except ValueError:
-        #         pass
     post_apoptosis(eptm, prev_first,
-                   fold_cells, mode='shorter',
+                   fold_cells,
                    **post_kwargs)
     xml_name = os.path.join(eptm.paths['xml'], 'after_apopto.xml')
     eptm.graph.save(xml_name)

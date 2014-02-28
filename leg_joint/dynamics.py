@@ -6,6 +6,8 @@ from __future__ import division
 from __future__ import absolute_import
 from __future__ import print_function
 
+import logging
+log = logging.getLogger(__name__)
 
 import numpy as np
 
@@ -118,7 +120,7 @@ class Dynamics(object):
     @active
     def gradient_array(self, gtol=1e-8):
         gradient = np.zeros(self.graph.num_vertices() * 3)
-        if self.__verbose__ : print('Gradient shape: %s' % gradient.shape)
+        if self.__verbose__ : log.info('Gradient shape: %s' % gradient.shape)
         gradient[::3] = self.grad_ix.fa
         gradient[1::3] = self.grad_wy.fa
         gradient[2::3] = self.grad_zed.fa 
@@ -170,7 +172,7 @@ class Dynamics(object):
             num_jverts = self.graph.num_vertices() - num_cells
             num_edges = self.is_junction_edge.a.sum()
             num_ctoj = self.is_ctoj_edge.a.sum()
-            print(
+            log.info(
                 '''Updating gradient for %i cells,
                 %i junctions vertices, %i junctions edges
                 and %i cell to junction edges'''

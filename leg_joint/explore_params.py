@@ -76,34 +76,19 @@ def get_kwargs(index, params):
         target = {}
         for key in sub_params.keys():
             try:
-                print(key, grid_indices[key][index])
                 param_index = grid_indices[key][index]
+                target[key] = get_param(key, params,
+                                        index=param_index)
+                print('Settng %s at %s' % (key, str(target[key])))
             except KeyError:
                 param_index = 0
-            target[key] = get_param(key, params,
-                                    index=param_index)
+                target[key] = get_param(key, params,
+                                        index=param_index)
+            
         return target
 
     return {sub_key: get_sub_dict(sub_params)
             for sub_key, sub_params in params.items()}
-
-def dump_json(all_kwds, index, save_dir):
-    
-    now = datetime.datetime.isoformat(
-        datetime.datetime.utcnow())
-    time_tag = '_'.join(now.split(':'))
-    identifier = '%05i_%s' % (index, time_tag)
-    json_name = os.path.join(save_dir,
-                             'params_%s.json'
-                              % identifier)
-    with open(json_name, 'w+') as json_file:
-        json.dump(all_kwds, json_file, sort_keys=True)
-        print('Wrote %s' % os.path.abspath(json_name))
-    return identifier
-
-
-
-
 
 def explore_delta_h_2D(eptm, param1, values1, param2, values2):
 

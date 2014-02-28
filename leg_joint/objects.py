@@ -26,6 +26,10 @@ from .utils import to_xy, to_rhotheta
 from .circumcircle import c_circumcircle
 from sklearn.decomposition import PCA
 
+import logging
+log = logging.getLogger(__name__)
+
+
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
@@ -217,7 +221,7 @@ class AbstractRTZGraph(object):
                                    self.sigmas, sigma)
         z_matches = gt.find_vertex(self.graph,
                                    self.zeds, zed)
-        if self.__verbose__: print(len(s_matches), len(z_matches))
+        if self.__verbose__: log.info(len(s_matches), len(z_matches))
         return [v for v in s_matches if v in z_matches][0]
         
     def periodic_boundary_condition(self):
@@ -627,7 +631,7 @@ class Cells():
         self.n_zeds = int(n_zeds)
         self.n_sigmas = int(n_sigmas)
         if self.__verbose__ :
-            print('''Creating a %i x %i cells lattice'''
+            log.info('''Creating a %i x %i cells lattice'''
                   % (self.n_zeds, self.n_sigmas))
         rhos = np.ones(n_sigmas * n_zeds) * rho_c
         zt_grid = np.mgrid[:n_zeds, :n_sigmas]
@@ -804,7 +808,7 @@ class ApicalJunctions():
             self.visited_cells.append(cell)
             new_jvs, new_ctoj_edges, ndrp = self._voronoi_nodes(cell)
             n_dropped += ndrp
-        print("%i triangles were dropped" % n_dropped)
+        log.info("%i triangles were dropped" % n_dropped)
         # Cell to junction graph
         n_jdropped = 0
         eptm.update_xy()
@@ -817,7 +821,7 @@ class ApicalJunctions():
                 continue
             new_edge, dropped = self._voronoi_edges(ctoj_edge)
             n_jdropped += dropped
-        print("%i junction edges were dropped" % n_dropped)
+        log.info("%i junction edges were dropped" % n_dropped)
         del self.visited_cells
 
     def _voronoi_nodes(self, cell):
@@ -853,7 +857,7 @@ class ApicalJunctions():
             try:
                 theta = sigma / rho
             except ZeroDivisionError: 
-                print('Error computing thetas')
+                log.info('Error computing thetas')
                 theta = 0
             # new junction vertex here
             # **directly** in the eptm graph
