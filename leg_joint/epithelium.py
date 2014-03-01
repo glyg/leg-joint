@@ -11,6 +11,12 @@ import datetime
 import json
 import logging
 log = logging.getLogger(__name__)
+ch = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+ch.setFormatter(formatter)
+ch.setLevel(logging.ERROR)
+log.addHandler(ch)
+
 
 
 import graph_tool.all as gt
@@ -18,21 +24,17 @@ import numpy as np
 #from scipy import weave
 import hdfgraph
 
-
-
 from .objects import  AbstractRTZGraph, Cells, ApicalJunctions
 from .xml_handler import ParamTree
 from .dynamics import Dynamics
-
-
 from .filters import active, j_edges_in, EpitheliumFilters
-from .utils import to_xy, to_rhotheta
-
 
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
 GRAPH_SAVE_DIR = os.path.join(ROOT_DIR, 'saved_graphs')
+SIMLOG  = os.path.join(ROOT_DIR, 'simulations.log')
+
 
 # See [the tau manifesto](http://tauday.com/tau-manifesto)
 tau = 2. * np.pi
@@ -110,6 +112,7 @@ class Epithelium(EpitheliumFilters,
         self.params = self.paramtree.absolute_dic
         self.set_identifier(identifier)
         self.stamp = 0
+        self._set_logger()
         
         # Graph instanciation
         if graph is None and graphXMLfile is None:
@@ -192,16 +195,27 @@ class Epithelium(EpitheliumFilters,
                 datetime.datetime.utcnow())
             time_tag = '_'.join(now.split(':')).split('.')[0]
             self.identifier = '_'.join((identifier, time_tag))
+
+    def _set_logger(self):
         
+        fh = logging.FileHandler(SIMLOG)
+        fh.setLevel(logging.INFO)
+        # create formatter and add it to the handlers
+        formatter = logging.Formatter('%(asctime)s - %(name)s -'
+                                      '%(levelname)s - {} :'
+                                      ' %(message)s @ stamp {}'.format(self.identifier,
+                                                                       self.stamp))
+        fh.setFormatter(formatter)
+        # add the handlers to the logger
+        log.addHandler(fh)
+
+    
     def dump_json(self, parameters):
 
-        json_name = os.path.join(self.save_dir,
-                                 'params_%s.json' % self.identifier)
-        with open(json_name, 'w+') as json_file:
+        with open(self.paths['json'], 'w+') as json_file:
             json.dump(parameters, json_file, sort_keys=True)
-            log.info('Wrote %s' % os.path.abspath(json_name))
+            log.info('Wrote %s' % self.paths['json'])
 
-        
     def _init_paths(self):
         '''Creates the paths where graphs will be saved.
 
@@ -235,6 +249,8 @@ class Epithelium(EpitheliumFilters,
         store = os.path.join(self.save_dir,
                              'eptm_%s.h5' % self.identifier)
         self.paths['hdf'] = os.path.abspath(store)
+        self.paths['json'] = os.path.join(self.save_dir,
+                                         'params_%s.json' % self.identifier)
             
     def update_geometry(self):
         '''

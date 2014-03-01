@@ -17,6 +17,8 @@ from .epithelium import hdf_snapshot
 from .optimizers import find_energy_min
 from .topology import type1_transition
 
+import logging
+log = logging.getLogger(__name__)
 
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)

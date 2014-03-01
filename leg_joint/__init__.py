@@ -5,13 +5,13 @@ from __future__ import division
 from __future__ import absolute_import
 from __future__ import print_function
 
-import logging
-log = logging.getLogger(__name__)
-# handler = logging.StreamHandler()
+# import logging
+# log = logging.getLogger(__name__)
+# # handler = logging.StreamHandler()
 
-# logger.addHandler(handler)
-log.setLevel(logging.INFO)
-# logger.propagate = False
+# # logger.addHandler(handler)
+# log.setLevel(logging.INFO)
+# # logger.propagate = False
 
 
 ## Import matplotlib here to avoid instabilities
@@ -31,6 +31,7 @@ from .graph_representation import plot_ortho_proj, plot_ortho_gradients
 from .graph_representation import plot_edges_generic, plot_cells_generic, plot_eptm_generic
 from .graph_representation import epithelium_draw as draw
 from .graph_representation import plot_2pannels, plot_2pannels_gradients
+from .graph_representation import plot_avg_rho
 from .explore_params import get_kwargs, get_grid_indices
 
 from .filters import local_slice, focus_on_cell

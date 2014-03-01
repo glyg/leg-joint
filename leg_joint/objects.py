@@ -40,8 +40,7 @@ tau = 2 * np.pi
 class AbstractRTZGraph(object):
     '''
     Wrapper of a (`graph_tool`)[http://projects.skewed.de/graph-tool]
-    object with the ::math:(\rho, \theta, z): coordinate system.
-
+    for a geometric graph in a 3D coordinate system
 
     Properties
     ===========
@@ -221,7 +220,8 @@ class AbstractRTZGraph(object):
                                    self.sigmas, sigma)
         z_matches = gt.find_vertex(self.graph,
                                    self.zeds, zed)
-        if self.__verbose__: log.info(len(s_matches), len(z_matches))
+        log.debug('Number of closest vertices found: %i, %i'
+                  % (len(s_matches), len(z_matches)))
         return [v for v in s_matches if v in z_matches][0]
         
     def periodic_boundary_condition(self):
@@ -630,9 +630,8 @@ class Cells():
         
         self.n_zeds = int(n_zeds)
         self.n_sigmas = int(n_sigmas)
-        if self.__verbose__ :
-            log.info('''Creating a %i x %i cells lattice'''
-                  % (self.n_zeds, self.n_sigmas))
+        log.info('''Creating a %i x %i cells lattice'''
+                 % (self.n_zeds, self.n_sigmas))
         rhos = np.ones(n_sigmas * n_zeds) * rho_c
         zt_grid = np.mgrid[:n_zeds, :n_sigmas]
         sigmas = zt_grid[1].astype('float')
@@ -857,7 +856,7 @@ class ApicalJunctions():
             try:
                 theta = sigma / rho
             except ZeroDivisionError: 
-                log.info('Error computing thetas')
+                log.warning('Error computing thetas')
                 theta = 0
             # new junction vertex here
             # **directly** in the eptm graph
