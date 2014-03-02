@@ -23,7 +23,7 @@ print(rc.ids)
 ### Base directories for saving, might as well have them here
 ### Base directories for saving, might as well have them here
 
-grid_kwargs =  {'seq_kwargs': {'num_cells': 1,
+grid_kwargs =  {'seq_kwargs': {'num_cells': 30,
                                'width_apopto':2.,
                                'p0': 1.,
                                'amp': 0.3,
@@ -36,7 +36,7 @@ grid_kwargs =  {'seq_kwargs': {'num_cells': 1,
                                   'contractility': 1.2,
                                   'radial_tension': [0., 0.2]},
                 'post_kwargs': {'max_ci':3.,
-                                'rate_ci':[1.],
+                                'rate_ci':[1., 1.2, 1.4],
                                 'span_ci':2}
                 }
 
