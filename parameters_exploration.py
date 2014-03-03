@@ -32,12 +32,12 @@ grid_kwargs =  {'seq_kwargs': {'num_cells': 30,
                                'num_steps': 10,
                                'ventral_bias': True,
                                'random': True},
-                'apopto_kwargs': {'vol_reduction':0.7,
-                                  'contractility': 1.2,
+                'apopto_kwargs': {'vol_reduction':0.5,
+                                  'contractility': 1.,
                                   'radial_tension': [0., 0.2]},
-                'post_kwargs': {'max_ci':3.,
-                                'rate_ci':[1., 1.2, 1.4],
-                                'span_ci':2}
+                'post_kwargs': {'max_ci':4.,
+                                'rate_ci':[1., 1.4, 2],
+                                'span_ci':3.}
                 }
 
 
@@ -52,6 +52,7 @@ print('Total number of simulations: %i' % n_sims)
 def single_simulation(args):
     import leg_joint as lj
     import matplotlib.pyplot as plt
+    import os
     index, params = args
 
     kwargs = lj.get_kwargs(index, params)
