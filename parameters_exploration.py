@@ -36,8 +36,8 @@ grid_kwargs =  {'seq_kwargs': {'num_cells': 30,
                                   'contractility': 1.,
                                   'radial_tension': [0., 0.2]},
                 'post_kwargs': {'max_ci':4.,
-                                'rate_ci':[1., 1.4, 2],
-                                'span_ci':3.}
+                                'rate_ci':[1., 1.4],
+                                'span_ci':[1, 3.]}
                 }
 
 
@@ -63,7 +63,7 @@ def single_simulation(args):
     lj.gradual_apoptosis(eptm, kwargs['seq_kwargs'],
                          kwargs['apopto_kwargs'], 
                          kwargs['post_kwargs'])
-    
+    lj.running_local_optimum(eptm, tol=1e-3)
     ax = lj.plot_avg_rho(eptm, bin_width=20)
     fig = ax.get_figure()
     plt.savefig(os.path.join(eptm.paths['svg'],

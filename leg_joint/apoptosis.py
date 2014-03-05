@@ -204,6 +204,7 @@ def post_apoptosis(eptm, a_cell, fold_cells, mode='shorter', **kwargs):
                              max_ci=kwargs['max_ci'],
                              rate_ci=kwargs['rate_ci'],
                              span=kwargs['span_ci'])
+        out = find_energy_min(eptm)
     except KeyError:
         pass
     eptm.set_local_mask(None)
@@ -248,7 +249,7 @@ def post_apoptosis(eptm, a_cell, fold_cells, mode='shorter', **kwargs):
         eptm.set_local_mask(None)
         eptm.set_local_mask(cell)
         find_energy_min(eptm)
-
+    eptm.isotropic_relax()
 
 def solve_all_rosettes(eptm, **kwargs):
     
