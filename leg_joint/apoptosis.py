@@ -368,10 +368,19 @@ def gradual_apoptosis(eptm, seq_kwargs,
     post_apoptosis(eptm, prev_first,
                    fold_cells,
                    **post_kwargs)
-    running_local_optimum(eptm, tol=1e-3)
+    
+    wide_relax(eptm)
     xml_name = os.path.join(eptm.paths['xml'], 'after_apopto.xml')
     eptm.graph.save(xml_name)
 
+@hdf_snapshot
+@png_snapshot
+def wide_relax(eptm, z_amp=20):
+    
+    eptm.local_slice(theta_amp=2*np.pi, z_amp=z_amp)
+    eptm.graph.set_vertex_filter(eptm.is_cell_vert)
+    running_local_optimum(eptm, tol=1e-3)
+    eptm.graph.set_vertex_filter(None)
     
 def show_death_pattern(eptm):
 

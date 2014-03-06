@@ -166,9 +166,9 @@ def isotropic_optimum(eptm, tol):
         criterium = np.abs(energy0 - energy1) / energy0 
 
 
-def running_local_optimum(eptm, tol, pola=False, save_to=None):
+def running_local_optimum(eptm, tol, pola=False, save_to=None, ):
     '''
-    Computes the local energy minimum for each cell on the epithelium
+    Computes the local energy minimum for each cell on the filtered epithelium
     in a random order
     '''
     cells = [cell for cell in eptm.cells if eptm.is_alive[cell]]
