@@ -91,8 +91,11 @@ def draw_polygons(eptm, coord1, coord2, colors,
                   vfilt=None, ax=None, **kwargs):
 
     eptm.graph.set_vertex_filter(vfilt)
+    eptm.update_dsigmas()
     polygons = [eptm.cells.polygon(cell, coord1, coord2)[0]
-                for cell in eptm.cells if eptm.is_alive[cell]]
+                for cell in eptm.cells
+                if (eptm.is_alive[cell]
+                    and not eptm.cells.is_boundary(cell))]
     colors = np.array([colors[cell] for cell in eptm.cells
                        if eptm.is_alive[cell]])
     colors -= colors.min()
@@ -362,7 +365,8 @@ def plot_edges_generic(eptm, xcoord, ycoord, efilt=None,
         edge_blue.fa = depth_cmap[:, 2]
         
     for edge in eptm.graph.edges():
-        if eptm.is_junction_edge[edge]:
+        if (eptm.is_junction_edge[edge]
+            and not eptm.at_boundary[edge]):
             ixs = (xcoord[edge.source()],
                    xcoord[edge.target()])
             wys = (ycoord[edge.source()],

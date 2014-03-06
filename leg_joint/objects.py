@@ -675,22 +675,22 @@ class Cells():
 
     def anisotropy(self, cell):
 
-        rhos = np.array([self.eptm.rhos[jv]
-                         for jv in cell.out_neighbours()])
+        # rhos = np.array([self.eptm.rhos[jv]
+        #                  for jv in cell.out_neighbours()])
         zeds = np.array([self.eptm.zeds[jv]
                          for jv in cell.out_neighbours()])
         ixs = np.array([self.eptm.ixs[jv]
                         for jv in cell.out_neighbours()])
         wys = np.array([self.eptm.wys[jv]
                         for jv in cell.out_neighbours()])
-        sigmas = np.arctan2(wys, ixs) * rhos.mean()
-        pos = np.vstack((sigmas, zeds)).T
+        # sigmas = np.arctan2(wys, ixs) * rhos.mean()
+        pos = np.vstack((ixs, wys, zeds)).T
         if pos.shape[0] > 0:
-            pca = PCA(n_components=2)
+            pca = PCA(n_components=3)
             pca_pos = pca.fit_transform(pos)
             delta_x = np.ptp(pca_pos[:, 0])
             delta_y = np.ptp(pca_pos[:, 1])
-            alignement = np.abs(pca.components_[:, 1][1])
+            alignement = np.abs(pca.components_[:, 0][0])
             return delta_x / delta_y, alignement
         return 0, 0
 
@@ -700,14 +700,16 @@ class Cells():
         alignements = anisotropies.copy()
         self.eptm.update_rhotheta()
         for cell in self:
-            # if not self.eptm.is_alive[cell]:
-            #     anisotropies[cell] = 0.
+            if self.is_boundary(cell):
+                continue
             anisotropies[cell], alignements[cell] = self.anisotropy(cell)
         return anisotropies, alignements
 
+    def is_boundary(self, cell):
+        return  any([self.eptm.at_boundary[ctoj]
+                     for ctoj in cell.out_edges()])
+        
     def polygon(self, cell, coord1, coord2):
-
-        self.eptm.update_dsigmas()
 
         rel_sz = np.array([[self.eptm.dsigmas[ctoj],
                             self.eptm.dzeds[ctoj]]
@@ -897,7 +899,10 @@ class ApicalJunctions():
                 dropped += 1
         return new_edges, dropped
 
+def fit_ellipse():
+    pass
 
+        
         
 # def c_circumcircle(sz0, sz1, sz2, cutoff):
 

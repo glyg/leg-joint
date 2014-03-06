@@ -188,8 +188,7 @@ class Epithelium(EpitheliumFilters,
         str1.append('Directory : %s' % self.save_dir)
         return '\n'.join(str1)
 
-    def set_identifier(self, identifier=''):
-
+    def set_identifier(self, identifier='', reset=True):
         if not hasattr(self, 'identifier'):
             now = datetime.datetime.isoformat(
                 datetime.datetime.utcnow())

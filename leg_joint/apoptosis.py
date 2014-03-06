@@ -14,7 +14,7 @@ from .topology import remove_cell, solve_rosette, find_rosettes
 from .graph_representation import png_snapshot
 from .epithelium import hdf_snapshot
 
-from .optimizers import find_energy_min
+from .optimizers import find_energy_min, running_local_optimum
 from .topology import type1_transition
 
 import logging
@@ -155,7 +155,6 @@ def _apopto_pdf(zed, theta, z0=0., width_apopto=1.5, amp=0.4):
 def regular_apoptotic_cells(eptm, num_cells, gamma=1, width_apopto=1.8):
     ''' Returns a list of `num_cells` evenly reparted around the joint.
 
-    If `gamma` is not `None` 
     '''
     is_apoptotic = eptm.is_alive.copy()
     is_apoptotic.a[:] = 0
@@ -249,7 +248,6 @@ def post_apoptosis(eptm, a_cell, fold_cells, mode='shorter', **kwargs):
         eptm.set_local_mask(None)
         eptm.set_local_mask(cell)
         find_energy_min(eptm)
-    eptm.isotropic_relax()
 
 def solve_all_rosettes(eptm, **kwargs):
     
@@ -370,9 +368,9 @@ def gradual_apoptosis(eptm, seq_kwargs,
     post_apoptosis(eptm, prev_first,
                    fold_cells,
                    **post_kwargs)
+    running_local_optimum(eptm, tol=1e-3)
     xml_name = os.path.join(eptm.paths['xml'], 'after_apopto.xml')
     eptm.graph.save(xml_name)
-    # lj.running_local_optimum(eptm, tol=1e-6)
 
     
 def show_death_pattern(eptm):
