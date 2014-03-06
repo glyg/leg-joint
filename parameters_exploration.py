@@ -37,7 +37,7 @@ grid_kwargs =  {'seq_kwargs': {'num_cells': 30,
                                   'radial_tension': [0., 0.2]},
                 'post_kwargs': {'max_ci':3.,
                                 'rate_ci':[1., 1.4],
-                                'span_ci':[1., 3.]}
+                                'span_ci':[2., 3.]}
                 }
 
 
