@@ -70,7 +70,7 @@ def average_rho(eptm, bin_width=10):
 def plot_avg_rho(eptm, bin_width, ax=None, retall=False, ls='r-'):
     
     if ax is None:
-        fig, ax = plt.subplots(figsize=(12,4))
+        fig, ax = plt.subplots(figsize=(8,2))
     else:
         fig = ax.get_figure()
     zeds_avg, rhos_avg, rhos_max, rhos_min = average_rho(eptm, bin_width)
@@ -81,6 +81,9 @@ def plot_avg_rho(eptm, bin_width, ax=None, retall=False, ls='r-'):
                     facecolor='0.5', edgecolor='0.9')
     ax.plot(zeds_avg, rhos_avg, ls, lw=2, alpha=0.7)
     ax.set_aspect('equal')
+    ax.set_xlabel('Proximal - distal (µm)')
+    ax.set_ylabel('Radius (µm)')
+    
     max_zed = ax.get_ylim()[1]
     ax.set_ylim(0, max_zed)
     if not retall:
@@ -445,11 +448,7 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=np.pi/4,
                     output2d='tissue_sz.pdf', verbose=False):
 
     eptm.graph.set_directed(False)
-    file_type = output3d.split('.')[-1]
-    # output3d = os.path.join('saved_graphs', file_type, output3d)
-    # output2d = os.path.join('saved_graphs', file_type, output2d)
 
-    graph = eptm.graph
     vertex_red = eptm.graph.new_vertex_property('float')
     vertex_green = eptm.graph.new_vertex_property('float')
     vertex_blue = eptm.graph.new_vertex_property('float') 
