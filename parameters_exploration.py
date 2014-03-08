@@ -59,7 +59,9 @@ def single_simulation(args):
     eptm = lj.Epithelium(
         graphXMLfile='saved_graphs/xml/before_apoptosis.xml',
         identifier='expl_%04i' % index)
+    eptm.isotropic_relax()
     eptm.dump_json(kwargs)
+    
     lj.gradual_apoptosis(eptm, kwargs['seq_kwargs'],
                          kwargs['apopto_kwargs'], 
                          kwargs['post_kwargs'])
