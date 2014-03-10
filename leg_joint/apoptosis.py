@@ -375,9 +375,10 @@ def gradual_apoptosis(eptm, seq_kwargs,
 
 @hdf_snapshot
 @png_snapshot
-def wide_relax(eptm, z_amp=20):
+def wide_relax(eptm, zed_amp=20):
     
-    eptm.local_slice(theta_amp=2*np.pi, z_amp=z_amp)
+    local_slice(eptm, theta_c=0, zed_c=0,
+                theta_amp=2*np.pi, zed_amp=zed_amp)
     eptm.graph.set_vertex_filter(eptm.is_cell_vert)
     running_local_optimum(eptm, tol=1e-3)
     eptm.graph.set_vertex_filter(None)
