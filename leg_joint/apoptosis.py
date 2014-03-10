@@ -228,7 +228,7 @@ def post_apoptosis(eptm, a_cell, fold_cells, mode='shorter', **kwargs):
                                   if (not je in new_edges)
                                   and eptm.is_junction_edge[je]])
         new_jv = remove_cell(eptm, a_cell)
-
+    wide_relax(eptm)
     # if  kwargs.get('residual_ab_tension') is not None:
     #     for jv in new_jvs:
     #         eptm.junctions.radial_tensions[jv] = kwargs['residual_ab_tension']
@@ -241,14 +241,16 @@ def post_apoptosis(eptm, a_cell, fold_cells, mode='shorter', **kwargs):
     #     increase_contractility(eptm, neighbours,
     #                            kwargs['contractility_increase'])
     
-    np.random.shuffle(fold_cells)
-    for cell in fold_cells:
-        if not eptm.is_alive[cell]:
-            continue
-        eptm.set_local_mask(None)
-        eptm.set_local_mask(cell)
-        find_energy_min(eptm)
+    # np.random.shuffle(fold_cells)
+    # for cell in fold_cells:
+    #     if not eptm.is_alive[cell]:
+    #         continue
+    #     eptm.set_local_mask(None)
+    #     eptm.set_local_mask(cell)
+    #     find_energy_min(eptm)
 
+
+        
 def solve_all_rosettes(eptm, **kwargs):
     
     rosettes = find_rosettes(eptm)
