@@ -30,7 +30,10 @@ def png_snapshot(func, *args, **kwargs):
                                   % eptm.stamp)
         outfname3d = os.path.join(png_dir, 'eptm3d_%04i.png'
                                   % eptm.stamp)
-        epithelium_draw(eptm, output2d=outfname2d, output3d=outfname3d)
+        try:
+            epithelium_draw(eptm, output2d=outfname2d, output3d=outfname3d)
+        except:
+            pass
         return out
     return new_func
 
