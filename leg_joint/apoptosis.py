@@ -350,6 +350,23 @@ def induce_contractility(eptm, a_cell, max_ci, rate_ci, span=1):
         new_c = eptm.cells.contractilities[cell] * increase
         eptm.cells.contractilities[cell] = min(new_c, max_ci*c0)
     eptm.graph.set_directed(True)
+
+def induce_tension(eptm, a_cell, max_ti, rate_ti, span=1):
+    """
+    """
+    
+    focus_on_cell(eptm, a_cell, radius=3*span)
+    t0 = eptm.params['line_tension']
+    eptm.graph.set_directed(False)
+    for cell in eptm.cells.local_cells():
+        dist = gt.shortest_distance(eptm.graph,
+                                    source=a_cell, target=cell) / 2.
+        increase = 1 + (rate_ti - 1) * np.exp((1 - dist) / span)
+        for je in eptm.cells.junctions[cell]:
+            new_t = eptm.junctions.line_tensions[je] * increase
+            eptm.junctions.line_tensions[je] = min(new_t, max_ti*t0)
+    eptm.graph.set_directed(True)
+
     
 @hdf_snapshot
 @png_snapshot
