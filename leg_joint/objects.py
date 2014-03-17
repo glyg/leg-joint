@@ -489,7 +489,7 @@ class Diamond(object):
         self.j_verts = j_verta, j_vertb
         self.triangles = {}
         num_adj = len(adj_cells)
-        if num_adj  == 2:
+        if num_adj == 2:
             cell0, cell1 = adj_cells
             self.triangles[cell0] = Triangle(eptm, cell0, j_edge)
             self.triangles[cell1] = Triangle(eptm, cell1, j_edge)
