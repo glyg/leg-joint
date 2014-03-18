@@ -10,13 +10,16 @@ import warnings
 import datetime
 import json
 import logging
-log = logging.getLogger(__name__)
-ch = logging.StreamHandler()
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-ch.setFormatter(formatter)
-ch.setLevel(logging.ERROR)
-log.addHandler(ch)
 
+log = logging.getLogger(__name__)
+# ch = logging.StreamHandler()
+# formatter = logging.Formatter('%(asctime)s -'
+#                               '%(name)s -'
+#                               '%(levelname)s -'
+#                               '%(message)s')
+# ch.setFormatter(formatter)
+# ch.setLevel(logging.DEBUG)
+# log.addHandler(ch)
 
 
 import graph_tool.all as gt
@@ -33,7 +36,6 @@ CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
 GRAPH_SAVE_DIR = os.path.join(ROOT_DIR, 'saved_graphs')
-SIMLOG  = os.path.join(ROOT_DIR, 'simulations.log')
 
 
 # See [the tau manifesto](http://tauday.com/tau-manifesto)
@@ -112,8 +114,11 @@ class Epithelium(EpitheliumFilters,
         self.params = self.paramtree.absolute_dic
         self.set_identifier(identifier)
         self.stamp = 0
+        log.info('Instanciating epithelium %s' % identifier)
+
+        self._init_paths()
         self._set_logger()
-        
+
         # Graph instanciation
         if graph is None and graphXMLfile is None:
             log.info('Created new graph')
@@ -156,7 +161,6 @@ class Epithelium(EpitheliumFilters,
             self.set_vertex_state()
             self.set_edge_state()
 
-        self._init_paths()
         self.reset_topology(local=False)
         # Dynamical components
         Dynamics.__init__(self)
@@ -197,7 +201,7 @@ class Epithelium(EpitheliumFilters,
 
     def _set_logger(self):
         
-        fh = logging.FileHandler(SIMLOG)
+        fh = logging.FileHandler(self.paths['log'])
         fh.setLevel(logging.INFO)
         # create formatter and add it to the handlers
         formatter = logging.Formatter('%(asctime)s - %(name)s -'
@@ -250,7 +254,10 @@ class Epithelium(EpitheliumFilters,
         self.paths['hdf'] = os.path.abspath(store)
         self.paths['json'] = os.path.join(self.save_dir,
                                          'params_%s.json' % self.identifier)
-            
+        self.paths['log'] = os.path.join(self.save_dir,
+                                         '%s.log' % self.identifier)
+        
+        
     def update_geometry(self):
         '''
         Computes cell positions (at the geometrical center
@@ -310,7 +317,11 @@ class Epithelium(EpitheliumFilters,
     @active
     def _set_junction_pos(self, new_xyz_pos):
         new_xyz_pos = new_xyz_pos.flatten()
-        assert len(new_xyz_pos) / 3 == self.graph.num_vertices()
+        
+        if not np.all(np.isfinite(new_xyz_pos)):
+            log.critical('''Non finite value for vertices {}'''.format(
+                ', '.join(str(jv) for jv in self.graph.vertices())))
+            return
         self.ixs.fa = new_xyz_pos[::3]
         self.wys.fa = new_xyz_pos[1::3]
         self.zeds.fa = new_xyz_pos[2::3]
@@ -494,19 +505,19 @@ def hdf_snapshot(func, *args, **kwargs):
     :class:`Epithelium` `stamp` attribute.
     '''
     def new_func(self, *args, **kwargs):
-        prev_vstate, prev_inverted_v = self.graph.get_vertex_filter()
-        prev_estate, prev_inverted_e = self.graph.get_edge_filter()
+        # prev_vstate, prev_inverted_v = self.graph.get_vertex_filter()
+        # prev_estate, prev_inverted_e = self.graph.get_edge_filter()
 
         out = func(self, *args, **kwargs)
-        self.graph.set_vertex_filter(None)
-        self.graph.set_edge_filter(None)
+        # self.graph.set_vertex_filter(None)
+        # self.graph.set_edge_filter(None)
 
         store = self.paths['hdf'] 
         hdfgraph.graph_to_hdf(self.graph, store,
                               stamp=self.stamp,
                               reset=False)
-        self.graph.set_vertex_filter(prev_vstate, prev_inverted_v)
-        self.graph.set_edge_filter(prev_estate, prev_inverted_e)
+        # self.graph.set_vertex_filter(prev_vstate, prev_inverted_v)
+        # self.graph.set_edge_filter(prev_estate, prev_inverted_e)
         return out
     return new_func
 
