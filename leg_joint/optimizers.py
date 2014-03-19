@@ -180,7 +180,7 @@ def running_local_optimum(eptm, tol, pola=False, save_to=None, ):
     for cell in cells:
         if not eptm.is_alive[cell]: continue
         eptm.set_local_mask(None)
-        eptm.set_local_mask(cell, wider=False)
+        eptm.set_local_mask(cell, wider=True)
         find_energy_min(eptm, tol=1e-3, approx_grad=0)
         if pola:
             eptm.update_tensions(phi, np.pi/3)

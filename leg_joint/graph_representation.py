@@ -554,6 +554,31 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=np.pi/4,
                          vorder=vorder, eorder=eorder,
                          output=output3d)
     if verbose: print('saved tissue to %s' % output3d)
+
+    #### 2D view
+
+    ### Junction edges
+    eptm.graph.set_edge_filter(eptm.is_junction_edge,
+                               inverted=False)
+
+    depth.a = rhos.a
+    depth.a = (depth.a - depth.a.min()) / (depth.a.max() - depth.a.min())
+    vertex_alpha.a = (depth.a * 0.8 + 0.2) * eptm.is_alive.a
+    for edge in eptm.graph.edges():
+        edge_alpha[edge] = vertex_alpha[edge.source()]
+        edge_height[edge] = (depth[edge.source()]
+                             + depth[edge.target()]) * 0.5
+
+
+    cmap = plt.cm.jet(edge_height.fa)
+    edge_red.fa = cmap[:, 0] #105/256.
+    edge_green.fa = cmap[:, 1] #201/256.
+    edge_blue.fa = cmap[:, 2] #40/256.
+    #edge_width.fa[:] = 1.
+    edge_width.fa = 2. * (eptm.junctions.line_tensions.fa /
+                          eptm.junctions.line_tensions.fa.mean())**0.5
+    eptm.graph.set_edge_filter(None)
+
     
     sigma = eptm.proj_sigma()
     zs = [zeds, sigma]
