@@ -18,11 +18,6 @@ with engines.sync_imports():
     
 print(rc.ids)
 
-# <codecell>
-
-### Base directories for saving, might as well have them here
-### Base directories for saving, might as well have them here
-
 grid_kwargs =  {'seq_kwargs': {'num_cells': 30,
                                'width_apopto':2.,
                                'p0': 1.,
@@ -34,10 +29,10 @@ grid_kwargs =  {'seq_kwargs': {'num_cells': 30,
                                'random': True},
                 'apopto_kwargs': {'vol_reduction':0.5,
                                   'contractility': 1.,
-                                  'radial_tension': [0., 0.2]},
-                'post_kwargs': {'max_ci':3.,
-                                'rate_ci':[1., 1.4],
-                                'span_ci':[2., 3.]}
+                                  'radial_tension': [0., 0.1, 0.2]},
+                'post_kwargs': {'max_ci':[1., 2., 3.],
+                                'rate_ci': 1.4,
+                                'span_ci':2.}
                 }
 
 
@@ -70,7 +65,7 @@ def single_simulation(args):
     plt.savefig(os.path.join(eptm.paths['svg'],
                              'avg_rho_%s.svg'
                              % eptm.identifier))
-    print('Done %s' % eptm.identifier)
+    eptm.log.info('Done %s' % eptm.identifier)
     return index
 
 arguments = zip(range(n_sims),

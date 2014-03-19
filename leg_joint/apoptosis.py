@@ -63,7 +63,8 @@ def apoptosis_step(eptm, a_cell,
     find_energy_min(eptm)
     
 def get_apoptotic_cells(eptm, **kwargs):
-    '''Returns the specified number of apoptotic cells around the joint. 
+    '''Returns the specified number of apoptotic cells around the
+    joint. 
     
     Parameters:
     ===========
