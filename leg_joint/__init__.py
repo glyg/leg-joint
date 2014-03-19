@@ -15,7 +15,7 @@ formatter = logging.Formatter('%(asctime)s -'
 ch.setFormatter(formatter)
 ch.setLevel(logging.DEBUG)
 log.addHandler(ch)
-
+log.setLevel(logging.INFO)
 log.propagate = False
 
 
@@ -42,3 +42,5 @@ from .explore_params import get_kwargs, get_grid_indices
 from .filters import local_slice, focus_on_cell
 
 from .explore_params import explore_delta_h_1D
+
+log.info('successfully imported leg_joint')

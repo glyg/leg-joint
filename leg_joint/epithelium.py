@@ -118,7 +118,8 @@ class Epithelium(EpitheliumFilters,
 
         self._init_paths()
         self._set_logger()
-
+        self.log = log
+        
         # Graph instanciation
         if graph is None and graphXMLfile is None:
             log.info('Created new graph')

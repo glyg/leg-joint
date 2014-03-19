@@ -12,10 +12,10 @@ sys.path.append(os.path.dirname(curdir))
 
 import matplotlib as mpl
 
-mpl.rcParams['figure.figsize']=(8.0,6.0)    #(6.0,4.0)
-mpl.rcParams['font.size']=12                #10
-mpl.rcParams['savefig.dpi']=100             #72 
-mpl.rcParams['figure.subplot.bottom']=.1    #.125
+mpl.rcParams['figure.figsize'] = (8.0,6.0)    #(6.0,4.0)
+mpl.rcParams['font.size'] = 12                #10
+mpl.rcParams['savefig.dpi'] = 100             #72 
+mpl.rcParams['figure.subplot.bottom'] = .1    #.125
 
 import graph_tool.all as gt
 #import matplotlib.pyplot as plt
