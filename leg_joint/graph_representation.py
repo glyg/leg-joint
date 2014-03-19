@@ -434,7 +434,8 @@ def pseudo3d_draw(graph, rtz, output="lattice_3d.pdf",
     vertex_green.a = np.ones(rhos.shape, dtype=np.float) * green 
     vertex_blue.a = np.ones(rhos.shape, dtype=np.float) * blue
     rgba = [vertex_red, vertex_green, vertex_blue, vertex_alpha]
-    pseudo3d_color = gt.group_vector_property(rgba, value_type='float')
+    pseudo3d_color = gt.group_vector_property(rgba,
+                                              value_type='float')
     
     xy = [pseudo_x, pseudo_y]
     pseudo3d_pos = gt.group_vector_property(xy, value_type='float')
@@ -446,7 +447,7 @@ def pseudo3d_draw(graph, rtz, output="lattice_3d.pdf",
     del pmap
     return pseudo3d_pos
     
-def epithelium_draw(eptm, z_angle=0.15, d_theta=np.pi/4,
+def epithelium_draw(eptm, z_angle=0.15, d_theta=4*np.pi/5,
                     output3d="tissue_3d.pdf",
                     output2d='tissue_sz.pdf', verbose=False):
 
@@ -556,11 +557,10 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=np.pi/4,
     if verbose: print('saved tissue to %s' % output3d)
 
     #### 2D view
-
+    eptm.rotate(-np.pi / 2)
     ### Junction edges
     eptm.graph.set_edge_filter(eptm.is_junction_edge,
                                inverted=False)
-
     depth.a = rhos.a
     depth.a = (depth.a - depth.a.min()) / (depth.a.max() - depth.a.min())
     vertex_alpha.a = (depth.a * 0.8 + 0.2) * eptm.is_alive.a
@@ -602,8 +602,7 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=np.pi/4,
     if verbose: print('saved tissue to %s' % output2d)
     del pmap, pmap2
     eptm.graph.set_directed(True)
-
-
+    eptm.rotate(np.pi / 2)
     
 def cylindrical2cartesian(rtz):
     """
