@@ -18,13 +18,13 @@ pyximport.install()
 
 import os
 import numpy as np
+import warnings
 
 import graph_tool.all as gt
 #from scipy import weave, spatial
 from .filters import EpitheliumFilters
 from .utils import to_xy, to_rhotheta
 from .circumcircle import c_circumcircle
-from sklearn.decomposition import PCA
 
 import logging
 log = logging.getLogger(__name__)
@@ -674,7 +674,12 @@ class Cells():
         return j_edges
 
     def anisotropy(self, cell):
-
+        try:
+            from sklearn.decomposition import PCA
+        except ImportError:
+            warnings.warn('`sklearn` is not installed'
+                          'PCA can"t be computed, sorry')
+            return
         # rhos = np.array([self.eptm.rhos[jv]
         #                  for jv in cell.out_neighbours()])
         zeds = np.array([self.eptm.zeds[jv]

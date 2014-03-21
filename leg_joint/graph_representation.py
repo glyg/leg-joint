@@ -648,9 +648,9 @@ def vertices_projections(rtz, **kwards):
                   xyz['wy'],
                   xyz['zed'])
     ax_3d.set_aspect('equal')
-    ax_3d.set_xlabel(u'Anterior - posterior axis (µm)')
-    ax_3d.set_ylabel(u'Ventral - dorsal axis (µm)')
-    ax_3d.set_zlabel(u'Proximal - distal axis (µm)')    
+    # ax_3d.set_xlabel(u'Anterior - posterior axis (µm)')
+    # ax_3d.set_ylabel(u'Ventral - dorsal axis (µm)')
+    # ax_3d.set_zlabel(u'Proximal - distal axis (µm)')    
     
     curv_ax = axes[0,1]
     curv_ax.plot(rtz['zed'], rtz['rho'] *  rtz['theta'],
@@ -664,8 +664,8 @@ def vertices_projections(rtz, **kwards):
                  rtz['rho'] * np.sin(rtz['theta']),
                  'o-', alpha=0.3)
     cut_ax.set_aspect('equal')
-    cut_ax.set_xlabel(u'Anterior - posterior axis (µm)')
-    cut_ax.set_ylabel(u'Ventral - dorsal axis (µm)')
+    # cut_ax.set_xlabel(u'Anterior - posterior axis (µm)')
+    # cut_ax.set_ylabel(u'Ventral - dorsal axis (µm)')
 
 def vertices_scatterplot(rtz, **kwargs):
     """
@@ -682,9 +682,9 @@ def vertices_scatterplot(rtz, **kwargs):
                   xyz['zed'],
                   **kwargs)
     ax_3d.set_aspect('equal')
-    ax_3d.set_xlabel(u'Anterior - posterior axis (µm)')
-    ax_3d.set_ylabel(u'Ventral - dorsal axis (µm)')
-    ax_3d.set_zlabel(u'Proximal - distal axis (µm)')    
+    # ax_3d.set_xlabel(u'Anterior - posterior axis (µm)')
+    # ax_3d.set_ylabel(u'Ventral - dorsal axis (µm)')
+    # ax_3d.set_zlabel(u'Proximal - distal axis (µm)')    
     plt.show()
     return fig, ax_3d 
 

@@ -60,8 +60,7 @@ def get_grid_indices(params):
     if not len(grid_params):
         return None
     grid_indices = np.meshgrid(*(np.arange(len(values))
-                                 for values in grid_params.values()),
-                               indexing='ij') ## Avoids the two first axes to be swaped
+                                 for values in grid_params.values())) ## Avoids the two first axes to be swaped
     grid_indices = {key: indices.ravel() 
                     for key, indices
                     in zip(grid_params.keys(), grid_indices)}
