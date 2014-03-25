@@ -79,7 +79,6 @@ def get_kwargs(index, params):
                 param_index = grid_indices[key][index]
                 target[key] = get_param(key, params,
                                         index=param_index)
-                print('Settng %s at %s' % (key, str(target[key])))
             except KeyError:
                 param_index = 0
                 target[key] = get_param(key, params,
