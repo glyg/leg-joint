@@ -71,7 +71,9 @@ def get_apoptotic_cells(eptm, **kwargs):
     
     eptm: a :class:`Epithelium` instance
 
-    num_cells: `int`, the number of cells seed: `int` passed to the
+    num_cells: `int`, the number of cells
+
+    seed: `int` passed to the
         random number generator
 
     random: {True | False}: the apoptotic cells
