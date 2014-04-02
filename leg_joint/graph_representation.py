@@ -57,27 +57,27 @@ def average_rho(eptm, bin_width=10):
     rhos = eptm.rhos.a
     rhos = rhos[np.argsort(zeds)]
     zeds = np.sort(zeds)
-    
+
     rhos_cliped = rhos[: -(rhos.size % bin_width)]
     rhos_cliped = rhos_cliped.reshape((rhos_cliped.size // bin_width, bin_width))
     rhos_avg = rhos_cliped.mean(axis=1)
     rhos_max = rhos_cliped.max(axis=1)
     rhos_min = rhos_cliped.min(axis=1)
-    
+
     zeds_cliped = zeds[: -(zeds.size % bin_width)]
     zeds_cliped = zeds_cliped.reshape((zeds_cliped.size // bin_width, bin_width))
     zeds_avg = zeds_cliped.mean(axis=1)
-    
+
     return zeds_avg, rhos_avg, rhos_max, rhos_min
 
 def plot_avg_rho(eptm, bin_width, ax=None, retall=False, ls='r-'):
-    
+
     if ax is None:
         fig, ax = plt.subplots(figsize=(8,2))
     else:
         fig = ax.get_figure()
     zeds_avg, rhos_avg, rhos_max, rhos_min = average_rho(eptm, bin_width)
-    
+
     ax.fill_between(zeds_avg,
                     rhos_max,
                     rhos_min,
@@ -86,26 +86,26 @@ def plot_avg_rho(eptm, bin_width, ax=None, retall=False, ls='r-'):
     ax.set_aspect('equal')
     ax.set_xlabel('Proximal - distal (µm)')
     ax.set_ylabel('Radius (µm)')
-    
+
     max_zed = ax.get_ylim()[1]
     ax.set_ylim(0, max_zed)
     if not retall:
         return ax
     return ax, (zeds_avg, rhos_avg, rhos_max, rhos_min)
-    
+
 def draw_polygons(eptm, coord1, coord2, colors,
-                  vfilt=None, ax=None, **kwargs):
+                  vfilt=None, ax=None, normalize=True, **kwargs):
 
     eptm.graph.set_vertex_filter(vfilt)
     eptm.update_dsigmas()
     polygons = [eptm.cells.polygon(cell, coord1, coord2)[0]
                 for cell in eptm.cells
-                if (eptm.is_alive[cell]
-                    and not eptm.cells.is_boundary(cell))]
+                if (eptm.is_alive[cell])]
     colors = np.array([colors[cell] for cell in eptm.cells
                        if eptm.is_alive[cell]])
-    colors -= colors.min()
-    colors /= colors.max()
+    if normalize:
+        colors -= colors.min()
+        colors /= colors.max()
     colors = plt.cm.jet(colors)
     eptm.graph.set_vertex_filter(None)
 
@@ -152,7 +152,7 @@ def plot_2pannels_gradients(eptm, axes=None,
     v_wys = np.array([pos0[1::3], - grad_wys]).T
     v_zeds = np.array([pos0[2::3], - grad_zeds]).T
     v_sigmas = np.array([sigmas, - grad_sigmas]).T
-    
+
     if axes is None:
         ax_zs, ax_xy =  plot_2pannels(eptm, axes=None,
                                       vfilt=eptm.is_local_vert,
@@ -173,7 +173,7 @@ def plot_2pannels_gradients(eptm, axes=None,
     return axes
 
 
-    
+
 def plot_ortho_gradients(eptm, axes=None,
                          scale=1., approx=0, **kwargs):
     '''
@@ -215,7 +215,7 @@ def plot_ortho_gradients(eptm, axes=None,
                     ec=ec, fc=fc, alpha=0.5)
         ax_rs.arrow(r[0], s[0], r[1], s[1], width=0.01,
                     ec=ec, fc=fc, alpha=0.5)
-        
+
     plt.draw()
     return axes
 
@@ -230,7 +230,7 @@ def plot_active(eptm, xcoord, ycoord, ax=None):
         ax =  plot_edges_generic(eptm, xcoord, ycoord, ax=None,
                                  vfilt=eptm.is_local_vert,
                                  efilt=eptm.is_local_edge)
-        
+
     ax.plot(xs, ys, 'ro', alpha=0.5, ms=8)
     plt.draw()
     return ax
@@ -246,16 +246,16 @@ def plot_2pannels(eptm, axes=None,
                         edge_kwargs=edge_kwargs,
                         cell_kwargs=cell_kwargs)
     return axes
-    
+
 def plot_pannels(eptm, xy_coords,
                  axes,
                  local=True,
                  edge_kwargs={}, cell_kwargs={}):
-    
+
     if not (len(axes) == len(xy_coords)):
         raise ValueError('the `xy_coords` and `axes` arguments'
                          ' should have the same length')
-    
+
     if local:
         cell_kwargs['vfilt'] = eptm.is_local_vert
         edge_kwargs['efilt'] = eptm.is_local_edge
@@ -269,7 +269,7 @@ def plot_pannels(eptm, xy_coords,
                           cell_kwargs=cell_kwargs)
     return axes
 
-    
+
 def plot_ortho_proj(eptm, ax=None, local=True,
                     edge_kwargs={}, cell_kwargs={}):
     if local:
@@ -279,7 +279,7 @@ def plot_ortho_proj(eptm, ax=None, local=True,
         fig, ax = plt.subplots(1,1)
     else:
         fig = ax.get_figure()
-    
+
     plot_eptm_generic(eptm, eptm.zeds,
                       eptm.proj_sigma(),
                       ax=ax,
@@ -287,7 +287,7 @@ def plot_ortho_proj(eptm, ax=None, local=True,
                       edge_kwargs=edge_kwargs)
 
     divider = make_axes_locatable(ax)
-    
+
     ax_zr = divider.append_axes("top", 2., pad=0.1, sharex=ax)
     plot_eptm_generic(eptm, eptm.zeds,
                       eptm.rhos,
@@ -319,7 +319,7 @@ def plot_eptm_generic(eptm, xcoord, ycoord,
 
     if ax is None:
         fig, ax = plt.subplots()
-    
+
     if local:
         cell_kwargs['vfilt'] = eptm.is_local_vert
         edge_kwargs['efilt'] = eptm.is_local_edge
@@ -333,8 +333,8 @@ def plot_eptm_generic(eptm, xcoord, ycoord,
                        ax=ax,
                        **edge_kwargs)
     return ax
-    
-def plot_cells_generic(eptm, xcoord, ycoord, ax=None, 
+
+def plot_cells_generic(eptm, xcoord, ycoord, ax=None,
                        vfilt=None, c_text=False,
                        cell_colors=None, **kwargs):
     if ax is None:
@@ -352,10 +352,10 @@ def plot_cells_generic(eptm, xcoord, ycoord, ax=None,
 
 def plot_edges_generic(eptm, xcoord, ycoord, efilt=None,
                        ax=None, j_text=False,
-                       edge_color=None, **kwargs):
+                       edge_color=None, edge_alpha=None, **kwargs):
     if ax is None:
         fig, ax = plt.subplots(1,1)
-        
+
     eptm.graph.set_edge_filter(efilt)
     eptm.graph.set_vertex_filter(None)
     # edge_width = eptm.junctions.line_tensions.copy()
@@ -369,22 +369,20 @@ def plot_edges_generic(eptm, xcoord, ycoord, efilt=None,
         edge_green.fa = depth_cmap[:, 1]
         edge_blue = edge_color.copy()
         edge_blue.fa = depth_cmap[:, 2]
-        
+
     for edge in eptm.graph.edges():
-        if (eptm.is_junction_edge[edge]
-            and not eptm.at_boundary[edge]):
+        if (eptm.is_junction_edge[edge]):
             ixs = (xcoord[edge.source()],
                    xcoord[edge.target()])
             wys = (ycoord[edge.source()],
                    ycoord[edge.target()])
+            if edge_alpha is not None:
+                kwargs['alpha'] = edge_alpha[edge]
+
             if edge_color is not None:
                 c = [edge_red[edge], edge_green[edge], edge_blue[edge]]
-                ax.plot(ixs, wys, '-', c=c, **kwargs)
-            else:
-                ax.plot(ixs, wys, '-', **kwargs)
-        # else:
-        #     ax.plot(ixs, wys, 'k-', lw=1.,
-        #             alpha=0.2, **kwargs)
+                kwargs['c'] = c
+            ax.plot(ixs, wys, '-', **kwargs)
     ax.set_aspect('equal')
     eptm.graph.set_edge_filter(None)
     return ax
@@ -416,14 +414,14 @@ def pseudo3d_draw(graph, rtz, output="lattice_3d.pdf",
     thetas += theta_rot
     output = os.path.join('saved_graph/pdf', output)
     red, green, blue = RGB
-    
+
     pseudo_x = graph.new_vertex_property('float')
     pseudo_y = graph.new_vertex_property('float')
     vertex_red = graph.new_vertex_property('float')
     vertex_green = graph.new_vertex_property('float')
     vertex_blue = graph.new_vertex_property('float')
     vertex_alpha = graph.new_vertex_property('float')
-    
+
     pseudo_x.a = zeds * np.cos(z_angle)\
                  - rhos * np.cos(thetas) * np.sin(z_angle)
     pseudo_y.a = rhos * np.sin(thetas)
@@ -431,45 +429,48 @@ def pseudo3d_draw(graph, rtz, output="lattice_3d.pdf",
     normed_depth = (depth - depth.min()) / (depth.max() - depth.min())
     vertex_alpha.a = normed_depth * 0.7 + 0.3
     vertex_red.a = np.ones(rhos.shape, dtype=np.float) * red
-    vertex_green.a = np.ones(rhos.shape, dtype=np.float) * green 
+    vertex_green.a = np.ones(rhos.shape, dtype=np.float) * green
     vertex_blue.a = np.ones(rhos.shape, dtype=np.float) * blue
     rgba = [vertex_red, vertex_green, vertex_blue, vertex_alpha]
     pseudo3d_color = gt.group_vector_property(rgba,
                                               value_type='float')
-    
+
     xy = [pseudo_x, pseudo_y]
     pseudo3d_pos = gt.group_vector_property(xy, value_type='float')
     pmap = gt.graph_draw(graph, pseudo3d_pos,
                          vertex_fill_color=pseudo3d_color,
                          vertex_color=pseudo3d_color,
-                         edge_pen_width=2., 
+                         edge_pen_width=2.,
                          output=output, **kwargs)
     del pmap
     return pseudo3d_pos
-    
+
 def epithelium_draw(eptm, z_angle=0.15, d_theta=4*np.pi/5,
                     output3d="tissue_3d.pdf",
-                    output2d='tissue_sz.pdf', verbose=False):
+                    output2d='tissue_sz.pdf', verbose=False,
+                    vfilt=None,
+                    efilt=None,
+                    **kwargs):
 
     eptm.graph.set_directed(False)
 
     vertex_red = eptm.graph.new_vertex_property('float')
     vertex_green = eptm.graph.new_vertex_property('float')
-    vertex_blue = eptm.graph.new_vertex_property('float') 
-    vertex_alpha = eptm.graph.new_vertex_property('float') 
-    vertex_size = eptm.graph.new_vertex_property('int') 
+    vertex_blue = eptm.graph.new_vertex_property('float')
+    vertex_alpha = eptm.graph.new_vertex_property('float')
+    vertex_size = eptm.graph.new_vertex_property('int')
 
     edge_red = eptm.graph.new_edge_property('float')
     edge_green = eptm.graph.new_edge_property('float')
-    edge_blue = eptm.graph.new_edge_property('float') 
-    edge_alpha = eptm.graph.new_edge_property('float') 
-    edge_width = eptm.graph.new_edge_property('float') 
-    edge_height = eptm.graph.new_edge_property('float') 
+    edge_blue = eptm.graph.new_edge_property('float')
+    edge_alpha = eptm.graph.new_edge_property('float')
+    edge_width = eptm.graph.new_edge_property('float')
+    edge_height = eptm.graph.new_edge_property('float')
 
-    
+
     eptm.update_rhotheta()
     rhos, thetas, zeds = eptm.rhos, eptm.thetas, eptm.zeds
-    
+
     pseudo_x = eptm.graph.new_vertex_property('float')
     pseudo_y = eptm.graph.new_vertex_property('float')
     pseudo_x.a = zeds.a * np.cos(z_angle) - rhos.a * np.cos(
@@ -484,10 +485,10 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=4*np.pi/5,
         edge_alpha[edge] = vertex_alpha[edge.source()]
         edge_height[edge] = (depth[edge.source()]
                              + depth[edge.target()]) * 0.5
-        
+
     vertex_alpha.a *= (1 - eptm.is_cell_vert.a)
 
-    vorder = eptm.graph.new_vertex_property('float') 
+    vorder = eptm.graph.new_vertex_property('float')
     vorder.a = np.argsort(vertex_alpha.a)
 
 
@@ -536,25 +537,29 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=4*np.pi/5,
     eptm.graph.set_edge_filter(None)
 
 
-    eorder = eptm.graph.new_edge_property('float') 
+    eorder = eptm.graph.new_edge_property('float')
     eorder.a = np.argsort(edge_alpha.a)
-    
+
     vertex_rgba = [vertex_red, vertex_green, vertex_blue, vertex_alpha]
     vertex_color = gt.group_vector_property(vertex_rgba, value_type='float')
     edge_rgba = [edge_red, edge_green, edge_blue, edge_alpha]
     edge_color = gt.group_vector_property(edge_rgba, value_type='float')
-    
+
     xy = [pseudo_x, pseudo_y]
     pseudo3d_pos = gt.group_vector_property(xy, value_type='float')
+    eptm.graph.set_vertex_filter(vfilt)
+    eptm.graph.set_edge_filter(efilt)
     pmap = gt.graph_draw(eptm.graph, pseudo3d_pos,
                          vertex_fill_color=vertex_color,
                          vertex_color=vertex_color,
-                         edge_pen_width=edge_width, 
+                         edge_pen_width=edge_width,
                          edge_color=edge_color,
                          vertex_size=vertex_size,
                          vorder=vorder, eorder=eorder,
-                         output=output3d)
+                         output=output3d,  **kwargs)
     if verbose: print('saved tissue to %s' % output3d)
+    eptm.graph.set_vertex_filter(None)
+    eptm.graph.set_edge_filter(None)
 
     #### 2D view
     eptm.rotate(-np.pi / 2)
@@ -579,7 +584,7 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=4*np.pi/5,
                           eptm.junctions.line_tensions.fa.mean())**0.5
     eptm.graph.set_edge_filter(None)
 
-    
+
     sigma = eptm.proj_sigma()
     zs = [zeds, sigma]
     zs_pos = gt.group_vector_property(zs, value_type='float')
@@ -587,42 +592,45 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=4*np.pi/5,
     edge_alpha.a = 1.
     edge_alpha.a *= (1 - eptm.at_boundary.a)
     edge_alpha.a *= eptm.is_junction_edge.a
-    
+
     edge_rgba = [edge_red, edge_green, edge_blue, edge_alpha]
     edge_color = gt.group_vector_property(edge_rgba, value_type='float')
-    
+    eptm.graph.set_vertex_filter(vfilt)
+    eptm.graph.set_edge_filter(efilt)
     pmap2 = gt.graph_draw(eptm.graph, zs_pos,
                           vertex_fill_color=vertex_color,
                           vertex_color=vertex_color,
-                          edge_pen_width=edge_width, 
+                          edge_pen_width=edge_width,
                           edge_color=edge_color,
                           vertex_size=vertex_size,
                           vorder=vorder, eorder=eorder,
-                          output=output2d)
+                          output=output2d,  **kwargs)
     if verbose: print('saved tissue to %s' % output2d)
+    eptm.graph.set_vertex_filter(None)
+    eptm.graph.set_edge_filter(None)
     del pmap, pmap2
     eptm.graph.set_directed(True)
     eptm.rotate(np.pi / 2)
-    
+
 def cylindrical2cartesian(rtz):
     """
     Transforms cylindrical coordinates
     ::math:(\rho, \theta, z):
     into cartesian ::math:(x, y, z):
     """
-    
+
     xs = rtz['rho'] * np.cos(rtz['theta'])
     ys = rtz['rho'] * np.sin(rtz['theta'])
     zeds = rtz['zed']
     num_points = rtz.shape[0]
-    
+
     xyz_dtype = np.dtype([('ix', FLOAT),
                           ('wy', FLOAT),
                           ('zed',FLOAT)])
     xyz = np.zeros((num_points,), dtype=xyz_dtype)
     xyz['ix'] = xs
     xyz['wy'] = ys
-    xyz['zed'] = zeds   
+    xyz['zed'] = zeds
     return xyz
 
 def vertices_projections(rtz, **kwards):
@@ -650,8 +658,8 @@ def vertices_projections(rtz, **kwards):
     ax_3d.set_aspect('equal')
     ax_3d.set_xlabel(u'Anterior - posterior axis (µm)')
     ax_3d.set_ylabel(u'Ventral - dorsal axis (µm)')
-    ax_3d.set_zlabel(u'Proximal - distal axis (µm)')    
-    
+    ax_3d.set_zlabel(u'Proximal - distal axis (µm)')
+
     curv_ax = axes[0,1]
     curv_ax.plot(rtz['zed'], rtz['rho'] *  rtz['theta'],
                  'o-', alpha=0.3)
@@ -684,9 +692,9 @@ def vertices_scatterplot(rtz, **kwargs):
     ax_3d.set_aspect('equal')
     ax_3d.set_xlabel(u'Anterior - posterior axis (µm)')
     ax_3d.set_ylabel(u'Ventral - dorsal axis (µm)')
-    ax_3d.set_zlabel(u'Proximal - distal axis (µm)')    
+    ax_3d.set_zlabel(u'Proximal - distal axis (µm)')
     plt.show()
-    return fig, ax_3d 
+    return fig, ax_3d
 
 def plot_validation(eptm):
     vfilt = eptm.is_cell_vert.copy()
