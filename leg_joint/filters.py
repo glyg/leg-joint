@@ -3,7 +3,7 @@
 from graph_tool import Graph, GraphView
 import numpy as np
 
-def local_slice(eptm, theta_c=0, theta_amp=np.pi/24, 
+def local_slice(eptm, theta_c=0, theta_amp=np.pi/24,
                 zed_c=0, zed_amp=None):
     ''' Mark as local a 'slice' of the epithelium, with
     zed = zed_c +/- zed_amp and theta = theta_c +/- theta_amp
@@ -20,7 +20,7 @@ def local_slice(eptm, theta_c=0, theta_amp=np.pi/24,
     else:
         zed_min = zed_c - zed_amp
         zed_max = zed_c + zed_amp
-        
+
     slice_cells = [cell for cell in eptm.cells
                    if (theta_min < eptm.thetas[cell] < theta_max)
                    and (zed_min < eptm.zeds[cell] < zed_max)]
@@ -34,9 +34,9 @@ def focus_on_cell(eptm, cell, radius):
     theta_amp = radius / eptm.rhos[cell]
     zed_c = eptm.zeds[cell]
     zed_amp = radius
-    local_slice(eptm, theta_c, theta_amp, 
+    local_slice(eptm, theta_c, theta_amp,
                 zed_c, zed_amp)
-        
+
 #####  Decorators
 def local(meth):
     def new_function(self, *args, **kwargs):
@@ -51,7 +51,7 @@ def local(meth):
         self.graph.set_edge_filter(prev_estate, prev_inverted_e)
         return out
     return new_function
-    
+
 
 def active(meth):
     def new_function(self, *args, **kwargs):
@@ -150,7 +150,7 @@ class EpitheliumFilters(object):
         else:
             self._get_edge_filters()
             self._get_vertex_filters()
-            
+
     def _init_edge_filters(self):
         self.is_junction_edge = self.graph.new_edge_property('bool')
         self.is_junction_edge.a[:] = 0
@@ -229,7 +229,7 @@ class EpitheliumFilters(object):
         else:
             return self.any_edge(vertex0, vertex1)
 
-            
+
     def new_vertex(self, source_vertex):
         new_v = self.graph.add_vertex()
         for prop in self.graph.vertex_properties.values():
@@ -303,7 +303,7 @@ class EpitheliumFilters(object):
                                                            jv)] = 1
                     for je in self.cells.junctions[neighb_cell]:
                         self.is_local_edge[je] = 1
-                    
+
             for edge in j_vert.all_edges():
                 self.is_active_edge[edge] = 1
         if wider:

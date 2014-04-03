@@ -94,8 +94,10 @@ def plot_avg_rho(eptm, bin_width, ax=None, retall=False, ls='r-'):
     return ax, (zeds_avg, rhos_avg, rhos_max, rhos_min)
 
 def draw_polygons(eptm, coord1, coord2, colors,
-                  vfilt=None, ax=None, normalize=True, **kwargs):
-
+                  vfilt=None, ax=None, normalize=True,
+                  cmap='jet',
+                  **kwargs):
+    cmap = plt.get_cmap(cmap)
     eptm.graph.set_vertex_filter(vfilt)
     eptm.update_dsigmas()
     polygons = [eptm.cells.polygon(cell, coord1, coord2)[0]
@@ -106,7 +108,7 @@ def draw_polygons(eptm, coord1, coord2, colors,
     if normalize:
         colors -= colors.min()
         colors /= colors.max()
-    colors = plt.cm.jet(colors)
+    colors = cmap(colors)
     eptm.graph.set_vertex_filter(None)
 
     if ax is None:
@@ -352,17 +354,18 @@ def plot_cells_generic(eptm, xcoord, ycoord, ax=None,
 
 def plot_edges_generic(eptm, xcoord, ycoord, efilt=None,
                        ax=None, j_text=False,
-                       edge_color=None, edge_alpha=None, **kwargs):
+                       edge_color=None, edge_alpha=None,
+                       cmap='jet', **kwargs):
     if ax is None:
         fig, ax = plt.subplots(1,1)
-
+    cmap = plt.get_cmap(cmap)
     eptm.graph.set_edge_filter(efilt)
     eptm.graph.set_vertex_filter(None)
     # edge_width = eptm.junctions.line_tensions.copy()
     # edge_width.fa = 2. * (eptm.junctions.line_tensions.fa
     #                       / eptm.junctions.line_tensions.fa.mean())**0.5
     if edge_color is not None:
-        depth_cmap = plt.cm.jet(edge_color.fa)
+        depth_cmap = cmap(edge_color.fa)
         edge_red = edge_color.copy()
         edge_red.fa = depth_cmap[:, 0]
         edge_green = edge_color.copy()

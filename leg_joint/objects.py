@@ -54,8 +54,8 @@ class AbstractRTZGraph(object):
     edge_lengths: edge PropertyMap giving the edge lengths
 
     u_dixs, u_dwys, ...: Coordinates of the unitary vector colinear to an edge
-    
-    
+
+
     Methods:
     ===========
 
@@ -72,19 +72,19 @@ class AbstractRTZGraph(object):
         self.current_angle = 0
         if self.new :
             self._init_edge_bool_props()
-            self._init_vertex_geometry()            
+            self._init_vertex_geometry()
             self._init_edge_geometry()
         else:
             self._get_edge_bool_props()
-            self._get_vertex_geometry()            
+            self._get_vertex_geometry()
             self._get_edge_geometry()
-            
+
         ## Properties that are not internalized
         ### edge properties from vertex properties
         self.edge_src_rhos = self.graph.new_edge_property('float')
         self.edge_trgt_rhos = self.graph.new_edge_property('float')
         self.rho_lumen = self.params['rho_lumen']
-            
+
     def _init_edge_bool_props(self):
         '''
         Creates the edge boolean PropertyMaps
@@ -99,7 +99,7 @@ class AbstractRTZGraph(object):
     def _get_edge_bool_props(self):
         self.at_boundary = self.graph.edge_properties["at_boundary"]
         self.is_new_edge = self.graph.edge_properties["is_new_edge"]
-        
+
     def _init_vertex_geometry(self):
         '''Creates the vertices geometric property maps
         '''
@@ -127,11 +127,11 @@ class AbstractRTZGraph(object):
         self.sigmas = self.graph.vertex_properties["sigmas"]
         self.ixs = self.graph.vertex_properties["ixs"]
         self.wys = self.graph.vertex_properties["wys"]
-        
+
     def _init_edge_geometry(self):
         '''Creates the edge geometric property maps
         '''
-        # deltas 
+        # deltas
         self.dthetas = self.graph.new_edge_property('float')
         self.graph.edge_properties["dthetas"] = self.dthetas
         self.dsigmas = self.graph.new_edge_property('float')
@@ -149,7 +149,7 @@ class AbstractRTZGraph(object):
         self.edge_lengths = self.graph.new_edge_property('float')
         self.graph.edge_properties["edge_lengths"] = self.edge_lengths
 
-        # unitary vectors 
+        # unitary vectors
         self.u_dsigmas = self.graph.new_edge_property('float')
         self.graph.edge_properties["u_dsigmas"] = self.u_dsigmas
         self.u_dzeds = self.graph.new_edge_property('float')
@@ -165,7 +165,7 @@ class AbstractRTZGraph(object):
         '''
         Creates attributes from  the  geometric property maps
         '''
-        # deltas 
+        # deltas
         self.dthetas = self.graph.edge_properties["dthetas"]
         self.dsigmas = self.graph.edge_properties["dsigmas"]
         self.dzeds = self.graph.edge_properties["dzeds"]
@@ -175,13 +175,13 @@ class AbstractRTZGraph(object):
 
         # Edge lengths
         self.edge_lengths = self.graph.edge_properties["edge_lengths"]
-        # unitary vectors 
+        # unitary vectors
         self.u_dsigmas = self.graph.edge_properties["u_dsigmas"]
         self.u_dzeds = self.graph.edge_properties["u_dzeds"]
         self.u_drhos = self.graph.edge_properties["u_drhos"]
         self.u_dixs = self.graph.edge_properties["u_dixs"]
         self.u_dwys = self.graph.edge_properties["u_dwys"]
-        
+
     def scale(self, scaling_factor):
         '''Multiply all the distances by a factor `scaling_factor`
 
@@ -223,7 +223,7 @@ class AbstractRTZGraph(object):
         log.debug('Number of closest vertices found: %i, %i'
                   % (len(s_matches), len(z_matches)))
         return [v for v in s_matches if v in z_matches][0]
-        
+
     def periodic_boundary_condition(self):
         '''
         Applies the periodic boundary condition
@@ -237,7 +237,7 @@ class AbstractRTZGraph(object):
         self.sigmas.a = self.thetas.a * self.rhos.a
         self.update_xy()
 
-        
+
     def any_edge(self, v0, v1):
         '''
         Returns the edge between vertices v0 and v1 if it exists,
@@ -256,8 +256,8 @@ class AbstractRTZGraph(object):
         rho_mean = self.rhos.a.mean()
         sigmas = self.thetas.copy()
         sigmas.a = self.thetas.a * rho_mean
-        return sigmas 
-        
+        return sigmas
+
     # For clarity reason, those are not properties and return copies
     def rtz_pos(self):
         """
@@ -296,14 +296,14 @@ class AbstractRTZGraph(object):
         self.ixs.a, self.wys.a = to_xy(self.rhos.a, self.thetas.a)
 
     def edge_difference(self, vprop, eprop=None):
-        
+
         vtype = vprop.value_type()
         if eprop == None:
             eprop = self.graph.new_edge_property(vtype)
         for e in self.graph.edges():
             eprop[e] = vprop[e.target()] - vprop[e.source()]
         return eprop
-        
+
     def update_deltas(self):
         ''' Updates the edge coordinates from their vertices posittions'''
         dzeds = self.edge_difference(self.zeds)
@@ -315,7 +315,7 @@ class AbstractRTZGraph(object):
         self.dwys.fa = dwys.fa
 
     def update_dsigmas(self):
-    
+
         drhos = self.edge_difference(self.rhos)
         self.drhos.a = drhos.a
 
@@ -325,7 +325,7 @@ class AbstractRTZGraph(object):
 
         edge_src_rhos = self.edge_src_rhos.a
         edge_trgt_rhos = self.edge_trgt_rhos.a
-        
+
         dthetas = self.edge_difference(self.thetas)
         dsigmas = self.edge_difference(self.sigmas)
 
@@ -337,7 +337,7 @@ class AbstractRTZGraph(object):
         dthetas.a[lower_than] += tau
         dsigmas.a[lower_than] += tau * edge_src_rhos[lower_than]
         at_boundary[lower_than] = 1
-        
+
         higher_than = [dthetas.a > tau/2.]
         dthetas.a[higher_than] -= tau
         dsigmas.a[higher_than] -= tau * edge_trgt_rhos[higher_than]
@@ -346,7 +346,7 @@ class AbstractRTZGraph(object):
         self.dthetas.a = dthetas.a
         self.dsigmas.a = dsigmas.a
         self.at_boundary.a = at_boundary
-        
+
     def update_edge_lengths(self):
         edge_lengths = np.sqrt(self.dixs.a**2
                                + self.dwys.a**2
@@ -355,7 +355,7 @@ class AbstractRTZGraph(object):
         self.u_dwys.a = self.dwys.a / edge_lengths
         self.u_dzeds.a = self.dzeds.a / edge_lengths
         self.edge_lengths.a = edge_lengths
-        
+
     def out_delta_sz(self, vertex0, vertex1 ):
         edge01 = self.graph.edge(vertex0, vertex1)
         if edge01 is not None:
@@ -366,7 +366,7 @@ class AbstractRTZGraph(object):
             return np.array([-self.dsigmas[edge10],
                              -self.dzeds[edge10]])
         return
-        
+
     def rtz_record_array(self):
         rtz_dtype = [('rho', np.float32),
                      ('theta', np.float32),
@@ -426,7 +426,7 @@ class Triangle(object):
 
     Attributes:
     ===========
-    eptm : a :class:`Epithelium` instance containing the triangle  
+    eptm : a :class:`Epithelium` instance containing the triangle
     cell : the `cell` vertex forming one of the triangle's corner
     j_edge : the junction edge forming the triangle side
         opposing the cell vertex
@@ -439,8 +439,8 @@ class Triangle(object):
         :math:`(r_{\alpha i} \times r_{\alpha j})`
     area : float, the triangle area
     u_cross : ndarray, the unitary vector colinear to the cross product
-    
-    
+
+
 
     Method:
     =======
@@ -448,21 +448,21 @@ class Triangle(object):
     update_geometry
     '''
     def __init__(self, eptm, cell, j_edge):
-        
+
         self.eptm = eptm
         self.cell  = cell
         self.j_edge = j_edge
         self.ctoj_edges = [eptm.graph.edge(self.cell, j_edge.source()),
                            eptm.graph.edge(self.cell, j_edge.target())]
         self.update_geometry()
-        
+
     def update_geometry(self):
         ctoj0, ctoj1 = self.ctoj_edges
-        self.deltas = np.array([[self.eptm.dixs[ctoj0], 
-                                 self.eptm.dwys[ctoj0], 
+        self.deltas = np.array([[self.eptm.dixs[ctoj0],
+                                 self.eptm.dwys[ctoj0],
                                  self.eptm.dzeds[ctoj0]],
-                                [self.eptm.dixs[ctoj1], 
-                                 self.eptm.dwys[ctoj1], 
+                                [self.eptm.dixs[ctoj1],
+                                 self.eptm.dwys[ctoj1],
                                  self.eptm.dzeds[ctoj1]]])
         self.rij_vect = np.array([self.eptm.dixs[self.j_edge],
                                   self.eptm.dwys[self.j_edge],
@@ -476,7 +476,7 @@ class Triangle(object):
         self.height = self.eptm.rhos[self.cell] - self.eptm.rho_lumen
         self.vol = self.height * self.area
         self.length = self.eptm.edge_lengths[self.j_edge]
-        
+
 class Diamond(object):
     '''a :class:`Diamond` instance is constituted of a junction edge
     and its two adjacent cells. It is the union of two
@@ -506,7 +506,7 @@ class Diamond(object):
 
 class Cells():
     '''
-    
+
     '''
     def __init__(self, eptm):
         self.eptm = eptm
@@ -517,7 +517,7 @@ class Cells():
             if self.eptm.generate:
                 n_sigmas, n_zeds = (self.eptm.params['n_sigmas'],
                                     self.eptm.params['n_zeds'])
-            
+
                 rhos, sigmas, zeds = self._generate_rsz(n_sigmas, n_zeds)
                 rsz = rhos, sigmas, zeds
                 self.eptm.graph = self._generate_graph(rsz)
@@ -541,7 +541,7 @@ class Cells():
 
         self.junctions = self.eptm.graph.new_vertex_property('object')
         self.num_sides = self.eptm.graph.new_vertex_property('int')
-        
+
 
     def __iter__(self):
         # for vertex in gt.find_vertex(self.eptm.graph,
@@ -555,15 +555,15 @@ class Cells():
                                      self.eptm.is_local_vert, 1):
             if self.eptm.is_cell_vert[vertex]:
                 yield vertex
-                
+
     def _init_cell_geometry(self):
         '''
-        Creates the `areas`, `vols` and `perimeters` properties 
+        Creates the `areas`, `vols` and `perimeters` properties
         '''
         area0 = self.params['prefered_area']
         height0 = self.params['prefered_height']
         self.areas = self.eptm.graph.new_vertex_property('float')
-        
+
         self.areas.a[:] = area0
         self.eptm.graph.vertex_properties["areas"] = self.areas
 
@@ -580,7 +580,7 @@ class Cells():
         self.areas = self.eptm.graph.vertex_properties["areas"]
         self.perimeters = self.eptm.graph.vertex_properties["perimeters"]
         self.vols = self.eptm.graph.vertex_properties["vols"]
-        
+
     def _init_cell_params(self):
         '''
         Creates the parameter dependant propery maps
@@ -591,8 +591,8 @@ class Cells():
         self.prefered_vol = self.eptm.graph.new_vertex_property('float')
         self.prefered_vol.a[:] = vol0
         self.eptm.graph.vertex_properties["prefered_vol"] = self.prefered_vol
-        
-        contractility0 = self.params['contractility']        
+
+        contractility0 = self.params['contractility']
         self.contractilities =self.eptm.graph.new_vertex_property('float')
         self.contractilities.a[:] = contractility0
         self.eptm.graph.vertex_properties["contractilities"]\
@@ -617,7 +617,7 @@ class Cells():
             = self.eptm.graph.vertex_properties["vol_elasticities"]
         self.ages = self.eptm.graph.vertex_properties["ages"]
 
-        
+
     def _generate_rsz(self, n_sigmas=5, n_zeds=20):
 
         lambda_0 = self.eptm.params['lambda_0']
@@ -627,7 +627,7 @@ class Cells():
         self.eptm.rho_lumen = rho_c - height0
         delta_sigma = 2 * np.pi * rho_c / n_sigmas
         delta_z = delta_sigma * np.sqrt(3)/2.
-        
+
         self.n_zeds = int(n_zeds)
         self.n_sigmas = int(n_sigmas)
         log.info('''Creating a %i x %i cells lattice'''
@@ -673,18 +673,18 @@ class Cells():
                     j_edges.append(j_edge)
         return j_edges
 
-    def anisotropy(self, cell):
+    def anisotropy(self, cell, sigmas):
 
         # rhos = np.array([self.eptm.rhos[jv]
         #                  for jv in cell.out_neighbours()])
         zeds = np.array([self.eptm.zeds[jv]
                          for jv in cell.out_neighbours()])
-        ixs = np.array([self.eptm.ixs[jv]
-                        for jv in cell.out_neighbours()])
-        wys = np.array([self.eptm.wys[jv]
-                        for jv in cell.out_neighbours()])
+        sigmas = np.array([sigmas[jv]
+                           for jv in cell.out_neighbours()])
+        # wys = np.array([self.eptm.wys[jv]
+        #                 for jv in cell.out_neighbours()])
         # sigmas = np.arctan2(wys, ixs) * rhos.mean()
-        pos = np.vstack((ixs, wys, zeds)).T
+        pos = np.vstack((zeds, sigmas)).T
         if pos.shape[0] > 0:
             pca = PCA(n_components=3)
             pca_pos = pca.fit_transform(pos)
@@ -695,6 +695,8 @@ class Cells():
         return 0, 0
 
     def get_anisotropies(self):
+
+        sigmas = self.eptm.proj_sigma()
         anisotropies = self.areas.copy()
         anisotropies.a[:] = 0
         alignements = anisotropies.copy()
@@ -708,7 +710,7 @@ class Cells():
     def is_boundary(self, cell):
         return  any([self.eptm.at_boundary[ctoj]
                      for ctoj in cell.out_edges()])
-        
+
     def polygon(self, cell, coord1, coord2):
 
         rel_sz = np.array([[self.eptm.dsigmas[ctoj],
@@ -735,7 +737,7 @@ class Cells():
             elif len(adj) == 1:
                 neighbors.append(adj[0])
         return neighbors
-        
+
 class ApicalJunctions():
 
     def __init__(self, eptm):
@@ -751,9 +753,9 @@ class ApicalJunctions():
             self._init_junction_params()
         else:
             self._get_junction_params()
-    
+
     def __iter__(self):
-        
+
         for edge in self.eptm.graph.edges():
             if self.eptm.is_junction_edge[edge] :
                 yield edge
@@ -763,9 +765,9 @@ class ApicalJunctions():
                                  self.eptm.is_local_edge, 1):
             if self.eptm.is_junction_edge[edge] :
                 yield edge
-                
+
     def _init_junction_params(self):
-                                 
+
         line_tension0 = self.eptm.params['line_tension']
         self.line_tensions = self.eptm.graph.new_edge_property('float')
         self.line_tensions.a[:] = line_tension0
@@ -782,7 +784,7 @@ class ApicalJunctions():
             = self.eptm.graph.edge_properties["line_tensions"]
         self.radial_tensions\
             = self.eptm.graph.vertex_properties["radial_tensions"]
-        
+
 
     def update_adjacent(self, j_edge):
         adj_cells = self.get_adjacent_cells(j_edge)
@@ -799,7 +801,7 @@ class ApicalJunctions():
                    if self.eptm.is_cell_vert[cell]]
         common_cells = [cell for cell in cells_a if cell in cells_b]
         return common_cells
-                
+
     def _compute_voronoi(self):
         n_dropped = 0
         eptm = self.eptm
@@ -831,7 +833,7 @@ class ApicalJunctions():
         cutoff = eptm.params['pos_cutoff']
         vecinos = [v for v in eptm.ordered_neighbours(cell)
                    if eptm.is_cell_vert[v]]#that's ordered
-        
+
         num_vecinos = len(vecinos)
         new_jvs = []
         new_ctoj_edges = []
@@ -857,7 +859,7 @@ class ApicalJunctions():
                    + eptm.rhos[vecino0] + eptm.rhos[vecino1]) / 3.
             try:
                 theta = sigma / rho
-            except ZeroDivisionError: 
+            except ZeroDivisionError:
                 log.warning('Error computing thetas')
                 theta = 0
             # new junction vertex here
@@ -875,7 +877,7 @@ class ApicalJunctions():
         for (cell, jv) in new_ctoj_edges:
             eptm.new_ctoj_edge(cell, jv)
         return new_jvs, new_ctoj_edges, n_dropped
-        
+
     def _voronoi_edges(self, ctoj_edge):
         eptm = self.eptm
         cell0 = ctoj_edge.source()
@@ -899,11 +901,14 @@ class ApicalJunctions():
                 dropped += 1
         return new_edges, dropped
 
-def fit_ellipse():
+def fit_ellipse(zeds, sigmas):
+    """
+    """
+
     pass
 
-        
-        
+
+
 # def c_circumcircle(sz0, sz1, sz2, cutoff):
 
 #     c_code = '''
@@ -915,7 +920,7 @@ def fit_ellipse():
 #     double zed1 = sz1[1];
 #     double zed2 = sz2[1];
 
-    
+
 #     double x1 = sigma1 - sigma0;
 #     double y1 = zed1 - zed0;
 #     double x2 = sigma2 - sigma0;
@@ -925,13 +930,13 @@ def fit_ellipse():
 #     double yc;
 
 #     if (y1*y1 < cutoff*cutoff
-#         && y2*y2 > cutoff*cutoff) 
+#         && y2*y2 > cutoff*cutoff)
 #         {
 #         xc = x1 / 2.;
 #         yc = (x2*x2 + y2*y2 - x2*x1)/(2*y2);
 #         }
 #     else if (y2*y2 < cutoff*cutoff
-#              && y1*y1 > cutoff*cutoff) 
+#              && y1*y1 > cutoff*cutoff)
 #         {
 #         xc = x2 / 2.;
 #         yc = (x1*x1 + y1*y1 - x1*x2)/(2*y1);
@@ -954,7 +959,7 @@ def fit_ellipse():
 #            }
 #        xc = (b1 - b2) / (a2 - a1);
 #        yc = a1 * xc + b1;
-#        } 
+#        }
 #        py::tuple results(2);
 #        results[0] = xc + sigma0;
 #        results[1] = yc + zed0;
@@ -966,7 +971,7 @@ def fit_ellipse():
 #                         headers=['<math.h>'])
 
 # def dist_rtz(rtz0, rtz1):
-    
+
 #     c_code = '''
 #     double r0 = rtz0[0];
 #     double t0 = rtz0[1];
