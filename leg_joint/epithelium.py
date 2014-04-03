@@ -47,7 +47,7 @@ class Epithelium(EpitheliumFilters,
                  Dynamics):
     """The :class:`Epithelium` class is the container for all the simulation.
     It inherits attributes form the following classes:
-    
+
     * :class:`EpitheliumFilters`, providing utilities to create and
         filter the graph edges and vertices.
     * :class:`AbstractRTZGraph` containing the geometrical aspects of
@@ -56,14 +56,14 @@ class Epithelium(EpitheliumFilters,
         functions to compute the energy and the gradients.
 
     Please refer to those classes documentations for more details.
-    
+
     The main attribute of the :class:`Epithelium` is a `graph_tool`
     :class:`gt.Graph` instance. The epithelium graph is oriented and
     contains two types of vertices:
 
      1 the cell centers, with their properties contained
        in a :class:`Cells` instance
-    
+
      2 the apical vertices
 
     Each cell is linked to each of its vertices by
@@ -77,7 +77,7 @@ class Epithelium(EpitheliumFilters,
 
     def __init__(self, graphXMLfile=None, identifier='0',
                  paramtree=None,
-                 paramfile=PARAMFILE,
+                 paramfile=PARAMFILE, copy=True,
                  graph=None, verbose=False, **params):
         """
         Parameters
@@ -112,14 +112,20 @@ class Epithelium(EpitheliumFilters,
             except KeyError:
                 pass
         self.params = self.paramtree.absolute_dic
-        self.set_identifier(identifier)
+        if copy or graphXMLfile is None:
+            self.set_identifier(identifier)
+        else:
+            xml_path = os.path.abspath(graphXMLfile)
+            splitted = xml_path.split(os.path.sep)
+            self.identifier = splitted[-3]
+            self.save_dir = os.path.sep.join(splitted[:-2])
         self.stamp = 0
         log.info('Instanciating epithelium %s' % identifier)
 
-        self._init_paths()
+        self._init_paths(copy)
         self._set_logger()
         self.log = log
-        
+
         # Graph instanciation
         if graph is None and graphXMLfile is None:
             log.info('Created new graph')
@@ -172,9 +178,9 @@ class Epithelium(EpitheliumFilters,
             self.periodic_boundary_condition()
         log.info('Update geometry')
         self.update_geometry()
-        
+
     def __str__(self):
-        
+
         num_cells = self.is_cell_vert.fa.sum()
         num_edges = self.is_junction_edge.fa.sum()
         str1 = ['<Epithelium with %i cells and %i junction edges'
@@ -194,14 +200,14 @@ class Epithelium(EpitheliumFilters,
         return '\n'.join(str1)
 
     def set_identifier(self, identifier='', reset=True):
-        if not hasattr(self, 'identifier'):
+        if reset:
             now = datetime.datetime.isoformat(
                 datetime.datetime.utcnow())
             time_tag = '_'.join(now.split(':')).split('.')[0]
             self.identifier = '_'.join((identifier, time_tag))
 
     def _set_logger(self):
-        
+
         fh = logging.FileHandler(self.paths['log'])
         fh.setLevel(logging.INFO)
         # create formatter and add it to the handlers
@@ -213,14 +219,14 @@ class Epithelium(EpitheliumFilters,
         # add the handlers to the logger
         log.addHandler(fh)
 
-    
+
     def dump_json(self, parameters):
 
         with open(self.paths['json'], 'w+') as json_file:
             json.dump(parameters, json_file, sort_keys=True)
             log.info('Wrote %s' % self.paths['json'])
 
-    def _init_paths(self):
+    def _init_paths(self, copy):
         '''Creates the paths where graphs will be saved.
 
         The root directory is stored as a string in the
@@ -228,7 +234,7 @@ class Epithelium(EpitheliumFilters,
         the `self.paths` dictionnary.
 
         `self.paths` contains the following keys:
-        
+
         * 'png', 'pdf', 'svg' are paths to _directories_ where
            graph representations will be stored.
 
@@ -240,16 +246,17 @@ class Epithelium(EpitheliumFilters,
         for more details).
 
         '''
-        self.save_dir = os.path.join(GRAPH_SAVE_DIR, self.identifier)
+        if not copy:
+            self.save_dir = os.path.join(GRAPH_SAVE_DIR, self.identifier)
+            if not os.path.isdir(self.save_dir):
+                os.mkdir(self.save_dir)
         self.paths = {'root': os.path.abspath(self.save_dir)}
-        if not os.path.isdir(self.save_dir):
-            os.mkdir(self.save_dir)
         for filetype in ['png', 'pdf', 'svg', 'xml']:
             subdir = os.path.join(self.save_dir, filetype)
             if not os.path.isdir(subdir):
                 os.mkdir(subdir)
             self.paths[filetype] = os.path.abspath(subdir)
-        
+
         store = os.path.join(self.save_dir,
                              'eptm_%s.h5' % self.identifier)
         self.paths['hdf'] = os.path.abspath(store)
@@ -257,15 +264,15 @@ class Epithelium(EpitheliumFilters,
                                          'params_%s.json' % self.identifier)
         self.paths['log'] = os.path.join(self.save_dir,
                                          '%s.log' % self.identifier)
-        
-        
+
+
     def update_geometry(self):
         '''
         Computes cell positions (at the geometrical center
         of the junction vertices), the edge lengths and the
         cell geometry (area and volume)
         '''
-        
+
         self.update_cells_pos()
         self.update_rhotheta()
         self.update_deltas()
@@ -277,7 +284,7 @@ class Epithelium(EpitheliumFilters,
         # cells
         for cell in self.cells:
             self._one_cell_geom(cell)
-            
+
     def _one_cell_geom(self, cell):
         """
         """
@@ -302,7 +309,7 @@ class Epithelium(EpitheliumFilters,
                     self.cells.vols[cell] += tr.vol
                 except KeyError:
                     pass
-                    
+
     def set_new_pos(self, new_xyz_pos):
         '''
         Modifies the position of the **active** junction vertices
@@ -314,11 +321,11 @@ class Epithelium(EpitheliumFilters,
             new positions in the cartesian coordinate system
         '''
         self._set_junction_pos(new_xyz_pos)
-        
+
     @active
     def _set_junction_pos(self, new_xyz_pos):
         new_xyz_pos = new_xyz_pos.flatten()
-        
+
         if not np.all(np.isfinite(new_xyz_pos)):
             log.critical('''Non finite value for vertices {}'''.format(
                 ', '.join(str(jv) for jv in self.graph.vertices())))
@@ -330,14 +337,14 @@ class Epithelium(EpitheliumFilters,
     def update_cells_pos(self):
         for cell in self.cells:
             self._set_cell_pos(cell)
-    
+
     def _set_cell_pos(self, cell):
         j_xyz = np.array([[self.ixs[jv], self.wys[jv], self.zeds[jv]]
                           for jv in cell.out_neighbours()])
         if len(j_xyz) < 3:
             return
         self.ixs[cell], self.wys[cell], self.zeds[cell] = j_xyz.mean(axis=0)
-        
+
     def reset_topology(self, local=True):
         '''Computes the epithelium topology, by finding *de novo* the
         cell's junction edges and the adjacent cells for each junction
@@ -354,7 +361,7 @@ class Epithelium(EpitheliumFilters,
                 self.cells.update_junctions(cell)
             for j_edge in self.junctions:
                 self.junctions.update_adjacent(j_edge)
-            
+
     def add_junction(self, j_verta, j_vertb, cell0, cell1):
         '''Adds a junction to the epithelium, creating a junction edge
         between `j_verta` and `j_vertb`, cell to junction edges
@@ -374,7 +381,7 @@ class Epithelium(EpitheliumFilters,
         j_edgeab = self.graph.edge(j_verta, j_vertb)
         if j_edgeab is not None:
             if self.__verbose__:
-                warnings.warn('''Previous %s to %s 
+                warnings.warn('''Previous %s to %s
                              edge is re-created.'''
                              % (str(j_verta), str(j_vertb)))
             self.graph.remove_edge(j_edgeab)
@@ -405,7 +412,7 @@ class Epithelium(EpitheliumFilters,
         if ctoj_0b is not None:
             self.graph.remove_edge(ctoj_0b)
         ctoj_0b = self.graph.add_edge(cell0, j_vertb)
-            
+
         for e_prop in self.graph.edge_properties.values():
             e_prop[ctoj_0a] = e_prop[ctoj_old]
             e_prop[ctoj_0b] = e_prop[ctoj_old]
@@ -433,7 +440,7 @@ class Epithelium(EpitheliumFilters,
         corresponding cell to junction edges for `cell0` and
         `cell1`
         '''
-        
+
         #This block should go in a decorator
         valid = np.array([element.is_valid() for element in
                           (cell0, j_verta, j_vertb)])
@@ -478,7 +485,7 @@ class Epithelium(EpitheliumFilters,
         je = self.any_edge(jv0, jv1)
         if je is None:
             raise ValueError('Can only merge connected edges')
-            
+
         edge_trash.append(je)
         for vert in jv1.out_neighbours():
             old_edge = self.graph.edge(jv1, vert)
@@ -513,7 +520,7 @@ def hdf_snapshot(func, *args, **kwargs):
         # self.graph.set_vertex_filter(None)
         # self.graph.set_edge_filter(None)
 
-        store = self.paths['hdf'] 
+        store = self.paths['hdf']
         hdfgraph.graph_to_hdf(self.graph, store,
                               stamp=self.stamp,
                               reset=False)
