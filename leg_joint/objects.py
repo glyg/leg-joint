@@ -18,6 +18,7 @@ pyximport.install()
 
 import os
 import numpy as np
+import scipy as sp
 
 import graph_tool.all as gt
 #from scipy import weave, spatial
@@ -673,39 +674,17 @@ class Cells():
                     j_edges.append(j_edge)
         return j_edges
 
-    def anisotropy(self, cell, sigmas):
-
-        # rhos = np.array([self.eptm.rhos[jv]
-        #                  for jv in cell.out_neighbours()])
-        zeds = np.array([self.eptm.zeds[jv]
-                         for jv in cell.out_neighbours()])
-        sigmas = np.array([sigmas[jv]
-                           for jv in cell.out_neighbours()])
-        # wys = np.array([self.eptm.wys[jv]
-        #                 for jv in cell.out_neighbours()])
-        # sigmas = np.arctan2(wys, ixs) * rhos.mean()
-        pos = np.vstack((zeds, sigmas)).T
-        if pos.shape[0] > 0:
-            pca = PCA(n_components=3)
-            pca_pos = pca.fit_transform(pos)
-            delta_x = np.ptp(pca_pos[:, 0])
-            delta_y = np.ptp(pca_pos[:, 1])
-            alignement = np.abs(pca.components_[:, 0][0])
-            return delta_x / delta_y, alignement
-        return 0, 0
-
-    def get_anisotropies(self):
-
-        sigmas = self.eptm.proj_sigma()
+    def get_anisotropies(self, coords):
         anisotropies = self.areas.copy()
         anisotropies.a[:] = 0
-        alignements = anisotropies.copy()
+        orientation = anisotropies.copy()
         self.eptm.update_rhotheta()
+
         for cell in self:
             if self.is_boundary(cell):
                 continue
-            anisotropies[cell], alignements[cell] = self.anisotropy(cell)
-        return anisotropies, alignements
+            anisotropies[cell], orientation[cell] = eval_anisotropy(cell, coords)
+        return anisotropies, orientation
 
     def is_boundary(self, cell):
         return  any([self.eptm.at_boundary[ctoj]
@@ -719,7 +698,6 @@ class Cells():
 
         phis = np.arctan2(rel_sz[:, 0], rel_sz[:, 1])
         indices = np.argsort(phis)
-
         uv = np.array([[coord1[je],
                         coord2[je]]
                        for je in cell.out_neighbours()])
@@ -901,90 +879,57 @@ class ApicalJunctions():
                 dropped += 1
         return new_edges, dropped
 
-def fit_ellipse(zeds, sigmas):
-    """
-    """
 
-    pass
+def cell_polygon(cell, coords, step):
+    ixs, wys = coords
+    jv_ixs = np.array([ixs[jv] - ixs[cell]
+                        for jv in cell.out_neighbours()])
+    jv_wys = np.array([wys[jv] - wys[cell]
+                         for jv in cell.out_neighbours()])
+    jv_thetas = np.arctan2(jv_ixs, jv_wys)
+    jv_ixs = jv_ixs[np.argsort(jv_thetas)]
+    jv_wys = jv_wys[np.argsort(jv_thetas)]
+    sg_xs = np.vstack([np.roll(jv_ixs, shift=1), jv_ixs]).T
+    sg_ys = np.vstack([np.roll(jv_wys, shift=1), jv_wys]).T
+    lengths = np.hypot(sg_xs[:,0] - sg_xs[:,1],
+                       sg_ys[:,0] - sg_ys[:,1])
+    num_points = np.round(lengths / step)
+    num_points[num_points < 2] = 2
+    line_x = np.concatenate([np.linspace(*sg_x, num=n_pts)[:-1]
+                             for sg_x, n_pts in zip(sg_xs, num_points)])
+    line_y = np.concatenate([np.linspace(*sg_y, num=n_pts)[:-1]
+                             for sg_y, n_pts in zip(sg_ys, num_points)])
+    return line_x, line_y
 
+def ellipse(thetas, params):
 
+    a, b, phi = params
+    rho = a * b / np.sqrt((b * np.cos(thetas + phi))**2
+                           + (a * np.sin(thetas + phi))**2)
+    return rho
 
-# def c_circumcircle(sz0, sz1, sz2, cutoff):
+def residuals(params, data):
+    x, y = data
+    thetas = np.arctan2(y, x)
+    rho = np.hypot(x, y)
+    fit_rho = ellipse(thetas, params)
+    return rho - fit_rho
 
-#     c_code = '''
-#     double sigma0 = sz0[0];
-#     double sigma1 = sz1[0];
-#     double sigma2 = sz2[0];
+def fit_ellipse(line_x, line_y):
+    a = line_x.max()
+    b = line_y.max()
+    phi = 0
+    params, r = sp.optimize.leastsq(residuals,
+                                    [a, b, phi],
+                                    [line_x, line_y])
+    return params, r
 
-#     double zed0 = sz0[1];
-#     double zed1 = sz1[1];
-#     double zed2 = sz2[1];
+def eval_anisotropy(cell, coords):
+    line_x, line_y = cell_polygon(cell, coords, step=0.21)
+    params, r = fit_ellipse(line_x, line_y)
+    a, b, phi = params
 
-
-#     double x1 = sigma1 - sigma0;
-#     double y1 = zed1 - zed0;
-#     double x2 = sigma2 - sigma0;
-#     double y2 = zed2 - zed0;
-
-#     double xc;
-#     double yc;
-
-#     if (y1*y1 < cutoff*cutoff
-#         && y2*y2 > cutoff*cutoff)
-#         {
-#         xc = x1 / 2.;
-#         yc = (x2*x2 + y2*y2 - x2*x1)/(2*y2);
-#         }
-#     else if (y2*y2 < cutoff*cutoff
-#              && y1*y1 > cutoff*cutoff)
-#         {
-#         xc = x2 / 2.;
-#         yc = (x1*x1 + y1*y1 - x1*x2)/(2*y1);
-#         }
-#     else if (y1*y1 + y2*y2 < cutoff*cutoff)
-#         {
-#         xc = 1e12;
-#         yc = 1e12;
-#         }
-#     else
-#        {
-#        double a1 = -x1/y1;
-#        double a2 = -x2/y2;
-#        double b1 = (x1*x1 + y1*y1) / (2*y1);
-#        double b2 = (x2*x2 + y2*y2) / (2*y2);
-#        if ((a2 - a1) * (a2 - a1) < cutoff*cutoff)
-#            {
-#            xc = 1e12;
-#            yc = 1e12;
-#            }
-#        xc = (b1 - b2) / (a2 - a1);
-#        yc = a1 * xc + b1;
-#        }
-#        py::tuple results(2);
-#        results[0] = xc + sigma0;
-#        results[1] = yc + zed0;
-
-#     return_val = results;
-#     '''
-#     return weave.inline(c_code,
-#                         arg_names=['sz0', 'sz1', 'sz2', 'cutoff'],
-#                         headers=['<math.h>'])
-
-# def dist_rtz(rtz0, rtz1):
-
-#     c_code = '''
-#     double r0 = rtz0[0];
-#     double t0 = rtz0[1];
-#     double z0 = rtz0[2];
-
-#     double r1 = rtz1[0];
-#     double t1 = rtz1[1];
-#     double z1 = rtz1[2];
-
-#     double dist = sqrt(r0*r0 + r1*r1 - 2*r0*r1*cos(t1 - t0) + (z1-z0)*(z1-z0));
-#     return_val = dist;
-#     '''
-#     return weave.inline(c_code,
-#                         arg_names=['rtz0', 'rtz1'],
-#                         headers=['<math.h>'])
+    orientation = np.abs(90 - (phi % np.pi) * 180 / np.pi)
+    anisotropy = b / a
+    return anisotropy, orientation
 

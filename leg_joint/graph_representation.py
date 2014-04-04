@@ -455,6 +455,7 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=4*np.pi/5,
                     efilt=None,
                     **kwargs):
 
+    kwargs['inline': False]
     eptm.graph.set_directed(False)
 
     vertex_red = eptm.graph.new_vertex_property('float')
