@@ -14,13 +14,13 @@ import matplotlib as mpl
 
 mpl.rcParams['figure.figsize'] = (8.0,6.0)    #(6.0,4.0)
 mpl.rcParams['font.size'] = 12                #10
-mpl.rcParams['savefig.dpi'] = 100             #72 
+mpl.rcParams['savefig.dpi'] = 100             #72
 mpl.rcParams['figure.subplot.bottom'] = .1    #.125
 
 import graph_tool.all as gt
 #import matplotlib.pyplot as plt
 import leg_joint as lj
-
+import numpy as np
 
 def before_after(func):
     def new_func(eptm, *args, **kwargs):
@@ -45,5 +45,5 @@ def show_optimisation(eptm, **kwargs):
 
 
 def local_optimum(*arg, **kwargs):
-    
+
     return show_optimisation(*arg, **kwargs)

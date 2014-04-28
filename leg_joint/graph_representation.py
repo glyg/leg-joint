@@ -355,15 +355,13 @@ def plot_cells_generic(eptm, xcoord, ycoord, ax=None,
 def plot_edges_generic(eptm, xcoord, ycoord, efilt=None,
                        ax=None, j_text=False,
                        edge_color=None, edge_alpha=None,
+                       edge_width=None,
                        cmap='jet', **kwargs):
     if ax is None:
         fig, ax = plt.subplots(1,1)
     cmap = plt.get_cmap(cmap)
     eptm.graph.set_edge_filter(efilt)
     eptm.graph.set_vertex_filter(None)
-    # edge_width = eptm.junctions.line_tensions.copy()
-    # edge_width.fa = 2. * (eptm.junctions.line_tensions.fa
-    #                       / eptm.junctions.line_tensions.fa.mean())**0.5
     if edge_color is not None:
         depth_cmap = cmap(edge_color.fa)
         edge_red = edge_color.copy()
@@ -385,6 +383,8 @@ def plot_edges_generic(eptm, xcoord, ycoord, efilt=None,
             if edge_color is not None:
                 c = [edge_red[edge], edge_green[edge], edge_blue[edge]]
                 kwargs['c'] = c
+            if edge_width is not None:
+                kwargs['lw'] = edge_width[edge]
             ax.plot(ixs, wys, '-', **kwargs)
     ax.set_aspect('equal')
     eptm.graph.set_edge_filter(None)

@@ -335,13 +335,13 @@ class AbstractRTZGraph(object):
         at_boundary = self.at_boundary.a
 
         lower_than = [dthetas.a < -tau/2.]
-        dthetas.a[lower_than] += tau
-        dsigmas.a[lower_than] += tau * edge_src_rhos[lower_than]
+        dthetas.a[lower_than] = dthetas.a[lower_than] + tau
+        dsigmas.a[lower_than] = dsigmas.a[lower_than] + tau * edge_src_rhos[lower_than]
         at_boundary[lower_than] = 1
 
         higher_than = [dthetas.a > tau/2.]
-        dthetas.a[higher_than] -= tau
-        dsigmas.a[higher_than] -= tau * edge_trgt_rhos[higher_than]
+        dthetas.a[higher_than] = dthetas.a[higher_than] - tau
+        dsigmas.a[higher_than] = dsigmas.a[higher_than] - tau * edge_trgt_rhos[higher_than]
         at_boundary[higher_than] = 1
 
         self.dthetas.a = dthetas.a
