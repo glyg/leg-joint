@@ -246,7 +246,7 @@ class Epithelium(EpitheliumFilters,
         for more details).
 
         '''
-        if not copy:
+        if copy:
             self.save_dir = os.path.join(GRAPH_SAVE_DIR, self.identifier)
             if not os.path.isdir(self.save_dir):
                 os.mkdir(self.save_dir)
