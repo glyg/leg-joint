@@ -12,19 +12,9 @@ import json
 import logging
 
 log = logging.getLogger(__name__)
-# ch = logging.StreamHandler()
-# formatter = logging.Formatter('%(asctime)s -'
-#                               '%(name)s -'
-#                               '%(levelname)s -'
-#                               '%(message)s')
-# ch.setFormatter(formatter)
-# ch.setLevel(logging.DEBUG)
-# log.addHandler(ch)
-
 
 import graph_tool.all as gt
 import numpy as np
-#from scipy import weave
 import hdfgraph
 
 from .objects import  AbstractRTZGraph, Cells, ApicalJunctions
@@ -506,19 +496,14 @@ def hdf_snapshot(func, *args, **kwargs):
     :class:`Epithelium` `stamp` attribute.
     '''
     def new_func(self, *args, **kwargs):
-        # prev_vstate, prev_inverted_v = self.graph.get_vertex_filter()
-        # prev_estate, prev_inverted_e = self.graph.get_edge_filter()
-
         out = func(self, *args, **kwargs)
-        # self.graph.set_vertex_filter(None)
-        # self.graph.set_edge_filter(None)
-
         store = self.paths['hdf'] 
-        hdfgraph.graph_to_hdf(self.graph, store,
-                              stamp=self.stamp,
-                              reset=False)
-        # self.graph.set_vertex_filter(prev_vstate, prev_inverted_v)
-        # self.graph.set_edge_filter(prev_estate, prev_inverted_e)
+        try:
+            hdfgraph.graph_to_hdf(self.graph, store,
+                                  stamp=self.stamp,
+                                  reset=False)
+        except:
+            self.log.error('HDF snapshot failed at stamp %i' % self.stamp)
         return out
     return new_func
 

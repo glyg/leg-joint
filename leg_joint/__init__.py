@@ -37,7 +37,9 @@ from .graph_representation import plot_edges_generic, plot_cells_generic
 from .graph_representation import epithelium_draw as draw, plot_eptm_generic
 from .graph_representation import plot_2pannels, plot_2pannels_gradients
 from .graph_representation import plot_avg_rho
-from .explore_params import get_kwargs, get_grid_indices
+from .graph_representation import plot_repartition
+
+from .explore_params import get_list_kwargs, get_grid_indices, get_grid_kwargs
 
 from .filters import local_slice, focus_on_cell
 

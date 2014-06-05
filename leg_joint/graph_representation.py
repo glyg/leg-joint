@@ -11,15 +11,48 @@ from matplotlib.patches import Polygon
 
 import graph_tool.all as gt
 
-from .filters import active
+from .filters import active, local_slice
 from .optimizers import precondition, approx_grad
 from .utils import to_rhotheta
+#from .apoptosis import get_apoptotic_cells
+
 FLOAT = np.dtype('float32')
 
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 GRAPH_SAVE_DIR = os.path.join(ROOT_DIR, 'saved_graphs')
 
+
+def plot_repartition(eptm, apopto_cells, seq_kwargs):
+    
+    eptm.set_local_mask(None)
+    local_slice(eptm, theta_amp=2*np.pi,
+                   zed_amp=seq_kwargs['width_apopto'])
+    
+    eptm.update_rhotheta()
+    d_theta = 0.
+    z_angle = np.pi / 6
+    pseudo_x = eptm.ixs.copy()
+    pseudo_y = eptm.ixs.copy()
+    pseudo_x.a = eptm.zeds.a * np.cos(z_angle) - eptm.rhos.a * np.sin(
+        eptm.thetas.a + d_theta) * np.sin(z_angle)
+    pseudo_y.a = eptm.rhos.a * np.cos(eptm.thetas.a + d_theta)
+    is_apopto = eptm.is_cell_vert.copy()
+    is_apopto.a[:] = 0
+    color_dead = eptm.zeds.copy()
+    color_dead.a[:] = 0.
+    for cell in apopto_cells:
+        color_dead[cell] = 1.
+        is_apopto[cell] = 1
+        for jv in cell.out_neighbours():
+            is_apopto[jv] = 1
+    ax = plot_eptm_generic(eptm,
+                           pseudo_x, pseudo_y, local=True,
+                           cell_kwargs={'cell_colors':color_dead, 'alpha':0.4},
+                           edge_kwargs={'c':'g', 'lw':1, 'alpha':0.4})
+    plt.savefig(os.path.join(eptm.paths['svg'],
+                             'apopto_repartition_%s.svg'
+                             % eptm.identifier))
 
 
 def png_snapshot(func, *args, **kwargs):
@@ -31,7 +64,8 @@ def png_snapshot(func, *args, **kwargs):
         outfname3d = os.path.join(png_dir, 'eptm3d_%04i.png'
                                   % eptm.stamp)
         try:
-            epithelium_draw(eptm, output2d=outfname2d, output3d=outfname3d)
+            epithelium_draw(eptm, d_theta= -np.pi/8,
+                            output2d=outfname2d, output3d=outfname3d)
         except:
             pass
         return out

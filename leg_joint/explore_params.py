@@ -66,7 +66,18 @@ def get_grid_indices(params):
                     in zip(grid_params.keys(), grid_indices)}
     return grid_indices
 
-def get_kwargs(index, params):
+def get_list_kwargs(index, list_kwargs):
+    kwargs = {key: {} for key in list_kwargs.keys()}
+    for key, sub_kwarg in list_kwargs.items():
+        for sub_key, arg in sub_kwarg.items():
+            if isinstance(arg, list):
+                kwargs[key][sub_key] = arg[index]
+            else:
+                kwargs[key][sub_key] = arg
+    return kwargs
+
+
+def get_grid_kwargs(index, params):
 
     grid_indices = get_grid_indices(params)
     if grid_indices is None:

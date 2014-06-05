@@ -6,6 +6,9 @@ import IPython.core.display as disp
 import json
 
 import sys, os
+sys.path.append('/home/admin/leg-joint')
+sys.path.append('/home/admin/hdfgraph')
+
 curdir = os.path.abspath(os.path.curdir)
 #print os.path.dirname(curdir)
 sys.path.append(os.path.dirname(curdir))
