@@ -90,6 +90,11 @@ def get_apoptotic_cells(eptm, **kwargs):
     num_cells = kwargs['num_cells']
     seed = kwargs['seed']
     num_steps = kwargs['num_steps']
+    if kwargs.get('theta_sorted') is not None:
+        theta_sorted = kwargs['theta_sorted']
+    else:
+        theta_sorted = True
+
     regular_kwargs = {name:kwargs[name]
                       for name in ['width_apopto', 'gamma']}
     proba_kwargs = {name:kwargs[name]
@@ -115,7 +120,8 @@ def get_apoptotic_cells(eptm, **kwargs):
                                    Try changing the parameters''')
             apopto_cells = random_apoptotic_cells(eptm, num_cells,
                                                   fold_cells, seed,
-                                                  proba_kwargs)
+                                                  proba_kwargs, 
+                                                  theta_sorted)
             n_apopto = len(apopto_cells)
     apopto_sequence = _get_sequence(apopto_cells, num_steps)
     return apopto_cells, fold_cells, apopto_sequence
@@ -130,7 +136,8 @@ def _get_sequence(apopto_cells, num_steps):
     return apopto_sequence
 
     
-def random_apoptotic_cells(eptm, num_cells, fold_cells, seed, proba_kwargs):
+def random_apoptotic_cells(eptm, num_cells, fold_cells, 
+                           seed, proba_kwargs, theta_sorted=True):
     '''
     Returns a **random** number of apoptotic cells,
     such that in average there are `num_cells` returned
@@ -144,9 +151,11 @@ def random_apoptotic_cells(eptm, num_cells, fold_cells, seed, proba_kwargs):
     np.random.seed(seed)
     dices = np.random.random(size=all_probas.size)
     apopto_cells = fold_cells[all_probas > dices]
-    thetas = np.array([eptm.thetas[cell] for cell in apopto_cells])
-    theta_idx = np.argsort(np.cos(thetas/2)**2)#[::-1]
-    return apopto_cells.take(theta_idx)
+    if theta_sorted:
+        thetas = np.array([eptm.thetas[cell] for cell in apopto_cells])
+        theta_idx = np.argsort(np.cos(thetas/2)**2)#[::-1]
+        apopto_cells = apopto_cells.take(theta_idx)
+    return apopto_cells
 
 def _apopto_pdf(zed, theta, z0=0., width_apopto=1.5, amp=0.4):
     p = np.exp(- (zed - z0)**2 / width_apopto**2)\

@@ -127,26 +127,37 @@ def plot_avg_rho(eptm, bin_width, ax=None, retall=False, ls='r-'):
         return ax
     return ax, (zeds_avg, rhos_avg, rhos_max, rhos_min)
     
-def draw_polygons(eptm, coord1, coord2, colors,
-                  vfilt=None, ax=None, **kwargs):
+def draw_polygons(eptm, coord1, coord2, colors=None,
+                  vfilt=None, ax=None, alphas=None, 
+                  cmap='jet', **kwargs):
 
     eptm.graph.set_vertex_filter(vfilt)
+    cmap = plt.get_cmap(cmap)
+
     eptm.update_dsigmas()
-    polygons = [eptm.cells.polygon(cell, coord1, coord2)[0]
-                for cell in eptm.cells
-                if (eptm.is_alive[cell]
-                    and not eptm.cells.is_boundary(cell))]
-    colors = np.array([colors[cell] for cell in eptm.cells
-                       if eptm.is_alive[cell]])
-    colors -= colors.min()
-    colors /= colors.max()
-    colors = plt.cm.jet(colors)
-    eptm.graph.set_vertex_filter(None)
+
+    if colors is not None:
+        color_cmap = cmap(colors.fa)
+        poly_red = colors.copy()
+        poly_red.fa = color_cmap[:, 0]
+        poly_green = colors.copy()
+        poly_green.fa = color_cmap[:, 1]
+        poly_blue = colors.copy()
+        poly_blue.fa = color_cmap[:, 2]
 
     if ax is None:
         fig, ax = plt.subplots()
-    for poly, color in zip(polygons, colors):
-        patch = Polygon(poly, color=color,
+
+    for cell in eptm.cells:
+        if not eptm.is_alive[cell] or eptm.cells.is_boundary(cell):
+            continue
+        poly = eptm.cells.polygon(cell, coord1, coord2)[0]
+        if colors is not None:
+            kwargs['color'] = [poly_red[cell], poly_green[cell], poly_blue[cell]]
+        if alphas is not None:
+            kwargs['alpha'] = alphas[cell]
+
+        patch = Polygon(poly,
                         fill=True, closed=True, **kwargs)
         ax.add_patch(patch)
     #ax.autoscale_view()
@@ -347,13 +358,16 @@ def plot_ortho_proj(eptm, ax=None, local=True,
     axes = ax, ax_zr, ax_rs
     return axes
 
+
+
+
 def plot_eptm_generic(eptm, xcoord, ycoord,
                       ax=None, local=True,
                       edge_kwargs={}, cell_kwargs={}):
 
     if ax is None:
         fig, ax = plt.subplots()
-    
+
     if local:
         cell_kwargs['vfilt'] = eptm.is_local_vert
         edge_kwargs['efilt'] = eptm.is_local_edge
@@ -367,8 +381,8 @@ def plot_eptm_generic(eptm, xcoord, ycoord,
                        ax=ax,
                        **edge_kwargs)
     return ax
-    
-def plot_cells_generic(eptm, xcoord, ycoord, ax=None, 
+
+def plot_cells_generic(eptm, xcoord, ycoord, ax=None,
                        vfilt=None, c_text=False,
                        cell_colors=None, **kwargs):
     if ax is None:
@@ -386,39 +400,38 @@ def plot_cells_generic(eptm, xcoord, ycoord, ax=None,
 
 def plot_edges_generic(eptm, xcoord, ycoord, efilt=None,
                        ax=None, j_text=False,
-                       edge_color=None, **kwargs):
+                       edge_color=None, edge_alpha=None,
+                       edge_width=None,
+                       cmap='jet', **kwargs):
     if ax is None:
         fig, ax = plt.subplots(1,1)
-        
+    cmap = plt.get_cmap(cmap)
     eptm.graph.set_edge_filter(efilt)
     eptm.graph.set_vertex_filter(None)
-    # edge_width = eptm.junctions.line_tensions.copy()
-    # edge_width.fa = 2. * (eptm.junctions.line_tensions.fa
-    #                       / eptm.junctions.line_tensions.fa.mean())**0.5
     if edge_color is not None:
-        depth_cmap = plt.cm.jet(edge_color.fa)
+        depth_cmap = cmap(edge_color.fa)
         edge_red = edge_color.copy()
         edge_red.fa = depth_cmap[:, 0]
         edge_green = edge_color.copy()
         edge_green.fa = depth_cmap[:, 1]
         edge_blue = edge_color.copy()
         edge_blue.fa = depth_cmap[:, 2]
-        
+
     for edge in eptm.graph.edges():
-        if (eptm.is_junction_edge[edge]
-            and not eptm.at_boundary[edge]):
+        if (eptm.is_junction_edge[edge]):
             ixs = (xcoord[edge.source()],
                    xcoord[edge.target()])
             wys = (ycoord[edge.source()],
                    ycoord[edge.target()])
+            if edge_alpha is not None:
+                kwargs['alpha'] = edge_alpha[edge]
+
             if edge_color is not None:
                 c = [edge_red[edge], edge_green[edge], edge_blue[edge]]
-                ax.plot(ixs, wys, '-', c=c, **kwargs)
-            else:
-                ax.plot(ixs, wys, '-', **kwargs)
-        # else:
-        #     ax.plot(ixs, wys, 'k-', lw=1.,
-        #             alpha=0.2, **kwargs)
+                kwargs['c'] = c
+            if edge_width is not None:
+                kwargs['lw'] = edge_width[edge]
+            ax.plot(ixs, wys, '-', **kwargs)
     ax.set_aspect('equal')
     eptm.graph.set_edge_filter(None)
     return ax
