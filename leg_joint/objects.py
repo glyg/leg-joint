@@ -681,7 +681,7 @@ class Cells():
         self.eptm.update_rhotheta()
 
         for cell in self:
-            if self.is_boundary(cell):
+            if self.is_boundary(cell) or (not self.eptm.is_alive[cell]):
                 continue
             anisotropies[cell], orientation[cell] = eval_anisotropy(cell, coords)
         return anisotropies, orientation
