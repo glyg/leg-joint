@@ -68,7 +68,9 @@ class Epithelium(EpitheliumFilters,
     def __init__(self, graphXMLfile=None, identifier='0',
                  paramtree=None,
                  paramfile=PARAMFILE, copy=True,
-                 graph=None, verbose=False, **params):
+                 graph=None, verbose=False,
+                 save_dir=GRAPH_SAVE_DIR,
+                 **params):
         """
         Parameters
         ----------
@@ -104,6 +106,7 @@ class Epithelium(EpitheliumFilters,
         self.params = self.paramtree.absolute_dic
         if copy or graphXMLfile is None:
             self.set_identifier(identifier)
+            self.save_dir = save_dir
         else:
             xml_path = os.path.abspath(graphXMLfile)
             splitted = xml_path.split(os.path.sep)
@@ -236,7 +239,6 @@ class Epithelium(EpitheliumFilters,
         for more details).
 
         '''
-        self.save_dir = os.path.join(GRAPH_SAVE_DIR, self.identifier)
         self.paths = {'root': os.path.abspath(self.save_dir)}
         if not os.path.isdir(self.save_dir):
             os.mkdir(self.save_dir)
@@ -503,7 +505,7 @@ def hdf_snapshot(func, *args, **kwargs):
     '''
     def new_func(self, *args, **kwargs):
         out = func(self, *args, **kwargs)
-        store = self.paths['hdf'] 
+        store = self.paths['hdf']
         try:
             hdfgraph.graph_to_hdf(self.graph, store,
                                   stamp=self.stamp,

@@ -1,6 +1,8 @@
 # This is the Drosophilia Leg Joint Simulation - or in short just leg-joint
-copyright Guillaume Gay - 2012 
-This work is still confidential
+
+copyright Guillaume Gay - 2012 - 2014 This work is pending
+publication - once the associated scientific article is out, it will
+be released as a GPL project.
 
 ## Project Tree
 
