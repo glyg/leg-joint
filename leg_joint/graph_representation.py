@@ -22,11 +22,11 @@ GRAPH_SAVE_DIR = os.path.join(ROOT_DIR, 'saved_graphs')
 
 
 def plot_repartition(eptm, apopto_cells, seq_kwargs):
-    
+
     eptm.set_local_mask(None)
     local_slice(eptm, theta_amp=2*np.pi,
                    zed_amp=seq_kwargs['width_apopto'])
-    
+
     eptm.update_rhotheta()
     d_theta = 0.
     z_angle = np.pi / 6
@@ -124,9 +124,9 @@ def plot_avg_rho(eptm, bin_width, ax=None, retall=False, ls='r-'):
     if not retall:
         return ax
     return ax, (zeds_avg, rhos_avg, rhos_max, rhos_min)
-    
+
 def draw_polygons(eptm, coord1, coord2, colors=None,
-                  vfilt=None, ax=None, alphas=None, 
+                  vfilt=None, ax=None, alphas=None,
                   cmap='jet', **kwargs):
 
     eptm.graph.set_vertex_filter(vfilt)
@@ -498,7 +498,7 @@ def epithelium_draw(eptm, z_angle=0.15, d_theta=4*np.pi/5,
                     efilt=None,
                     **kwargs):
 
-    kwargs['inline': False]
+    kwargs['inline'] = False
     eptm.graph.set_directed(False)
 
     vertex_red = eptm.graph.new_vertex_property('float')

@@ -17,6 +17,8 @@ import graph_tool.all as gt
 import numpy as np
 import hdfgraph
 
+
+from .data import default_params
 from .objects import  AbstractRTZGraph, Cells, ApicalJunctions
 from .xml_handler import ParamTree
 from .dynamics import Dynamics
@@ -24,7 +26,7 @@ from .filters import active, j_edges_in, EpitheliumFilters
 
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
-PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
+PARAMFILE = default_params()
 GRAPH_SAVE_DIR = os.path.join(ROOT_DIR, 'saved_graphs')
 
 
@@ -106,7 +108,7 @@ class Epithelium(EpitheliumFilters,
         self.params = self.paramtree.absolute_dic
         if copy or graphXMLfile is None:
             self.set_identifier(identifier)
-            self.save_dir = save_dir
+            self.save_dir = os.path.join(save_dir, identifier)
         else:
             xml_path = os.path.abspath(graphXMLfile)
             splitted = xml_path.split(os.path.sep)
@@ -189,7 +191,7 @@ class Epithelium(EpitheliumFilters,
         #     str1.append('    * %s' % key)
 
         str1.append('Identifier : %s' % self.identifier)
-        str1.append('Directory : %s' % self.save_dir)
+        str1.append('Directory : %s' % os.path.abspath(self.paths['root']))
         return '\n'.join(str1)
 
     def set_identifier(self, identifier='', reset=True):

@@ -25,6 +25,7 @@ import graph_tool.all as gt
 from .filters import EpitheliumFilters
 from .utils import to_xy, to_rhotheta
 from .circumcircle import c_circumcircle
+from .data import default_params
 from sklearn.decomposition import PCA
 
 import logging
@@ -33,7 +34,7 @@ log = logging.getLogger(__name__)
 
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
-PARAMFILE = os.path.join(ROOT_DIR, 'default', 'params.xml')
+PARAMFILE = default_params()
 tau = 2 * np.pi
 
 
