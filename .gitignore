@@ -48,3 +48,6 @@ doc/source/_templates
 
 #Merged files
 *.orig
+
+#Saved graphs
+notebooks/saved_graphs

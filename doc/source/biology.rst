@@ -13,10 +13,10 @@ The leg disk consists in a one cell thick epithelial sheet of
 ellipsolidal shape. On specific bands of the epithelium, folds are
 formed, corresponding to the future leg joints.
 
- .. image:: ../imgs/apical_view_WT.png
+ .. image:: ../leg_joint/data/imgs/apical_view_WT.png
 
 The morphogenesis of those folds depends on the apoptosis (progammed
-cell death) of some cells of the epithelium. 
+cell death) of some cells of the epithelium.
 
 The apical junctions
 ====================
@@ -33,5 +33,5 @@ Apoptosis as the driving source of leg joint morphogensis
 As cells undergo apoptosis around specific bands on the epithelium,
 the fold gets more and more pronounced. This fold formation si myosin dependant.
 
- .. image:: ../imgs/Fold_and_depth.png
+ .. image:: ../leg_joint/data/imgs/Fold_and_depth.png
 

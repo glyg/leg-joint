@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 import numpy as np
@@ -15,9 +14,9 @@ def to_rhotheta(x, y):
     rho = np.hypot(x, y)
     theta = np.arctan2(y, x)
     return rho, theta
-    
+
 def compute_distribution(prop_u, prop_v, bins, smth=0):
-    
+
     hist_uv, bins_u, bins_v = np.histogram2d(prop_u,
                                              prop_v, bins=bins)
     bin_wu = bins_u[1] - bins_u[0]
@@ -27,7 +26,7 @@ def compute_distribution(prop_u, prop_v, bins, smth=0):
     regular_v = bins_v[:-1] + bin_wv/2.
 
     Huv = hist_uv, bins_u, bins_v
-    
+
     print('''bin width = %.3f''' % bin_wu)
     norm = hist_uv.sum(axis=1)
     mean_vfu = (regular_v * hist_uv).sum(axis=1) / hist_uv.sum(axis=1)
@@ -62,7 +61,7 @@ def _local_subgraph(meth):
         eptm.graph.set_vertex_filter(None)
         eptm.graph.set_edge_filter(None)
         eptm.reset_topology()
-            
+
         return out
     return new_function
 
@@ -76,7 +75,7 @@ def local_subgraph(meth):
         #     eptm.rotate(np.pi)
         #     eptm.current_angle = np.pi
         #     print('rotated')
-        
+
         out = meth(eptm, *args, **kwargs)
         # if not -1e-8 < eptm.current_angle < 1e-8:
         #     eptm.rotate(-eptm.current_angle)
@@ -85,8 +84,7 @@ def local_subgraph(meth):
 
         eptm.graph.set_vertex_filter(None)
         eptm.graph.set_edge_filter(None)
-            
+
         return out
     return new_function
 
-    

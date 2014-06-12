@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 
-
-
 import numpy as np
 # Import mpltlib before graph-tool to
 # avoid Gtk seg fault (don't ask why)
@@ -33,10 +31,10 @@ def get_param(key, params, index):
     '''
     Returns the corresponding paramter value at position `index`
     if the valuie is a list or the value itself
-    
+
     Parameters:
     ===========
-    
+
     key: a dictionary key (usually a string)
     params: a dictionnary of dictonnaries
     index: int: the position of the value
@@ -48,7 +46,7 @@ def get_param(key, params, index):
             return sub_params[key][index]
         except TypeError:
             return sub_params[key]
-    
+
 def get_grid_indices(params):
 
     grid_params = {}
@@ -61,7 +59,7 @@ def get_grid_indices(params):
         return None
     grid_indices = np.meshgrid(*(np.arange(len(values))
                                  for values in grid_params.values())) ## Avoids the two first axes to be swaped
-    grid_indices = {key: indices.ravel() 
+    grid_indices = {key: indices.ravel()
                     for key, indices
                     in zip(grid_params.keys(), grid_indices)}
     return grid_indices
@@ -93,7 +91,7 @@ def get_grid_kwargs(index, params):
                 param_index = 0
                 target[key] = get_param(key, params,
                                         index=param_index)
-            
+
         return target
 
     return {sub_key: get_sub_dict(sub_params)
@@ -117,7 +115,7 @@ def explore_delta_h_1D(eptm, param, values):
     return delta_hs
 
 def one_division_height(eptm, **param_dict):
-    
+
     eptm2 = Epithelium(graph=eptm.graph.copy(), **param_dict)
     try:
         eptm2.isotropic_relax()
