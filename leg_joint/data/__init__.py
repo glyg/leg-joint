@@ -15,6 +15,12 @@ def default_params():
     '''
     return os.path.join(data_path, 'defaults', 'params.xml')
 
+def initial_graph_xml():
+    '''Returns the path to the epithelium used
+    as the initial tissue before cell divisions
+    '''
+    return os.path.join(data_path, 'graphs', 'initial_graph.xml')
+
 
 def before_apoptosis_xml():
     '''Returns the path to the epithelium used

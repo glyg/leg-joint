@@ -28,11 +28,11 @@ def before_after(func):
         import leg_joint as lj
         #eptm.update_gradient()
         fig, axes = plt.subplots(1,4, figsize=(12,4))
-        axes_before = lj.plot_2pannels(eptm, axes[0:2], c_text=False)
+        axes_before = lj.plot_2pannels(eptm, axes[0:2])
         lj.plot_2pannels_gradients(eptm, axes_before, scale=10.)
         foutput = func(eptm, *args, **kwargs)
         #eptm.update_gradient()
-        axes_after = lj.plot_2pannels(eptm, axes[2:], c_text=False)
+        axes_after = lj.plot_2pannels(eptm, axes[2:])
         lj.plot_2pannels_gradients(eptm, axes_after, scale=10.)
         return foutput
     return new_func

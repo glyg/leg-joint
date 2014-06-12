@@ -91,13 +91,15 @@ def average_rho(eptm, bin_width=10):
     zeds = np.sort(zeds)
 
     rhos_cliped = rhos[: -(rhos.size % bin_width)]
-    rhos_cliped = rhos_cliped.reshape((rhos_cliped.size // bin_width, bin_width))
+    rhos_cliped = rhos_cliped.reshape((rhos_cliped.size // bin_width,
+                                       bin_width))
     rhos_avg = rhos_cliped.mean(axis=1)
     rhos_max = rhos_cliped.max(axis=1)
     rhos_min = rhos_cliped.min(axis=1)
 
     zeds_cliped = zeds[: -(zeds.size % bin_width)]
-    zeds_cliped = zeds_cliped.reshape((zeds_cliped.size // bin_width, bin_width))
+    zeds_cliped = zeds_cliped.reshape((zeds_cliped.size // bin_width,
+                                       bin_width))
     zeds_avg = zeds_cliped.mean(axis=1)
 
     return zeds_avg, rhos_avg, rhos_max, rhos_min
@@ -198,8 +200,6 @@ def plot_2pannels_gradients(eptm, axes=None,
 
     if axes is None:
         ax_zs, ax_xy =  plot_2pannels(eptm, axes=None,
-                                      vfilt=eptm.is_local_vert,
-                                      efilt=eptm.is_local_edge,
                                       **kwargs)
         axes = ax_zs, ax_xy
     else:
@@ -280,6 +280,8 @@ def plot_active(eptm, xcoord, ycoord, ax=None):
 
 def plot_2pannels(eptm, axes=None,
                   edge_kwargs={}, cell_kwargs={}):
+    if edge_kwargs.get('c') is None:
+        edge_kwargs['c'] = 'g'
     if axes is None:
         fig, axes = plt.subplots(1, 2)
     xy_coords = ((eptm.zeds, eptm.proj_sigma()), (eptm.ixs, eptm.wys))
@@ -360,7 +362,7 @@ def plot_ortho_proj(eptm, ax=None, local=True,
 
 def plot_eptm_generic(eptm, xcoord, ycoord,
                       ax=None, local=True,
-                      edge_kwargs={}, cell_kwargs={}):
+                      edge_kwargs={'c':'g'}, cell_kwargs={}):
 
     if ax is None:
         fig, ax = plt.subplots()

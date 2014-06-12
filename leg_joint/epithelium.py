@@ -27,7 +27,7 @@ from .filters import active, j_edges_in, EpitheliumFilters
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = default_params()
-GRAPH_SAVE_DIR = os.path.join(ROOT_DIR, 'saved_graphs')
+GRAPH_SAVE_DIR = '.'
 
 
 # See [the tau manifesto](http://tauday.com/tau-manifesto)
