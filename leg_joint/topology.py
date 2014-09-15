@@ -16,6 +16,7 @@ import graph_tool.all as gt
 
 from .graph_representation import epithelium_draw, png_snapshot, local_svg_snapshot
 from .optimizers import find_energy_min
+from .epithelium import hdf_snapshot
 
 import logging
 log = logging.getLogger(__name__)
@@ -37,8 +38,8 @@ def find_rosettes(eptm):
     total = eptm.graph.degree_property_map('total')
     eptm.graph.set_vertex_filter(None)
     return gt.find_vertex_range(eptm.graph, total, (4, 20))
-    
-    
+
+
 def solve_rosette(eptm, central_vert, tension_increase=1.):
     cells = [cell for cell in central_vert.in_neighbours()
              if eptm.is_cell_vert[cell]]
@@ -55,9 +56,9 @@ def solve_rosette(eptm, central_vert, tension_increase=1.):
                            for jv in j_verts])
     rel_thetas[rel_thetas > np.pi] -= 2 * np.pi
     rel_thetas[rel_thetas < -np.pi] += 2 * np.pi
-    upper_jvs = [jv for jv in j_verts 
+    upper_jvs = [jv for jv in j_verts
                  if rel_thetas[j_verts.index(jv)] > 0]
-    lower_jvs = [jv for jv in j_verts 
+    lower_jvs = [jv for jv in j_verts
                  if rel_thetas[j_verts.index(jv)] < 0]
     split_cells = []
     for cell in cells:
@@ -71,11 +72,11 @@ def solve_rosette(eptm, central_vert, tension_increase=1.):
     new_jv = eptm.new_vertex(central_vert)
     eptm.zeds[new_jv] += 0.1
     eptm.zeds[central_vert] -= 0.1
-    to_remove = [(central_vert, jv) + 
+    to_remove = [(central_vert, jv) +
                   tuple(eptm.junctions.adjacent_cells[
                       eptm.any_edge(central_vert, jv)])
                   for jv in upper_jvs]
-    to_add = [(new_jv, jv) + 
+    to_add = [(new_jv, jv) +
               tuple(eptm.junctions.adjacent_cells[
                   eptm.any_edge(central_vert, jv)])
               for jv in upper_jvs]
@@ -91,7 +92,7 @@ def solve_rosette(eptm, central_vert, tension_increase=1.):
 def xml_snapshot(func, *args, **kwargs):
     def new_func(eptm, *args, **kwargs):
         out = func(eptm, *args, **kwargs)
-        
+
         xml_save = os.path.join(eptm.paths['xml'],
                                 'eptm_%04i.xml' % eptm.stamp)
         eptm.graph.save(xml_save)
@@ -99,7 +100,7 @@ def xml_snapshot(func, *args, **kwargs):
     return new_func
 
 
-        
+
 #@snapshot
 def type1_transition(eptm, elements, verbose=False):
     """
@@ -108,30 +109,30 @@ def type1_transition(eptm, elements, verbose=False):
     Suppplementary figure S1)
 
     In ASCII art (letters represent junctions and number represent cells):
-    
-    e 2 d                  
-     \ /         e  d        e  2  d  
+
+    e 2 d
+     \ /         e  d        e  2  d
       b           \/          \   /
-    1 | 3  ---->  ab  ----> 1  a-b  3  
-      a           /\          /   \    
-     / \         c  f        c  4  f 
-    c 4 f                     
+    1 | 3  ---->  ab  ----> 1  a-b  3
+      a           /\          /   \
+     / \         c  f        c  4  f
+    c 4 f
 
     Parameters
     ----------
 
     eptm:  ::class:`Epithelium` instance
-    
+
     elements: graph edge or vertex:
         Can be either:
-    
+
         * two cell vertices (1 and 3),
         * two junction vertices (a and b)
         * or a single edge (between a and b)
 
     verbose: bool, default `False`
         if True, prints informations
-    
+
     """
     #### Parsing arguments
     try:
@@ -201,14 +202,14 @@ def type1_transition(eptm, elements, verbose=False):
     j_edgebe = eptm.any_edge(j_vertb, j_verte)
     if None in (j_edgebe, j_edgeac):
         raise ValueError("Invalid geometry")
-        
+
     if not cell1 in eptm.junctions.adjacent_cells[j_edgeac]:
         #Switch f and c
-        j_vertc, j_vertf = j_vertf, j_vertc 
+        j_vertc, j_vertf = j_vertf, j_vertc
         j_edgeac = eptm.any_edge(j_verta, j_vertc)
     if not cell3 in eptm.junctions.adjacent_cells[j_edgebe]:
         #Switch d and e
-        j_verte, j_vertd = j_vertd, j_verte 
+        j_verte, j_vertd = j_vertd, j_verte
         j_edgebe = eptm.any_edge(j_vertb, j_verte)
     cell2 = eptm.junctions.adjacent_cells[j_edgebe][1]
     eptm.log.debug(''' adjacent cells edge be : %s, %s
@@ -261,7 +262,7 @@ def type1_transition(eptm, elements, verbose=False):
     center_sigma = (sigma_a + sigma_b) / 2
     delta_s = delta_t * rho_a
     center_zed = (zed_a + zed_b)/2.
-        
+
     delta_z = np.abs(zed_b - zed_a)
     if eptm.sigmas[cell1] < eptm.sigmas[cell3]:
         eptm.sigmas[j_verta] = center_sigma + flip * delta_z/2.
@@ -275,7 +276,7 @@ def type1_transition(eptm, elements, verbose=False):
     else:
         eptm.zeds[j_vertb] = center_zed + delta_s/2.
         eptm.zeds[j_verta] = center_zed - delta_s/2.
-        
+
     eptm.set_local_mask(cell1)
     eptm.set_local_mask(cell3)
     eptm.update_xy()
@@ -283,7 +284,8 @@ def type1_transition(eptm, elements, verbose=False):
     return modified_cells, modified_jverts
 
 
-#@snapshot
+@hdf_snapshot
+#@png_snapshot
 def cell_division(eptm, mother_cell,
                   phi_division=None,
                   verbose=False):
@@ -295,15 +297,15 @@ def cell_division(eptm, mother_cell,
     a0 = eptm.params['prefered_area']
     h = eptm.params['prefered_height']
     v0 = a0 * (eptm.rhos[mother_cell] - eptm.rho_lumen)
-    eptm.cells.prefered_vol[mother_cell] = v0    
+    eptm.cells.prefered_vol[mother_cell] = v0
     daughter_cell = eptm.new_vertex(mother_cell)
     eptm.is_cell_vert[daughter_cell] = 1
     eptm.cells.ages[mother_cell] += 1
     eptm.cells.ages[daughter_cell] = 0
     eptm.cells.junctions[daughter_cell] = []
-    
+
     eptm.log.info("Cell %s is born" % str(daughter_cell))
-    
+
     junction_trash = []
     new_junctions = []
     new_jvs = []
@@ -311,21 +313,21 @@ def cell_division(eptm, mother_cell,
         if j_edge is None:
             continue
         j_src, j_trgt = j_edge
-    
+
         sigma_src = eptm.dsigmas[eptm.graph.edge(mother_cell, j_src)]
         zed_src = eptm.dzeds[eptm.graph.edge(mother_cell, j_src)]
         sigma_trgt = eptm.dsigmas[eptm.graph.edge(mother_cell, j_trgt)]
         zed_trgt = eptm.dzeds[eptm.graph.edge(mother_cell, j_trgt)]
-        
+
         phi_trgt = np.arctan2(sigma_trgt, zed_trgt) + tau/2
         phi_trgt = (phi_trgt - phi_division) % tau
         phi_src = np.arctan2(sigma_src, zed_src) + tau/2
         phi_src = (phi_src - phi_division) % tau
-        
+
         ## edge is on the mother side
         if phi_src > tau/2 and phi_trgt > tau/2:
             continue
-        
+
         ## edge is on the daughter side
         elif phi_src <= tau/2 and phi_trgt <= tau/2:
 
@@ -334,11 +336,11 @@ def cell_division(eptm, mother_cell,
 
             adj_cell = cell1 if cell0 == mother_cell else cell0
             new_junctions.append((j_src, j_trgt, adj_cell, daughter_cell))
-        
-        ## edge is cut by the division    
+
+        ## edge is cut by the division
         elif ((phi_src > tau/2 and phi_trgt <= tau/2)
               or ( phi_src <= tau/2 and phi_trgt > tau/2 )) :
-            
+
             cell0, cell1 = eptm.junctions.adjacent_cells[j_edge]
             adj_cell = cell1 if cell0 == mother_cell else cell0
             new_jv = eptm.new_vertex(j_src)
@@ -352,7 +354,7 @@ def cell_division(eptm, mother_cell,
             ## The midle of the segment is closer to the final optimum
             # sigma_n = (sigma_src + sigma_trgt) / 2.
             # zed_n = (zed_src + zed_trgt) / 2.
-            
+
             eptm.rhos[new_jv] = (eptm.rhos[j_src] +
                                  eptm.rhos[j_trgt]) / 2.
             eptm.zeds[new_jv] = zed_n + eptm.zeds[mother_cell]
@@ -390,7 +392,7 @@ def cell_division(eptm, mother_cell,
     eptm.set_local_mask(mother_cell, wider=True)
     eptm.set_local_mask(daughter_cell, wider=True)
     eptm.update_xy()
-    
+
     # eptm.graph.set_vertex_filter(eptm.is_local_vert)
     # eptm.graph.set_edge_filter(eptm.is_local_edge)
     eptm.reset_topology()
@@ -403,7 +405,7 @@ def cell_division(eptm, mother_cell,
 #@snapshot
 def type3_transition(eptm, cell, reduce_edgenum=True, verbose=False):
     """
-    
+
     That's when a three faced cell disappears.
     """
     eptm.graph.set_vertex_filter(None)
@@ -417,7 +419,7 @@ def type3_transition(eptm, cell, reduce_edgenum=True, verbose=False):
         cell1, cell3 = eptm.junctions.adjacent_cells[je]
         modified = type1_transition(eptm, (cell1, cell3),
                                     verbose=verbose)
-        return 
+        return
     old_jvs = [old_jv for old_jv in cell.out_neighbours()]
     new_jv = eptm.new_vertex(old_jvs[0])
     eptm.log.debug('Cell %s removed, edge %s created'
@@ -443,7 +445,7 @@ def type3_transition(eptm, cell, reduce_edgenum=True, verbose=False):
                 eptm.new_j_edge(edge.source(), new_jv)
         edge_trash.extend(old_jv.all_edges())
         eptm.is_alive[old_jv] = 0
-    
+
     for edge in edge_trash:
         try:
             eptm.graph.remove_edge(edge)
@@ -461,7 +463,7 @@ def remove_cell(eptm, cell):
 
     if isinstance(cell, int):
         cell = eptm.graph.vertex(cell)
-    
+
     eptm.set_local_mask(None)
     eptm.graph.set_vertex_filter(None)
     eptm.graph.set_edge_filter(None)
@@ -499,7 +501,7 @@ def remove_cell(eptm, cell):
                 jv0, jv1 = edge
                 opposite = jv0 if jv1 == jv else jv1
                 new_jes.append((opposite, new_jv))
-        
+
     for neighb_cell, jv in new_ctojs:
         ctoj = eptm.new_edge(neighb_cell, jv, ctojs[0])
         eptm.set_local_mask(neighb_cell)
@@ -508,7 +510,7 @@ def remove_cell(eptm, cell):
         eptm.is_local_vert[jv0] = 1
         eptm.is_local_vert[jv1] = 1
         eptm.is_local_edge[je] = 1
-        
+
     eptm.is_alive[cell] = 0
     eptm.is_cell_vert[cell] = 0
     for v in vertex_trash:
@@ -526,7 +528,7 @@ def remove_cell(eptm, cell):
 
 
 ### TODO : The function bellow is outdated
-    
+
 def resolve_small_edges(eptm, threshold=5e-2, vfilt=None, efilt=None):
     # Collapse 3 sided cells
     if vfilt == None:
