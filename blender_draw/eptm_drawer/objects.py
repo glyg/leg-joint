@@ -1,5 +1,6 @@
 import numpy as np
 import bpy
+import pandas as pd
 
 def hex_to_rgb(col, factors = 255.):
     return tuple(c / factors for c in bytes.fromhex(col.replace('#', '')))

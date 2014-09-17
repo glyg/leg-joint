@@ -5,6 +5,7 @@ saved_graphs/pdf/tmp/*
 saved_graphs/png/tmp/*
 saved_graphs/png/apopto_vr*
 notebooks/.ipynb_checkpoints
+blender_draw/*.blend[12345]
 
 iterate.dat
 *.py[co]
@@ -22,6 +23,7 @@ var
 sdist
 develop-eggs
 .installed.cfg
+
 
 # Installer logs
 pip-log.txt
