@@ -95,7 +95,7 @@ def main():
         src_idx, trgt_idx, stamp = je_idx
         #stamp = je_df.index.get_level_values(level='stamp')[0]
         name = 'je{}to{}'.format(src_idx, trgt_idx)
-        je_obj = objects.set_junction_arm(name, src_idx, trgt_idx)
+        je_obj = objects.set_junction_arm(name, src_idx, trgt_idx, edge_color)
         # break
         # j_src = jvs_df.xs((src_idx, stamp))
         # j_trgt = jvs_df.xs((trgt_idx, stamp))
@@ -105,14 +105,8 @@ def main():
         #                               (j_src.zeds, j_trgt.zeds),
         #                               edge_color)
 
-
-
-
-
-
-
     scene.frame_current = 0
-
+    bpy.ops.object.posemode_toggle()
     # Smooth objects view
     utils.select_all()
     bpy.ops.object.shade_smooth()

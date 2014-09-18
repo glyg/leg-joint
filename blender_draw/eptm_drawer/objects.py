@@ -61,15 +61,34 @@ def set_cell(name, x, y, z, stamp,
     # slot.material = material
     return obj
 
-def set_junction_arm(name, src_idx, trgt_idx):
+def set_junction_arm(name, src_idx, trgt_idx, color):
     '''
     '''
     if name in bpy.data.objects:
         return
+
+    bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.1,
+                                        view_align=False,
+                                        enter_editmode=False,
+                                        depth=1,
+                                        location=(0, 0, 0))
+
+    cyl_name = 'cyl{}to{}'.format(src_idx, trgt_idx)
+    cyl = bpy.context.object
+    cyl.name = cyl_name
+    material = bpy.data.materials.new("%s_color" % name)
+    material.diffuse_color = hex_to_rgb(color)
+    bpy.ops.object.material_slot_add()
+    slot = cyl.material_slots[0]
+    slot.material = material
+
+
+
     bpy.ops.object.armature_add()
     arm = bpy.context.object
     arm.location = (0, 0, 0)
     arm.name = name
+    arm.layers = tuple(i == 3 for i in range(20))
     arm.parent = bpy.data.objects['jv{}'.format(src_idx)]
     bone = arm.pose.bones[0]
     bpy.ops.object.posemode_toggle()
@@ -80,19 +99,12 @@ def set_junction_arm(name, src_idx, trgt_idx):
     bone.constraints["Stretch To"].keep_axis = 'PLANE_Z'
     bone.constraints["Stretch To"].volume = 'VOLUME_XZX'
 
-    bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.1,
-                                        view_align=False,
-                                        enter_editmode=False,
-                                        depth=1,
-                                        location=(0, 0, 0))
-
-    cyl_name = 'cyl{}to{}'.format(src_idx, trgt_idx)
-    obj = bpy.context.object
-    obj.name = cyl_name
-    obj.parent = bpy.data.objects[name]
-    obj.parent_type = 'BONE'
-    obj.parent_bone = "Bone"
-
+    cyl.parent = bpy.data.objects[name]
+    cyl.parent_type = 'BONE'
+    cyl.parent_bone = "Bone"
+    cyl.delta_location = (0, -0.5, 0)
+    cyl.delta_rotation_euler = (np.pi/2, 0, 0)
+    cyl.layers = tuple(i == 0 for i in range(20))
 
 def set_junction(name, stamp, xx, yy, zz, color):
     """
