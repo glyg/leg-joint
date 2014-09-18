@@ -39,13 +39,14 @@ def out_edges(vert_idx, vertices_df, edges_df):
 
 
 
-def main():
+def main(fname, time_dilation=1):
 
-    source_inplace = os.path.join(os.path.dirname(bpy.data.filepath),
-                                  "epithelium.h5")
-    fname = os.path.join(source_inplace)
 
-    scene = utils.clear_scene()
+    #source_inplace = os.path.join(os.path.dirname(bpy.data.filepath),
+    #                              "epithelium.h5")
+    #fname = os.path.join(source_inplace)
+
+    scene = bpy.context.scene
 
     cell_color = '#2887c8'
     edge_color = '#3dc828'
@@ -88,7 +89,7 @@ def main():
     for (jv_idx, stamp), jv_df in jvs_df.iterrows():
 
         name = 'jv{}'.format(jv_idx)
-        objects.set_jv(name, stamp,
+        objects.set_jv(name, np.int(stamp*time_dilation),
                        jv_df.ixs, jv_df.wys, jv_df.zeds)
 
     for je_idx, je_df in jes_df.iterrows():
@@ -117,3 +118,10 @@ def main():
     camera.name = "camera"
 
     scene.objects.active = None
+
+
+def _draw_j_edges():
+    pass
+
+def _draw_j_verts():
+    pass

@@ -6,7 +6,6 @@ def hex_to_rgb(col, factors = 255.):
     return tuple(c / factors for c in bytes.fromhex(col.replace('#', '')))
 
 
-time_dilation = 10
 
 def set_jv(name, stamp, x, y, z):
     """
@@ -19,7 +18,7 @@ def set_jv(name, stamp, x, y, z):
         obj.name = name
         obj.layers = tuple(i == 2 for i in range(20))
     scn = bpy.context.scene
-    scn.frame_current = stamp * time_dilation
+    scn.frame_current = stamp
     obj.location = (x, y, z)
     obj.keyframe_insert('location')
 
@@ -37,7 +36,7 @@ def set_cell(name, x, y, z, stamp,
         obj.layers = tuple(i == 1 for i in range(20))
 
     scn = bpy.context.scene
-    scn.frame_current = stamp * time_dilation
+    scn.frame_current = stamp
 
     obj.location = (x, y, z)
     vertices = ([(0, 0, 0),]
@@ -66,6 +65,12 @@ def set_junction_arm(name, src_idx, trgt_idx, color):
     '''
     if name in bpy.data.objects:
         return
+    trgt_name = 'jv{}'.format(trgt_idx)
+    src_name = 'jv{}'.format(src_idx)
+    if not src_name in bpy.data.objects:
+        return
+    if not trgt_name in bpy.data.objects:
+        return
 
     bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.1,
                                         view_align=False,
@@ -89,12 +94,12 @@ def set_junction_arm(name, src_idx, trgt_idx, color):
     arm.location = (0, 0, 0)
     arm.name = name
     arm.layers = tuple(i == 3 for i in range(20))
-    arm.parent = bpy.data.objects['jv{}'.format(src_idx)]
+    arm.parent = bpy.data.objects[src_name]
     bone = arm.pose.bones[0]
     bpy.ops.object.posemode_toggle()
 
     bpy.ops.pose.constraint_add(type='STRETCH_TO')
-    bone.constraints["Stretch To"].target = bpy.data.objects['jv{}'.format(trgt_idx)]
+    bone.constraints["Stretch To"].target = bpy.data.objects[trgt_name]
     bone.constraints["Stretch To"].rest_length = 1.
     bone.constraints["Stretch To"].keep_axis = 'PLANE_Z'
     bone.constraints["Stretch To"].volume = 'VOLUME_XZX'
@@ -106,11 +111,13 @@ def set_junction_arm(name, src_idx, trgt_idx, color):
     cyl.delta_rotation_euler = (np.pi/2, 0, 0)
     cyl.layers = tuple(i == 0 for i in range(20))
 
+
 def set_junction(name, stamp, xx, yy, zz, color):
     """
+    deprecated
     """
     scn = bpy.context.scene
-    scn.frame_current = stamp * time_dilation
+    scn.frame_current = stamp
     obj = bpy.data.objects.get(name)
     if obj  is None:
         bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.1,
