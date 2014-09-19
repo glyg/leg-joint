@@ -511,9 +511,9 @@ def hdf_snapshot(func, *args, **kwargs):
         try:
             hdfgraph.graph_to_hdf(self.graph, store,
                                   stamp=self.stamp,
-                                  reset=False)
+                                  reset=False,
+                                  vert_kwargs={'data_columns':['ixs', 'wys', 'zeds', 'thetas']})
         except:
             self.log.error('HDF snapshot failed at stamp %i' % self.stamp)
         return out
     return new_func
-

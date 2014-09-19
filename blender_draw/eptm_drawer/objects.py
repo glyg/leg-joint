@@ -2,10 +2,13 @@ import numpy as np
 import bpy
 import pandas as pd
 
+cell_color = '#2887c8'
+edge_color = '#3dc828'
+j_radius = 0.3
+
+
 def hex_to_rgb(col, factors = 255.):
     return tuple(c / factors for c in bytes.fromhex(col.replace('#', '')))
-
-
 
 def set_jv(name, stamp, x, y, z):
     """
@@ -46,21 +49,17 @@ def set_cell(name, x, y, z, stamp,
     faces = [(0, i + 1, i + 2, 0) for i in range(len(vertices) - 2)]
     me.from_pydata(vertices, [], faces)
     me.update(calc_edges=True)
-
-    # size = (1., 1., 1.)
-
-    # bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2,
-    #                                       size=1, view_align=False,
-    # enter_editmode=False, location=(x, y, z), rotation=(0, 0, 0))
-
-    # material = bpy.data.materials.new("%s_color" % name)
-    # material.diffuse_color = hex_to_rgb(color)
-    # bpy.ops.object.material_slot_add()
-    # slot = obj.material_slots[0]
-    # slot.material = material
     return obj
 
-def set_junction_arm(name, src_idx, trgt_idx, color):
+
+
+def create_junction_material():
+
+    material = bpy.data.materials.new("junction")
+    material.diffuse_color = hex_to_rgb(edge_color)
+
+
+def set_junction_arm(name, src_idx, trgt_idx):
     '''
     '''
     if name in bpy.data.objects:
@@ -72,7 +71,7 @@ def set_junction_arm(name, src_idx, trgt_idx, color):
     if not trgt_name in bpy.data.objects:
         return
 
-    bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.1,
+    bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=j_radius,
                                         view_align=False,
                                         enter_editmode=False,
                                         depth=1,
@@ -81,13 +80,9 @@ def set_junction_arm(name, src_idx, trgt_idx, color):
     cyl_name = 'cyl{}to{}'.format(src_idx, trgt_idx)
     cyl = bpy.context.object
     cyl.name = cyl_name
-    material = bpy.data.materials.new("%s_color" % name)
-    material.diffuse_color = hex_to_rgb(color)
     bpy.ops.object.material_slot_add()
     slot = cyl.material_slots[0]
-    slot.material = material
-
-
+    slot.material = bpy.data.materials["junction"]
 
     bpy.ops.object.armature_add()
     arm = bpy.context.object
