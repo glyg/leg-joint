@@ -51,8 +51,6 @@ def set_cell(name, x, y, z, stamp,
     me.update(calc_edges=True)
     return obj
 
-
-
 def create_junction_material():
 
     material = bpy.data.materials.new("junction")
@@ -90,6 +88,7 @@ def set_junction_arm(name, src_idx, trgt_idx):
     arm.name = name
     arm.layers = tuple(i == 3 for i in range(20))
     arm.parent = bpy.data.objects[src_name]
+    arm.data.draw_type = 'STICK'
     bone = arm.pose.bones[0]
     bpy.ops.object.posemode_toggle()
 
@@ -97,7 +96,7 @@ def set_junction_arm(name, src_idx, trgt_idx):
     bone.constraints["Stretch To"].target = bpy.data.objects[trgt_name]
     bone.constraints["Stretch To"].rest_length = 1.
     bone.constraints["Stretch To"].keep_axis = 'PLANE_Z'
-    bone.constraints["Stretch To"].volume = 'VOLUME_XZX'
+    bone.constraints["Stretch To"].volume = 'NO_VOLUME'
 
     cyl.parent = bpy.data.objects[name]
     cyl.parent_type = 'BONE'

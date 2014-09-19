@@ -121,7 +121,7 @@ def main(fname, time_dilation=1, start_stamp=None, stop_stamp=None, v_bounds={})
     stop = 1 if stop_stamp is None else int(stop_stamp * time_dilation)
 
     scene.frame_start = start
-    scene.frame_stop = stop
+    scene.frame_end = stop
 
 
 def _draw_j_edges():
