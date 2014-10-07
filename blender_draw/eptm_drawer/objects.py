@@ -57,7 +57,8 @@ def create_junction_material():
     material.diffuse_color = hex_to_rgb(edge_color)
 
 
-def set_junction_arm(name, src_idx, trgt_idx):
+def set_junction_arm(name, src_idx, trgt_idx,
+                     stamp_i, stamp_f):
     '''
     '''
     if name in bpy.data.objects:
@@ -78,6 +79,8 @@ def set_junction_arm(name, src_idx, trgt_idx):
     cyl_name = 'cyl{}to{}'.format(src_idx, trgt_idx)
     cyl = bpy.context.object
     cyl.name = cyl_name
+    cyl.delta_scale[2] = 0.2
+
     bpy.ops.object.material_slot_add()
     slot = cyl.material_slots[0]
     slot.material = bpy.data.materials["junction"]
@@ -104,6 +107,46 @@ def set_junction_arm(name, src_idx, trgt_idx):
     cyl.delta_location = (0, -0.5, 0)
     cyl.delta_rotation_euler = (np.pi/2, 0, 0)
     cyl.layers = tuple(i == 0 for i in range(20))
+    set_visible(cyl, stamp_i)
+    set_invisible(cyl, stamp_f)
+
+
+def set_invisible(obj, stamp_f):
+    ### from http://blenderscripting.blogspot.fr/2011/07/scripted-keyframing-of-hide-hide-render.html
+    ###### place at t = stamp-1 a keyframe with hide set to True
+    current_frame = stamp_f - 1
+    bpy.ops.anim.change_frame(frame=current_frame)
+    obj.hide = True
+    obj.keyframe_insert(data_path="hide",
+                        index=-1,
+                        frame=current_frame)
+
+    ###### place at stamp a keyframe with hide set to False
+    current_frame = stamp_f
+    bpy.ops.anim.change_frame(frame=current_frame)
+    obj.hide = False
+    obj.keyframe_insert(data_path="hide",
+                        index=-1,
+                        frame=current_frame)
+
+
+def set_visible(obj, stamp_i):
+    ### from http://blenderscripting.blogspot.fr/2011/07/scripted-keyframing-of-hide-hide-render.html
+    ###### place at t = stamp-1 a keyframe with hide set to False
+    current_frame = stamp_i - 1
+    bpy.ops.anim.change_frame(frame=current_frame)
+    obj.hide = False
+    obj.keyframe_insert(data_path="hide",
+                        index=-1,
+                        frame=current_frame)
+
+    ###### place at stamp a keyframe with hide set to False
+    current_frame = stamp_i
+    bpy.ops.anim.change_frame(frame=current_frame)
+    obj.hide = False
+    obj.keyframe_insert(data_path="hide",
+                        index=-1,
+                        frame=current_frame)
 
 
 def set_junction(name, stamp, xx, yy, zz, color):

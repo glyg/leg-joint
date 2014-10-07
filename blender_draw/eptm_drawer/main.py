@@ -76,20 +76,24 @@ def create_jvs(jvs_df, time_dilation):
 def create_jes(jes_df):
     objects.create_junction_material()
     for je_idx, je_df in jes_df.iterrows():
+
         src_idx, trgt_idx, stamp = je_idx
-        #stamp = je_df.index.get_level_values(level='stamp')[0]
+        stamps = je_df.index.get_level_values(level='stamp')
+        stamp_i, stamp_f = stamps[[0, -1]]
         name = 'je{}to{}'.format(src_idx, trgt_idx)
-        je_obj = objects.set_junction_arm(name, src_idx, trgt_idx)
+        objects.set_junction_arm(name, src_idx, trgt_idx,
+                                 stamp_i, stamp_f)
 
-
-def main(fname, time_dilation=1, start_stamp=None, stop_stamp=None, v_bounds={}):
+def main(fname, time_dilation=1, start_stamp=None,
+         stop_stamp=None, v_bounds={}):
 
     scene = bpy.context.scene
 
     vertices_df = graph_io.load_vertices(fname, start_stamp, stop_stamp)
     edges_df = graph_io.load_edges(fname, start_stamp, stop_stamp)
     if len(v_bounds):
-        vertices_df, edges_df = hdfgraph.slice_data(vertices_df, edges_df, v_bounds)
+        vertices_df, edges_df = hdfgraph.slice_data(vertices_df,
+                                                    edges_df, v_bounds)
 
     jvs_df = vertices_df[vertices_df['is_cell_vert'] == 0]
     jes_df = edges_df[edges_df['is_junction_edge'] == 1]
