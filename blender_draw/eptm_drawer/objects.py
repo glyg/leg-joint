@@ -58,7 +58,7 @@ def create_junction_material():
 
 
 def set_junction_arm(name, src_idx, trgt_idx,
-                     stamp_i, stamp_f):
+                     stamp_i=None, stamp_f=None):
     '''
     '''
     if name in bpy.data.objects:

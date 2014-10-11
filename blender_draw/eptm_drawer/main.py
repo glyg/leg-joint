@@ -46,7 +46,8 @@ def create_cells(cells_df, ctojs_df, jvs_df):
         if not init_cell.is_alive:
             continue
         name = 'cell{}'.format(cell_idx)
-        neighbs_df = out_neighbours(cell_idx, ctojs_df, jvs_df).xs(init_stamp, level='stamp')
+        neighbs_df = out_neighbours(cell_idx, ctojs_df, jvs_df).xs(init_stamp,
+                                                                   level='stamp')
         if neighbs_df.shape[0] == 0:
             continue
         coords = ['ixs', 'wys', 'zeds']
@@ -75,11 +76,11 @@ def create_jvs(jvs_df, time_dilation):
 
 def create_jes(jes_df):
     objects.create_junction_material()
-    for je_idx, je_df in jes_df.iterrows():
+    for je_idx, je_df in jes_df.groupby(['source', 'target']):
 
-        src_idx, trgt_idx, stamp = je_idx
+        src_idx, trgt_idx = je_idx
         stamps = je_df.index.get_level_values(level='stamp')
-        stamp_i, stamp_f = stamps[[0, -1]]
+        stamp_i, stamp_f = stamps[0], stamps[-1]
         name = 'je{}to{}'.format(src_idx, trgt_idx)
         objects.set_junction_arm(name, src_idx, trgt_idx,
                                  stamp_i, stamp_f)
