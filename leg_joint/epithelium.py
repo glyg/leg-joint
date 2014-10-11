@@ -434,8 +434,6 @@ class Epithelium(EpitheliumFilters,
         `cell1`
         '''
 
-        self.cells.update_junctions(cell0)
-        self.cells.update_junctions(cell1)
         #This block should go in a decorator
         valid = np.array([element.is_valid() for element in
                           (cell0, j_verta, j_vertb)])
@@ -452,10 +450,14 @@ class Epithelium(EpitheliumFilters,
             warnings.warn("Junction from %s to %s doesn't exist"
                          % (str(j_edgeab.source()), str(j_edgeab.target())))
             return
-        self.cells.junctions[cell0].remove(j_edgeab)
-        self.cells.junctions[cell1].remove(j_edgeab)
-        self.junctions.adjacent_cells[j_edgeab] = []
+        # self.cells.junctions[cell0].remove(j_edgeab)
+        # self.cells.junctions[cell1].remove(j_edgeab)
+        # self.junctions.adjacent_cells[j_edgeab] = []
+
         self.graph.remove_edge(j_edgeab)
+        self.cells.update_junctions(cell0)
+        self.cells.update_junctions(cell1)
+        #self.junctions.update_adjacent()
         ctoj_0a = self.graph.edge(cell0, j_verta)
         if ctoj_0a is not None:
             self.graph.remove_edge(ctoj_0a)
