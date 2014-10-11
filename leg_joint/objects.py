@@ -666,8 +666,7 @@ class Cells():
 
     def update_junctions(self, cell):
         self.junctions[cell] = self.get_cell_junctions(cell)
-        self.num_sides[cell]\
-            = self.eptm.graph.degree_property_map('out')[cell]
+        self.num_sides[cell] = self.eptm.graph.degree_property_map('out')[cell]
 
     def get_cell_junctions(self, cell):
         jvs = [jv for jv in cell.out_neighbours()]

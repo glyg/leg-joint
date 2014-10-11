@@ -434,6 +434,8 @@ class Epithelium(EpitheliumFilters,
         `cell1`
         '''
 
+        self.cells.update_junctions(cell0)
+        self.cells.update_junctions(cell1)
         #This block should go in a decorator
         valid = np.array([element.is_valid() for element in
                           (cell0, j_verta, j_vertb)])
