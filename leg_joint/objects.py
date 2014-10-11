@@ -20,16 +20,21 @@ import os
 import numpy as np
 import scipy as sp
 
+import logging
+log = logging.getLogger(__name__)
+
+
 import graph_tool.all as gt
 #from scipy import weave, spatial
 from .filters import EpitheliumFilters
 from .utils import to_xy, to_rhotheta
-from .circumcircle import c_circumcircle
+try:
+    from .circumcircle import c_circumcircle
+except ImportError:
+    log.warning('''Compiling circumcircle failed - tissue generation won't work''')
 from .data import default_params
 from sklearn.decomposition import PCA
 
-import logging
-log = logging.getLogger(__name__)
 
 
 CURRENT_DIR = os.path.dirname(__file__)
@@ -933,4 +938,3 @@ def eval_anisotropy(cell, coords):
     orientation = np.abs(90 - (phi % np.pi) * 180 / np.pi)
     anisotropy = b / a
     return anisotropy, orientation
-
