@@ -9,13 +9,7 @@ This work was done in collaboration with
 [Magali Suzanne group](http://www-lbcmcp.ups-tlse.fr/Nouveau_site/modeles/EquipeSuzanne-Accueil.htm)
 at LBCMCP - Université de Toulouse.
 
-<iframe src="//player.vimeo.com/video/107188046" width="500"
-height="500" frameborder="0" webkitallowfullscreen mozallowfullscreen
-allowfullscreen></iframe> <p><a href="http://vimeo.com/107188046">Fold
-formation model</a> from <a
-href="http://vimeo.com/user12210065">glyg</a> on <a
-href="https://vimeo.com">Vimeo</a>.</p>
-
+If you're just here for eye candy, you can watch a video of the simulation [here](http://vimeo.com/107188046)
 
 ### Dependencies
 
