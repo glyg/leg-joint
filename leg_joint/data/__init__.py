@@ -28,11 +28,14 @@ def before_apoptosis_xml():
     '''
     return os.path.join(data_path, 'graphs', 'before_apoptosis.xml')
 
+def small_xml():
+    '''Returns the path to a small precomputed epithelium
+    (mostly for testing)
+    '''
+    return os.path.join(data_path, 'graphs', 'small.xml')
+
+
 def get_image(im_name):
     '''Returns the path to the image im_name
     '''
     return os.path.join(data_path, 'imgs', im_name)
-
-
-
-

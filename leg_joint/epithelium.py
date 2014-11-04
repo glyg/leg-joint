@@ -383,10 +383,8 @@ class Epithelium(EpitheliumFilters,
         for e_prop in self.graph.edge_properties.values():
             e_prop[j_edgeab] = e_prop[j_edge_old]
         self.junctions.adjacent_cells[j_edgeab] = cell0, cell1
-        if self.cells.junctions[cell0] is None:
-            self.cells.junctions[cell0] = [j_edgeab,]
-        else:
-            self.cells.junctions[cell0].append(j_edgeab)
+
+        self.cells.junctions[cell0].append(j_edgeab)
 
         if self.cells.junctions[cell1] is None:
             self.cells.junctions[cell1] = [j_edgeab,]

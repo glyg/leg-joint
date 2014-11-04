@@ -200,7 +200,7 @@ def type1_transition(eptm, elements, verbose=False):
 
     j_edgeac = eptm.any_edge(j_verta, j_vertc)
     j_edgebe = eptm.any_edge(j_vertb, j_verte)
-    if None in (j_edgebe, j_edgeac):
+    if j_edgebe is None or j_edgeac is None:
         raise ValueError("Invalid geometry")
 
     if not cell1 in eptm.junctions.adjacent_cells[j_edgeac]:
@@ -289,13 +289,16 @@ def type1_transition(eptm, elements, verbose=False):
 def cell_division(eptm, mother_cell,
                   phi_division=None,
                   verbose=False):
+    '''
+    Devides a cell
+    '''
+
     tau = 2 * np.pi
     if phi_division is None:
         phi_division = np.random.random() * tau
     eptm.update_rhotheta()
     eptm.update_dsigmas()
     a0 = eptm.params['prefered_area']
-    h = eptm.params['prefered_height']
     v0 = a0 * (eptm.rhos[mother_cell] - eptm.rho_lumen)
     eptm.cells.prefered_vol[mother_cell] = v0
     daughter_cell = eptm.new_vertex(mother_cell)
@@ -304,7 +307,7 @@ def cell_division(eptm, mother_cell,
     eptm.cells.ages[daughter_cell] = 0
     eptm.cells.junctions[daughter_cell] = []
 
-    eptm.log.info("Cell %s is born" % str(daughter_cell))
+    eptm.log.info("Cell {} is born".format(str(daughter_cell)))
 
     junction_trash = []
     new_junctions = []
@@ -378,13 +381,16 @@ def cell_division(eptm, mother_cell,
                 new_junctions.append((new_jv, j_trgt,
                                       adj_cell, daughter_cell))
     if not len(new_jvs) == 2:
-        eptm.log.error('Problem in the division of cell %s'
-                       % str(mother_cell))
+        eptm.log.error('Problem in the division of cell {}'.format(
+            str(mother_cell)))
         eptm.is_alive[daughter_cell] = 0
         return
     for (j_src, j_trgt, cell0, cell1) in junction_trash:
         eptm.remove_junction(j_src, j_trgt, cell0, cell1)
     for (j_src, j_trgt, cell0, cell1) in new_junctions:
+        ### Strange behaviour of gt here
+        eptm.graph.set_edge_filter(None)
+        eptm.graph.set_vertex_filter(None)
         j = eptm.add_junction(j_src, j_trgt, cell0, cell1)
     # Cytokinesis
     septum = eptm.add_junction(new_jvs[0], new_jvs[1],
