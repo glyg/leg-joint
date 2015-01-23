@@ -189,6 +189,27 @@ class AbstractRTZGraph(object):
         self.u_dixs = self.graph.edge_properties["u_dixs"]
         self.u_dwys = self.graph.edge_properties["u_dwys"]
 
+    def new_edge(self, vertex0, vertex1, source_edge):
+        '''Adds an edge between vertex0 and vertex1 and copies the properties
+        of source_edge to this new edge
+        '''
+        if self.any_edge(vertex0, vertex1) is None:
+            new_edge = self.graph.add_edge(vertex0, vertex1)
+            for prop in self.graph.edge_properties.values():
+                prop[new_edge] = prop[source_edge]
+            return new_edge
+        else:
+            return self.any_edge(vertex0, vertex1)
+
+    def new_vertex(self, source_vertex):
+        '''Adds a vertex and copies the properties
+        of source_vertex to this new vertex
+        '''
+        new_v = self.graph.add_vertex()
+        for prop in self.graph.vertex_properties.values():
+            prop[new_v] = prop[source_vertex]
+        return new_v
+
     def scale(self, scaling_factor):
         '''Multiply all the distances by a factor `scaling_factor`
 
@@ -303,16 +324,11 @@ class AbstractRTZGraph(object):
         self.ixs.a, self.wys.a = to_xy(self.rhos.a, self.thetas.a)
 
     def edge_difference(self, vprop, eprop=None):
-
-        vtype = vprop.value_type()
-        if eprop == None:
-            eprop = self.graph.new_edge_property(vtype)
-        for e in self.graph.edges():
-            eprop[e] = vprop[e.target()] - vprop[e.source()]
+        eprop = gt.edge_difference(self.graph, vprop)
         return eprop
 
     def update_deltas(self):
-        ''' Updates the edge coordinates from their vertices posittions'''
+        ''' Updates the edge coordinates from their vertices positions'''
         dzeds = self.edge_difference(self.zeds)
         dixs = self.edge_difference(self.ixs)
         dwys = self.edge_difference(self.wys)

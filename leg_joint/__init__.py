@@ -9,7 +9,7 @@ import logging
 log = logging.getLogger(__name__)
 ch = logging.StreamHandler()
 formatter = logging.Formatter('%(asctime)s -'
-                              '%(name)s -'
+                              '%(name)s -%(funcName)s -- '
                               '%(levelname)s -'
                               '%(message)s')
 ch.setFormatter(formatter)

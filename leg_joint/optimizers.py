@@ -14,10 +14,13 @@ from .filters import active
 from .utils import local_subgraph
 from .epithelium import hdf_snapshot
 
+import logging
+log = logging.getLogger(__name__)
+
 
 @active
 def precondition(eptm):
-    '''Grabd the positions and computes the maximum displacements
+    '''Grabs the positions and computes the maximum displacements
     before optimisation.
     '''
     pos0 = np.vstack([eptm.ixs.fa,
@@ -44,7 +47,6 @@ def precondition(eptm):
         bounds[3 * n] = (x_bounds[n, 0], x_bounds[n, 1])
         bounds[3 * n + 1] = (y_bounds[n, 0], y_bounds[n, 1])
         bounds[3 * n + 2] = (z_bounds[n, 0], z_bounds[n, 1])
-
     return pos0, bounds
 
 @local_subgraph
@@ -59,19 +61,14 @@ def find_energy_min(eptm, method='fmin_l_bfgs_b',
     output = 0
     if method == 'fmin_l_bfgs_b':
         ## I set `factr` to 1e11 to avoid too long computation
-        output = optimize.fmin_l_bfgs_b(opt_energy,
-                                        pos0.flatten(),
+        output = optimize.fmin_l_bfgs_b(opt_energy, pos0.flatten(),
                                         fprime=opt_gradient,
                                         #approx_grad=approx_grad,
                                         bounds=bounds.flatten(),
-                                        args=(eptm,),
-                                        factr=1e10,
-                                        m=10,
-                                        pgtol=tol,
-                                        epsilon=epsilon,
-                                        iprint=1,
-                                        maxfun=150,
-                                        disp=None)
+                                        args=(eptm,), factr=1e10,
+                                        m=10, pgtol=tol,
+                                        epsilon=epsilon, iprint=1,
+                                        maxfun=150, disp=None)
 
     elif method=='fmin':
         output = optimize.fmin(opt_energy,
@@ -119,7 +116,7 @@ def approx_grad(eptm):
 @local_subgraph
 def check_local_grad(eptm):
     pos0, bounds = precondition(eptm)
-    if eptm.__verbose__: print("Checking gradient")
+    log.info("Checking gradient")
 
     # grad_err = np.linalg.norm(approx_grad(eptm)
     #                           - eptm.gradient_array())

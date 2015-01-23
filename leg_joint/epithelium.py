@@ -160,8 +160,8 @@ class Epithelium(EpitheliumFilters,
                       % (total_edges - good_edges))
             self.graph.set_edge_filter(efilt)
             self.graph.purge_edges()
-            self.set_vertex_state()
-            self.set_edge_state()
+            self.graph.set_vertex_filter(None)
+            self.graph.set_edge_filter(None)
 
         self.reset_topology(local=False)
         # Dynamical components
