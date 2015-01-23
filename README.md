@@ -2,14 +2,20 @@
 
 copyright Guillaume Gay - 2012 - 2014 - http://damcb.com
 
-This work is pending publication - once the associated scientific
-article is out, it will be released as a GPL project.
+This work is part of a research project which has been publish in Nature:
+
+**Apico-basal forces exerted by apoptotic cells drive epithelium folding**
+
+Bruno Monier, Melanie Gettings, Guillaume Gay, Thomas Mangeat, Sonia Schott, Ana Guarner, Magali Suzanne
+Nature (21 January 2015), [doi:10.1038/nature14152](http://dx.doi.org/10.1038/nature14152)
+
 
 This work was done in collaboration with
 [Magali Suzanne group](http://www-lbcmcp.ups-tlse.fr/Nouveau_site/modeles/EquipeSuzanne-Accueil.htm)
 at LBCMCP - Université de Toulouse.
 
 If you're just here for eye candy, you can watch a video of the simulation [here](http://vimeo.com/107188046)
+There's a short summary of the biology [here](http://damcb.com/paper_out.html), and you can ask for the paper itself by e-mail.
 
 ### Dependencies
 
@@ -27,11 +33,9 @@ If you're just here for eye candy, you can watch a video of the simulation [here
 
 The easiest route to install (nearly) all the dependencies is to use
 [Anaconda](https://store.continuum.io/cshop/anaconda/). For
-`graph-tool` follow the link above and the instructions
-there. If 2.2.36 or higher is stable, the easiest way is to install
-from the precompiled packaged binaries, if available for your OS. If
-only 2.2.35 is released (as of the time of this writing), you need to
-compile the version from `git`.
+`graph-tool` follow the link above and the instructions there. The
+easiest way is to install from the precompiled packaged binaries, if
+available for your OS. Due to a bug, version 2.2.35 won't work.
 
 
 ### Documentation

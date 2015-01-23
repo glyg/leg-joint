@@ -14,11 +14,11 @@ from .filters import active
 from .utils import local_subgraph
 from .epithelium import hdf_snapshot
 
-    
+
 @active
 def precondition(eptm):
     '''Grabd the positions and computes the maximum displacements
-    before optimisation. 
+    before optimisation.
     '''
     pos0 = np.vstack([eptm.ixs.fa,
                       eptm.wys.fa,
@@ -159,12 +159,12 @@ def isotropic_optimum(eptm, tol):
     energy0 = eptm.calc_energy()
     eptm.isotropic_relax()
     energy1 = eptm.calc_energy()
-    criterium = np.abs(energy0 - energy1) / energy0 
+    criterium = np.abs(energy0 - energy1) / energy0
     while criterium > tol:
         energy0 = energy1
         eptm.isotropic_relax()
         energy1 = eptm.calc_energy()
-        criterium = np.abs(energy0 - energy1) / energy0 
+        criterium = np.abs(energy0 - energy1) / energy0
 
 
 def running_local_optimum(eptm, tol, pola=False, save_to=None, ):
