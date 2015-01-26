@@ -90,7 +90,7 @@ class Epithelium(EpitheliumFilters,
            paramfile contains the paramters values for the simulation.
 
         graph : a graph_tool :class:`Graph` instance
-
+        save_dir: str or path
         verbose : bool, optional
            if `True`, the simulation will output -possibly lots of-
            information on the successive operations.
