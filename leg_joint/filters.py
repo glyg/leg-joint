@@ -1,11 +1,7 @@
-#!/usr/bin/env python -*- coding: utf-8 -*-
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 from graph_tool import Graph, GraphView
-
 import numpy as np
-import logging
-log = logging.getLogger(__name__)
-
-
 
 def local_slice(eptm, theta_c=0, theta_amp=np.pi/24,
                 zed_c=0, zed_amp=None):
@@ -44,36 +40,50 @@ def focus_on_cell(eptm, cell, radius):
 #####  Decorators
 def local(meth):
     def new_function(self, *args, **kwargs):
-        log.debug('filter local')
-        self.graph.set_vertex_filter(self.is_local_vert)
-        self.graph.set_edge_filter(self.is_local_edge)
+        prev_vstate, prev_inverted_v = self.graph.get_vertex_filter()
+        prev_estate, prev_inverted_e = self.graph.get_edge_filter()
+        if self.__verbose__ : print('filter local')
+        self.set_vertex_state([(self.is_local_vert, False),])
+        self.set_edge_state([(self.is_local_edge, False)])
         out = meth(self, *args, **kwargs)
+        if self.__verbose__ : print('restore from local filter')
+        self.graph.set_vertex_filter(prev_vstate, prev_inverted_v)
+        self.graph.set_edge_filter(prev_estate, prev_inverted_e)
         return out
     return new_function
 
 
 def active(meth):
     def new_function(self, *args, **kwargs):
-        log.debug('filter active')
-        self.graph.set_vertex_filter(self.is_active_vert)
-        self.graph.set_edge_filter(self.is_active_edge)
+        prev_vstate, prev_inverted_v = self.graph.get_vertex_filter()
+        prev_estate, prev_inverted_e = self.graph.get_edge_filter()
+        if self.__verbose__ : print('filter active')
+        self.set_vertex_state([(self.is_active_vert, False),])
+        self.set_edge_state([(self.is_active_edge, False)])
         out = meth(self, *args, **kwargs)
+        if self.__verbose__ : print('restore from active filter')
+        self.graph.set_vertex_filter(prev_vstate, prev_inverted_v)
+        self.graph.set_edge_filter(prev_estate, prev_inverted_e)
         return out
     return new_function
+
 
 def no_filter(meth):
     def new_function(self, *args, **kwargs):
-        log.debug('no filter')
+        if self.__verbose__ : print('no filter')
+        prev_vstate, prev_inverted_v = self.graph.get_vertex_filter()
+        prev_estate, prev_inverted_e = self.graph.get_edge_filter()
         self.graph.set_vertex_filter(None)
         self.graph.set_edge_filter(None)
         out = meth(self, *args, **kwargs)
+        if self.__verbose__ : print('restore from no filter')
+        self.graph.set_vertex_filter(prev_vstate, prev_inverted_v)
+        self.graph.set_edge_filter(prev_estate, prev_inverted_e)
         return out
     return new_function
 
-
 def cells_in(meth):
     def new_function(self, *args, **kwargs):
-        log.warning('This is deprecated')
         prev_vstate, prev_inverted = self.graph.get_vertex_filter()
         if self.__verbose__ : print('filter cells in')
         #self.graph.set_vertex_filter(self.is_cell_vert)
@@ -87,7 +97,6 @@ def cells_in(meth):
 
 def cells_out(meth):
     def new_function(self, *args, **kwargs):
-        log.warning('This is deprecated')
         if self.__verbose__ : print('cells out')
         prev_vstate, prev_inverted = self.graph.get_vertex_filter()
         self.set_vertex_state([(self.is_cell_vert, True),
@@ -112,10 +121,10 @@ def j_edges_in(meth):
 def ctoj_in(meth):
     def new_function(self, *args, **kwargs):
         prev_estate, prev_inverted = self.graph.get_edge_filter()
-        log.debug('cell to junctions edges in')
+        if self.__verbose__ : print('cell to junctions edges in')
         self.set_edge_state([(self.is_ctoj_edge, False),])
         out = meth(self, *args, **kwargs)
-        log.debug('restore from cell to junctions edges in')
+        if self.__verbose__ : print('restore from cell to junctions edges in')
         self.graph.set_edge_filter(prev_estate, prev_inverted)
         return out
     return new_function
@@ -131,7 +140,6 @@ def deads_in(meth):
         self.graph.set_vertex_filter(prev_vstate, prev_inverted)
         return out
     return new_function
-
 
 class EpitheliumFilters(object):
 
@@ -212,6 +220,22 @@ class EpitheliumFilters(object):
         else:
             return self.any_edge(jv0, jv1)
 
+    def new_edge(self, vertex0, vertex1, source_edge):
+        if self.any_edge(vertex0, vertex1) is None:
+            new_edge = self.graph.add_edge(vertex0, vertex1)
+            for prop in self.graph.edge_properties.values():
+                prop[new_edge] = prop[source_edge]
+            return new_edge
+        else:
+            return self.any_edge(vertex0, vertex1)
+
+
+    def new_vertex(self, source_vertex):
+        new_v = self.graph.add_vertex()
+        for prop in self.graph.vertex_properties.values():
+            prop[new_v] = prop[source_vertex]
+        return new_v
+
     def set_vertex_state(self,  properties=[]):
         if len(properties) == 0:
             self.graph.set_vertex_filter(None)
@@ -229,7 +253,8 @@ class EpitheliumFilters(object):
                 tmp_vfilt.a *= (1 - prop.a)
             else:
                 tmp_vfilt.a *= prop.a
-        log.debug('%i vertices filtered in' % tmp_vfilt.a.sum())
+        if self.__verbose__:
+            print('%i vertices filtered in' % tmp_vfilt.a.sum())
         self.graph.set_vertex_filter(tmp_vfilt)
 
     def set_edge_state(self,  properties=[]):
@@ -246,8 +271,8 @@ class EpitheliumFilters(object):
         for prop, inverted in properties:
             tmp_efilt.a *= (1 - prop.a) if inverted else prop.a
 
-        log.debug('%i edges filtered in'
-                  % tmp_efilt.a.sum())
+        if self.__verbose__: print('%i edges filtered in'
+                                   % tmp_efilt.a.sum())
         self.graph.set_edge_filter(tmp_efilt)
 
     #### Local Masks
