@@ -68,7 +68,7 @@ class Dynamics(object):
         self.graph.vertex_properties["volume_grad_cell"]\
             = self.volume_grad_cell
 
-        
+
     def _get_gradients(self):
         # Gradients amplitudes
         self.elastic_grad = self.graph.vertex_properties["elastic_grad"]
@@ -89,12 +89,12 @@ class Dynamics(object):
         self.volume_grad_cell = self.graph.new_vertex_property('vector<double>')
         self.graph.vertex_properties["volume_grad_cell"]\
             = self.volume_grad_cell
-        
+
     def calc_energy(self):
         """ Computes the apical energy on the filtered epithelium """
         contractile_term, volume_term = self.calc_cells_energy()
         junction_term, radial_term = self.calc_junctions_energy()
-        
+
         total_energy = (contractile_term.sum()
                         + volume_term.sum()
                         + junction_term.sum()
@@ -108,7 +108,7 @@ class Dynamics(object):
         volume_term = 0.5 * self.cells.vol_elasticities.fa \
                       * (self.cells.vols.fa - self.cells.prefered_vol.fa)**2
         return contractile_term, volume_term
-        
+
     @j_edges_in
     def calc_junctions_energy(self):
         junctions_energy = self.junctions.line_tensions.fa\
@@ -116,14 +116,14 @@ class Dynamics(object):
         radial_energy = self.junctions.radial_tensions.fa\
                         * (self.rhos.fa - self.rho_lumen)
         return junctions_energy, radial_energy
-        
+
     @active
     def gradient_array(self, gtol=1e-8):
         gradient = np.zeros(self.graph.num_vertices() * 3)
         log.debug('Gradient shape: %s' % gradient.shape)
         gradient[::3] = self.grad_ix.fa
         gradient[1::3] = self.grad_wy.fa
-        gradient[2::3] = self.grad_zed.fa 
+        gradient[2::3] = self.grad_zed.fa
         gradient[np.abs(gradient) < gtol] = 0.
         return gradient / self.norm_factor
 
@@ -132,12 +132,12 @@ class Dynamics(object):
         Updates the components of the gradient exerted on the junction
         vertices
 
-        
+
         '''
-        
+
         self._update_cells_grad()
         self._update_junctions_grad()
-        
+
     def _update_cells_grad(self):
         # Cell vertices
         self.contractile_grad.fa =  self.cells.contractilities.fa \
@@ -150,7 +150,7 @@ class Dynamics(object):
             self._calc_vol_grad_cell(cell)
 
     def _calc_vol_grad_cell(self, cell):
-        
+
         vol_grad = [0, 0, 0]
         if  self.is_alive[cell]:
             for j_edge in self.cells.junctions[cell]:
@@ -164,7 +164,7 @@ class Dynamics(object):
             vol_grad *= self.volume_grad_radial[cell]\
                         / self.cells.num_sides[cell]
         self.volume_grad_cell[cell] = vol_grad
-            
+
     def _update_junctions_grad(self):
 
         self.grad_wy.a = 0.
@@ -174,6 +174,7 @@ class Dynamics(object):
         radial = self.junctions.radial_tensions.a
         self.grad_ix.a += radial * self.ixs.a / self.rhos.a
         self.grad_wy.a += radial * self.wys.a / self.rhos.a
+        self.grad_zed.a += radial * self.zeds.a / self.rhos.a
 
         # Contribution from junction edges
         for j_edge in self.junctions:
@@ -186,18 +187,18 @@ class Dynamics(object):
             self.grad_ix[j_vert] += gc_x
             self.grad_wy[j_vert] += gc_y
             self.grad_zed[j_vert] += gc_z
-            
+
     def _update_edge_grad(self, j_edge):
         ''' Computes the components of the gradient for the junction edge
-        `j_edge` vertices 
+        `j_edge` vertices
 
         Parameter
         ---------
         j_edge : a junction edge
-        
+
         '''
 
-        
+
         tension = self.junctions.line_tensions[j_edge]
         jv0, jv1 = j_edge
         u_xg = self.u_dixs[j_edge]
@@ -206,7 +207,7 @@ class Dynamics(object):
         self.grad_ix[jv0] -= tension * u_xg
         self.grad_wy[jv0] -= tension * u_yg
         self.grad_zed[jv0] -= tension * u_zg
-        
+
         self.grad_ix[jv1] += tension * u_xg
         self.grad_wy[jv1] += tension * u_yg
         self.grad_zed[jv1] += tension * u_zg
@@ -244,7 +245,7 @@ class Dynamics(object):
             self.grad_ix[jv1] += ctr_grad * u_xg
             self.grad_wy[jv1] += ctr_grad * u_yg
             self.grad_zed[jv1] += ctr_grad * u_zg
-            
+
     def update_tensions(self, phi, delta_phi, factor=2.):
         '''
         Multiplies tension by `factor` for junctions that verify:
@@ -255,7 +256,7 @@ class Dynamics(object):
         ..math::
 
            \phi = \tan^{-1}\frac{\sqrt{\delta x^2 + \delta y^2}}{\delta z}
-        
+
         Parameters
         ----------
         phi : graph_tool :class:`EdgePropertyMap` with `float` data type
@@ -263,7 +264,7 @@ class Dynamics(object):
 
         delta_phi : float
             Angular range for which the line tension is changed
-        
+
         '''
 
         lt0 = self.params['line_tension']
@@ -304,10 +305,10 @@ class Dynamics(object):
         self.delta_o = delta_o
         self.ground_energy = self.isotropic_energy(delta_o)
         ### Scaling
-        
+
         self.scale(delta_o)
         self.update_geometry()
-        
+
 
     def isotropic_energy(self, delta):
         """
@@ -322,10 +323,10 @@ class Dynamics(object):
         tension = lbda * mu * delta / 2.
         energy = elasticity + contractility + tension
         return energy
-        
+
 
     def isotropic_grad_poly(self):
-        
+
         lbda = self.paramtree.relative_dic['line_tension']
         gamma = self.paramtree.relative_dic['contractility']
         grad_poly = [3, 0, 0,
@@ -340,7 +341,7 @@ class Dynamics(object):
 
     def find_grad_roots(self):
         p = self.isotropic_grad_poly()
-        roots = np.roots(p)            
+        roots = np.roots(p)
         good_roots = np.real([r for r in roots if np.abs(r) == r])
         np.sort(good_roots)
         if len(good_roots) == 1:
@@ -350,7 +351,7 @@ class Dynamics(object):
         else:
             return np.nan
 
-        
+
     def check_phase_space(self):
         '''
         Checks wether parameter values `gamma` and `lbda` yields a
@@ -382,5 +383,3 @@ class Dynamics(object):
             report = ('Invalid values for line tension and contractility')
             return False, report
         return True, 'ok!'
-
-

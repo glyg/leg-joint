@@ -27,7 +27,7 @@ def _get_je(eptm, tup=(100, 101)):
     return eptm.graph.edge(*tup)
 
 def grad_norm(eptm, jv):
-    return (eptm.grad_ix[jv]**2 + eptm.grad_zed[jv]**2 + eptm.grad_wy[jv]**2)
+    return (eptm.grad_ix[jv]**2 + eptm.grad_zed[jv]**2 + eptm.grad_wy[jv]**2)**0.5
 
 def test_gradient():
     eptm = lj.Epithelium(graphXMLfile=lj.data.small_xml(),
@@ -42,6 +42,5 @@ def test_gradient():
     growth_rate = 1.5
     eptm.cells.prefered_vol[mother_cell] *= growth_rate
     eptm.update_gradient()
-    assert_almost_equal(grad_norm(eptm, jv0),
-                        grad_norm(eptm, jv0),
-                        decimal=3)
+    assert_almost_equal(grad_norm(eptm, jv0)/4845., 1, decimal=3)
+    assert_almost_equal(grad_norm(eptm, jv1)/5080., 1, decimal=3)
