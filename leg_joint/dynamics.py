@@ -235,11 +235,11 @@ class Dynamics(object):
 
             self.grad_ix[jv0] += v_grad_r * self.ixs[jv0] / self.rhos[jv0]
             self.grad_wy[jv0] += v_grad_r * self.wys[jv0] / self.rhos[jv0]
-            self.grad_zed[jv0] += v_grad_r * self.zeds[jv0] / self.zeds[jv0]
+            self.grad_zed[jv0] += v_grad_r * self.zeds[jv0] / self.rhos[jv0]
 
             self.grad_ix[jv1] += v_grad_r * self.ixs[jv1] / self.rhos[jv1]
             self.grad_wy[jv1] += v_grad_r * self.wys[jv1] / self.rhos[jv1]
-            self.grad_zed[jv1] += v_grad_r * self.zeds[jv1] / self.zeds[jv1]
+            self.grad_zed[jv1] += v_grad_r * self.zeds[jv1] / self.rhos[jv1]
 
             ctr_grad = self.contractile_grad[triangle.cell]
             self.grad_ix[jv0] -= ctr_grad * u_xg
