@@ -11,24 +11,83 @@ import pandas as pd
 import numpy as np
 import hdfgraph
 from leg_joint.objects import get_faces
+import logging
+log = logging.getLogger(__name__)
 
-#local_graph = None
-eptm = None
+
+
+'''
+The purpose of this small module is to efficiently compute
+the geometrical an dynamical properties of the epithelium graph.
+
+As those computations are vectorial calculus, we use pandas to perfor them
+
+'''
+
+class Unique_index:
+    ''' constructor class to retrieve unique indices from the faces'''
+    def __init__(self, idx):
+        self._full_idx = idx
+        self._idx = None
+
+    @property
+    def idx(self):
+        '''Unique indices'''
+        return self._full_idx.unique()
+
+class DFSelector:
+    ''' constructor class to downcast and upcast
+    from the 3 DataFrame'''
+    def __init__(self, df, idx, *columns):
+
+        self.idx
+        self._idx = None
+
+    @property
+    def idx(self):
+        '''Unique indices'''
+        return self._full_idx.unique()
 
 
 def _to_3d(df):
     return df.repeat(3).reshape((df.size, 3))
 
-def parse_graph(graph, coords):
+def parse_graph(graph):
 
     vertex_df, edges_df  = hdfgraph.graph_to_dataframes(graph)
-
     triangles = get_faces(graph)
     return vertex_df, edges_df, triangles
 
 class Triangles:
+    '''
+    Data structure defined to index the ensembles of sub-graph homologue to
+    this topology:
+
+     jv_i (i) -- > (j) jv_j
+           ^       ^
+            \     /
+             \   /
+              (a) cell
+
+    In the 3D coordinate system, this represents an oriented
+    triangular face.  Note that as long as the cell to junction edges
+    go outward from the cell, the complete epithelium is a unique
+    set of faces homologue to this topology (regardess of the
+    orientation of jv_i and jv_j) thus the triangle is the unit cell
+    of the geometrical network - in the cristalography sense of unit
+    cell.
+
+    '''
 
     def __init__(self, vertex_df, edges_df, triangles, coords):
+        '''
+        Creates a container class for the triangles geometry
+
+        Parameters:
+        -----------
+        vertex_df:  :class:`pandas.DataFrame` class
+
+        '''
 
         self.vertex_df = vertex_df.copy()
         self.edges_df = edges_df.copy()
@@ -38,41 +97,88 @@ class Triangles:
         self.normal_coords = ['u'+c for c in self.coords]
 
         self._build_indices(triangles)
-        self.triangles = pd.DataFrame(index=self.tri_midx)
+        self.faces = pd.DataFrame(index=self.tri_midx)
+        self._complete_df_cols()
 
-    def _build_indices(self, triangles):
 
-        self.tri_midx = pd.MultiIndex.from_arrays(triangles.T,
-                                                  names=('cell', 'jv_i', 'jv_j'))
-        self.tri_cells = self.tri_midx.get_level_values('cell')
-        self.tri_jvis = self.tri_midx.get_level_values('jv_i')
-        self.tri_jvjs = self.tri_midx.get_level_values('jv_j')
+    def _build_indices(self, faces):
 
-        self.tri_ij = self.tri_midx.droplevel('cell')
-        self.tri_ak = self.tri_midx.droplevel('jv_j')
-        self.tri_am = self.tri_midx.droplevel('jv_i')
+        self.indices = {}
+        names =('cell', 'jv_i', 'jv_j')
+        letters = ('a', 'i', 'j')
 
-        self.cell_idxs = self.tri_cells.unique()
-        self.jvi_idxs = self.tri_jvis.unique()
-        self.jvj_idxs = self.tri_jvjs.unique()
+        ### MultiIndex named (cell, jv_i, jv_j) for each triangle
+        ### Those indices must be coherent with the original graph
+        self.tri_midx = pd.MultiIndex.from_arrays(faces.T,
+                                                  names=names)
+        self.indices[tuple(names)] = self.tri_midx
+        for letter, name  in zip(letters, names):
 
-        self.jv_idxs = np.array(set(self.jvi_idxs).union(self.jvj_idxs))
-        self.je_idxs = self.tri_ij.unique()
+            ### single level index on current
+            ### vertex type (contains repeated values)
+            idx_name = 'tri_{}'.format(letter)
+            idx = self.tri_midx.get_level_values(name)
+            setattr(self, idx_name, idx)
+            self.indices[name] = idx
 
-    def _check_structure(self):
+            unique = Unique_index(idx)
+            unique_name = 'uix_{}'.format(letter)
+            setattr(self, unique_name, unique.idx)
+
+            ### 2 level MultiIndex on the oriented edge opposed
+            ### to the current vertex
+            other_letters = list(letters)
+            other_letters.remove(letter)
+            other_names = list(names)
+            other_names.remove(name)
+
+            idx_name = 'tri_{}{}'.format(*other_letters)
+            idx = self.tri_midx.droplevel(name)
+            setattr(self, idx_name, idx)
+
+            self.indices[tuple(other_names)] = idx
+            unique_name = 'uix_{}{}'.format(*other_letters)
+            unique = Unique_index(idx)
+            setattr(self, unique_name, unique.idx)
+
+    @property
+    def mandatory_vcols(self):
+
+        cols = set(self.coords)
+        topology = {'is_cell_vert',
+                    'num_sides'}
+        cols.update(topology)
+        cell_geom = {'heights',
+                     'perimeters',
+                     'areas',
+                     'vols'}
+        cols.update(cell_geom)
+
+        dyn_parameters = ['contractilities',
+                          'vol_elasticities']
+        cols.update(dyn_parameters)
+        return cols
+
+    @property
+    def mandatory_ecols(self):
+        cols = set(self.dcoords)
+        cols.update({'edge_length',
+                     'line_tensions'})
+        return cols
+
+
+    def _complete_df_cols(self):
 
         ### mendatory columns
-        vertex_cols = self.coords + ['is_cell_vert', 'areas', 'num_sides',
-                                     'cell_heights', 'vols', 'rhos', 'perimeters',
-                                     'contractilities', 'vol_elasticities']
-
-        missing = set(vertex_cols).difference(self.vertex_df.columns)
+        missing = self.mandatory_vcols.difference(self.vertex_df.columns)
         for col in missing:
+            log.debug('appending null column {}'.format(col),
+                      'to vertex_df')
             self.vertex_df[col] = 0
-        edges_cols = self.dcoords + ['edge_length', 'line_tensions']
-
-        missing = set(edges_cols).difference(self.edges_df.columns)
+        missing = self.mandatory_ecols.difference(self.edges_df.columns)
         for col in missing:
+            log.debug('appending null column {}'.format(col),
+                      'to edges_df')
             self.edges_df[col] = 0
 
     def geometry(self, rho_lumen):
@@ -83,7 +189,7 @@ class Triangles:
         self.edges_df[self.dcoords] = self.vertex_df.loc[trgts, self.coords].values\
                                       - self.vertex_df.loc[srcs, self.coords].values
         self.edges_df['edge_lengths'] = (self.edges_df[self.dcoords]**2).sum(axis=1)**0.5
-        self.triangles['ell_ij'] = self.edges_df.loc[self.tri_ij, 'edge_lengths'].values
+        self.faces['ell_ij'] = self.edges_df.loc[self.tri_ij, 'edge_lengths'].values
 
         cell_idxs = self.cell_idxs
         ### This should be done elsewhere
@@ -97,13 +203,13 @@ class Triangles:
         crosses = pd.DataFrame(np.cross(r_ak, r_am), index=self.tri_cells)
 
         sub_areas = ((crosses**2).sum(axis=1)**0.5) / 2
-        self.triangles['sub_areas'] = sub_areas.values
+        self.faces['sub_areas'] = sub_areas.values
         normals = 2 * crosses / _to_3d(sub_areas)
         normals.columns = self.normal_coords
-        self.triangles.append(normals)
+        self.faces.append(normals)
 
         self.vertex_df.loc[cell_idxs, 'areas'] = sub_areas.sum(level='cell').loc[cell_idxs]
-        self.vertex_df.loc[cell_idxs, 'perimeters'] = self.triangles.ell_ij.sum(level='cell').loc[cell_idxs]
+        self.vertex_df.loc[cell_idxs, 'perimeters'] = self.faces.ell_ij.sum(level='cell').loc[cell_idxs]
         self.vertex_df.loc[cell_idxs, 'vols'] = (self.vertex_df.cell_heights * self.vertex_df.areas).loc[cell_idxs]
 
     def gradient(self):
