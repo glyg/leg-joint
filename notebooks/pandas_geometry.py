@@ -201,6 +201,11 @@ class Triangles:
                       'to edges_df')
             self.edges_df[col] = 0
 
+        for c in self.normal_coords:
+            self.faces[c] = 0
+
+
+
     def geometry(self, rho_lumen):
 
         srcs = self.edges_df.index.get_level_values('source')
@@ -211,6 +216,7 @@ class Triangles:
         self.edges_df['edge_lengths'] = (self.edges_df[self.dcoords]**2).sum(axis=1)**0.5
         self.faces['ell_ij'] = self.tdf_itoj['edge_lengths'].values
 
+        ### This must be computed before hand
         self.udf_cell['cell_heights'] = self.udf_cell['rhos'] - rho_lumen
 
         num_sides = self.tix_aij.get_level_values('cell').value_counts()
@@ -223,8 +229,7 @@ class Triangles:
         sub_areas = ((crosses**2).sum(axis=1)**0.5) / 2
         self.faces['sub_areas'] = sub_areas.values
         normals = 2 * crosses / _to_3d(sub_areas)
-        normals.columns = self.normal_coords
-        self.faces.append(normals)
+        self.faces[self.normal_coords] = normals.values
 
         self.udf_cell['areas'] = sub_areas.sum(level='cell').loc[self.uix_a]
         self.udf_cell['perimeters'] = self.faces.ell_ij.sum(level='cell').loc[self.uix_a]
@@ -235,42 +240,123 @@ class Triangles:
 
         self.vertex_df['E_v'] = 0
         self.udf_cell['E_v'] = 0.5 * (self.udf_cell['vol_elasticities']
-                                     * (self.udf_cell['vols']
-                                        - self.udf_cell['prefered_vol'])**2)
+                                      * (self.udf_cell['vols']
+                                         - self.udf_cell['prefered_vol'])**2)
         self.vertex_df['E_c'] = 0
         self.udf_cell['E_c'] = 0.5 * (self.udf_cell['contractilities']
-                                     * self.udf_cell['perimeters']**2)
+                                      * self.udf_cell['perimeters']**2)
         self.edges_df['E_t'] = 0
         E_t = self.udf_itoj['line_tensions'] * self.udf_itoj['edge_lengths']
         self.udf_itoj['E_t'] = E_t.values
 
-    def gradient(self):
-
+    def gradient(self, components=False):
+        '''
+        If components is tTrue, returns the individual terms
+        (grad_t, grad_c, grad_v)
+        '''
         self.grad_coords = ['g'+c for c in self.coords]
-        grad_i = pd.DataFrame(0, index=self.jv_idxs,
-                              columns=self.grad_coords)
+        uix_jv = set(self.uix_i).union(self.uix_j)
+        grad_i = pd.DataFrame(0, index=uix_jv,
+                              columns=self.grad_coords).sort_index()
+        grad_i_lij = - self.udf_itoj[self.dcoords] / _to_3d(self.udf_itoj['edge_lengths'])
+        grad_i_lij.index = pd.MultiIndex.from_tuples(self.uix_ij, names=('jv_i', 'jv_j'))
 
-        grad_i_lij = self.edges_df[self.dcoords] / _to_3d(self.edges_df.edge_lengths)
-        grad_i_lij = grad_i_lij.loc[self.je_idxs]
+        grad_t = self.tension_grad(grad_i, grad_i_lij)
+        grad_c = self.contractile_grad(grad_i, grad_i_lij)
+        grad_v = self.volume_grad(grad_i, grad_i_lij)
 
-        tensions = self.edges_df.loc[self.je_idxs, 'line_tensions']
+        grad_i = grad_t + grad_c + grad_v
+        if components:
+            return grad_i, grad_t, grad_c, grad_v
+        return grad_i
+
+
+    def tension_grad(self, grad_i, grad_i_lij):
+
+        grad_t = grad_i.copy()
+        grad_t[:] = 0
+
+        tensions = self.udf_itoj['line_tensions']
         tensions.index.names = ('jv_i', 'jv_j')
 
-        contract = self.vertex_df.loc[self.cell_idxs, 'contractilities']
+        _grad_t = grad_i_lij * _to_3d(tensions)
+        grad_t.loc[self.uix_i] += _grad_t.sum(level='jv_i').loc[self.uix_i].values
+        grad_t.loc[self.uix_j] += _grad_t.sum(level='jv_j').loc[self.uix_j].values
+        return grad_t
+
+    def contractile_grad(self, grad_i, grad_i_lij):
+
+        grad_c = grad_i.copy()
+        grad_c[:] = 0
+
+        contract = self.udf_cell['contractilities']
         contract.index.name = 'cell'
-        perimeters = self.vertex_df.loc[self.cell_idxs, 'perimeters']
+        perimeters = self.udf_cell['perimeters']
 
         gamma_L = contract * perimeters
         gamma_L = gamma_L.loc[self.tix_a]
         gamma_L.index = self.tix_aij
 
-        area_term_alpha = gamma_L.groupby(level='jv_i').apply(
+        area_term = gamma_L.groupby(level='jv_i').apply(
             lambda df: df.sum(level='jv_j'))
-        area_term_beta = gamma_L.groupby(level='jv_j').apply(
-            lambda df: df.sum(level='jv_i')).swaplevel(0,1).sortlevel()
 
-        big_term_a = grad_i_lij * _to_3d(tensions + area_term_alpha)
-        big_term_b = grad_i_lij * _to_3d(tensions + area_term_beta)
+        _grad_c = grad_i_lij.loc[self.uix_ij] * _to_3d(area_term.loc[self.uix_ij])
+        grad_c.loc[self.uix_i] += _grad_c.sum(level='jv_i').loc[self.uix_i].values
+        grad_c.loc[self.uix_j] += _grad_c.sum(level='jv_j').loc[self.uix_j].values
 
-        grad_i.loc[self.jvi_idxs] += big_term_a.sum(level='jv_i').loc[self.jvi_idxs].values
-        grad_i.loc[self.jvj_idxs] -= big_term_b.sum(level='jv_j').loc[self.jvj_idxs].values
+        return grad_c
+
+    def volume_grad(self, grad_i, grad_i_lij):
+
+        grad_v = grad_i.copy()
+        grad_v[:] = 0
+
+        elasticity = self.udf_cell['vol_elasticities']
+        pref_V = self.udf_cell['prefered_vol']
+        V = self.udf_cell['vols']
+        KV_V0 = elasticity * (V - pref_V)
+        tri_KV_V0 = KV_V0.loc[self.tix_a]
+        tri_KV_V0.index = self.tix_aij
+
+        r_ijs = self.tdf_itoj[self.dcoords]
+        cross_ur = pd.DataFrame(np.cross(self.faces[self.normal_coords], r_ijs),
+                                index=self.tix_aij, columns=self.coords)
+
+        h_nu = self.udf_cell['cell_heights'] / (2 * self.udf_cell['num_sides'])
+        grad_i_V_cell = cross_ur.sum(level='cell') * _to_3d(KV_V0 * h_nu)
+
+        cell_term = grad_i_V_cell.loc[self.tix_a].set_index(self.tix_aij)
+        cell_term.columns = self.coords
+
+        _r_to_rho_i = self.udf_jv_i[self.coords] / _to_3d(2 * self.udf_jv_i['rhos'])
+        _r_to_rho_j = self.udf_jv_j[self.coords] / _to_3d(2 * self.udf_jv_j['rhos'])
+        r_to_rho_i = _r_to_rho_i.loc[self.tix_i].set_index(self.tix_aij)
+        r_to_rho_j = _r_to_rho_j.loc[self.tix_j].set_index(self.tix_aij)
+
+        r_ai = self.tdf_atoi[self.dcoords]
+        r_aj = self.tdf_atoj[self.dcoords]
+        normals = self.faces[self.normal_coords]
+        cross_ai = pd.DataFrame(np.cross(normals, r_ai),
+                                index=self.tix_aij, columns=self.coords)
+        cross_aj = pd.DataFrame(np.cross(normals, r_aj),
+                                index=self.tix_aij, columns=self.coords)
+
+        tri_heights = self.tdf_cell['cell_heights']
+        tri_heights.index = self.tix_aij
+        sub_areas = self.faces['sub_areas']
+
+        radial_term_a = _to_3d(tri_KV_V0 * sub_areas) * r_to_rho_i - _to_3d(tri_heights / 2) * cross_aj
+        radial_term_b = _to_3d(tri_KV_V0 * sub_areas) * r_to_rho_j + _to_3d(tri_heights / 2) * cross_ai
+
+        ij_term = radial_term_a.groupby(level='jv_i').apply(lambda df: df.sum(level='jv_j'))
+        jk_term = radial_term_b.groupby(level='jv_j').apply(lambda df: df.sum(level='jv_i')).swaplevel(0, 1)
+
+        _cell_term = cell_term.groupby(level='jv_i').apply(lambda df: df.sum(level='jv_j'))
+        print(_cell_term.loc[self.uix_ij].head())
+
+        print(jk_term.loc[self.uix_ij].head())
+        alpha_term = (_cell_term.loc[self.uix_ij] + ij_term.loc[self.uix_ij].values)
+        beta_term = (_cell_term.loc[self.uix_ij] + jk_term.loc[self.uix_ij].values)
+        grad_v.loc[self.uix_i] += alpha_term.sum(level='jv_i').loc[self.uix_i].values
+        grad_v.loc[self.uix_j] += beta_term.sum(level='jv_j').loc[self.uix_j].values
+        return grad_v
