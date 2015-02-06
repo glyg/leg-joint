@@ -24,16 +24,16 @@ As those computations are vectorial calculus, we use pandas to perfor them
 
 '''
 
+def opt_energy(pos0, triangles):
+    pass
+
+
+
 class Unique_index:
     ''' constructor class to retrieve unique indices from the faces'''
     def __init__(self, idx):
         self._full_idx = idx
-        self._idx = None
-
-    @property
-    def idx(self):
-        '''Unique indices'''
-        return self._full_idx.unique()
+        self.idx = self._full_idx.unique()
 
 class DataView:
     '''constructor class to get and set
@@ -106,13 +106,13 @@ class Triangles:
         self._complete_df_cols()
         self._ucells = None
 
-
-
     def _build_indices(self, faces):
 
         self.indices = {}
         names =('cell', 'jv_i', 'jv_j')
         letters = ('a', 'i', 'j')
+
+        self.uix_active = self.vertex_df[self.vertex_df.is_active_vert==1].index
 
         ### MultiIndex named (cell, jv_i, jv_j) for each triangle
         ### Those indices must be coherent with the original graph
@@ -204,10 +204,14 @@ class Triangles:
         for c in self.normal_coords:
             self.faces[c] = 0
 
-
-
     def geometry(self, rho_lumen):
+        ### update cell pos
+        all_coords = self.coords+['rhos']
+        self.udf_cell[all_coords] = (
+            self.tdf_jv_i[all_coords].set_index(self.tix_aij).mean(level='cell')
+            +self.tdf_jv_j[all_coords].set_index(self.tix_aij).mean(level='cell'))/2
 
+        ### update lengths
         srcs = self.edges_df.index.get_level_values('source')
         trgts = self.edges_df.index.get_level_values('target')
 
@@ -228,7 +232,7 @@ class Triangles:
 
         sub_areas = ((crosses**2).sum(axis=1)**0.5) / 2
         self.faces['sub_areas'] = sub_areas.values
-        normals = 2 * crosses / _to_3d(sub_areas)
+        normals = crosses / _to_3d(2 * sub_areas)
         self.faces[self.normal_coords] = normals.values
 
         self.udf_cell['areas'] = sub_areas.sum(level='cell').loc[self.uix_a]
@@ -323,16 +327,21 @@ class Triangles:
                                 index=self.tix_aij, columns=self.coords)
 
         h_nu = self.udf_cell['cell_heights'] / (2 * self.udf_cell['num_sides'])
+
         grad_i_V_cell = cross_ur.sum(level='cell') * _to_3d(KV_V0 * h_nu)
 
-        cell_term = grad_i_V_cell.loc[self.tix_a].set_index(self.tix_aij)
-        cell_term.columns = self.coords
+        cell_term_i = grad_i_V_cell.loc[self.tix_a].set_index(self.tix_ai)
+        cell_term_j = grad_i_V_cell.loc[self.tix_a].set_index(self.tix_aj)
 
-        _r_to_rho_i = self.udf_jv_i[self.coords] / _to_3d(2 * self.udf_jv_i['rhos'])
-        _r_to_rho_j = self.udf_jv_j[self.coords] / _to_3d(2 * self.udf_jv_j['rhos'])
+        grad_v.loc[self.uix_i] += cell_term_i.loc[self.uix_ai].sum(
+            level='jv_i').loc[self.uix_i].values/2
+        grad_v.loc[self.uix_j] += cell_term_j.loc[self.uix_aj].sum(
+            level='jv_j').loc[self.uix_j].values/2
+
+        _r_to_rho_i = self.udf_jv_i[self.coords] / _to_3d(self.udf_jv_i['rhos'])
+        _r_to_rho_j = self.udf_jv_j[self.coords] / _to_3d(self.udf_jv_j['rhos'])
         r_to_rho_i = _r_to_rho_i.loc[self.tix_i].set_index(self.tix_aij)
         r_to_rho_j = _r_to_rho_j.loc[self.tix_j].set_index(self.tix_aij)
-
         r_ai = self.tdf_atoi[self.dcoords]
         r_aj = self.tdf_atoj[self.dcoords]
         normals = self.faces[self.normal_coords]
@@ -345,18 +354,17 @@ class Triangles:
         tri_heights.index = self.tix_aij
         sub_areas = self.faces['sub_areas']
 
-        radial_term_a = _to_3d(tri_KV_V0 * sub_areas) * r_to_rho_i - _to_3d(tri_heights / 2) * cross_aj
-        radial_term_b = _to_3d(tri_KV_V0 * sub_areas) * r_to_rho_j + _to_3d(tri_heights / 2) * cross_ai
+        _ij_term = _to_3d(tri_KV_V0) *(_to_3d(sub_areas / 2) * r_to_rho_i
+                                       - _to_3d(tri_heights / 2) * cross_aj)
+        _jk_term = _to_3d(tri_KV_V0) *(_to_3d(sub_areas / 2) * r_to_rho_j
+                                       + _to_3d(tri_heights / 2) * cross_ai)
 
-        ij_term = radial_term_a.groupby(level='jv_i').apply(lambda df: df.sum(level='jv_j'))
-        jk_term = radial_term_b.groupby(level='jv_j').apply(lambda df: df.sum(level='jv_i')).swaplevel(0, 1)
+        ij_term = _ij_term.groupby(level='jv_i').apply(
+            lambda df: df.sum(level='jv_j'))
+        jk_term = _jk_term.groupby(level='jv_j').apply(
+            lambda df: df.sum(level='jv_i'))
 
-        _cell_term = cell_term.groupby(level='jv_i').apply(lambda df: df.sum(level='jv_j'))
-        print(_cell_term.loc[self.uix_ij].head())
+        grad_v.loc[self.uix_i] += ij_term.sum(level='jv_i').loc[self.uix_i].values
+        grad_v.loc[self.uix_j] += jk_term.sum(level='jv_j').loc[self.uix_j].values
 
-        print(jk_term.loc[self.uix_ij].head())
-        alpha_term = (_cell_term.loc[self.uix_ij] + ij_term.loc[self.uix_ij].values)
-        beta_term = (_cell_term.loc[self.uix_ij] + jk_term.loc[self.uix_ij].values)
-        grad_v.loc[self.uix_i] += alpha_term.sum(level='jv_i').loc[self.uix_i].values
-        grad_v.loc[self.uix_j] += beta_term.sum(level='jv_j').loc[self.uix_j].values
         return grad_v

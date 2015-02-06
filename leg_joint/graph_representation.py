@@ -382,7 +382,7 @@ def plot_eptm_generic(eptm, xcoord, ycoord,
     return ax
 
 def plot_cells_generic(eptm, xcoord, ycoord, ax=None,
-                       vfilt=None, c_text=False,
+                       vfilt=None, c_text=False, j_text=False,
                        cell_colors=None, **kwargs):
     if ax is None:
         fig, ax = plt.subplots(1,1)
@@ -390,6 +390,11 @@ def plot_cells_generic(eptm, xcoord, ycoord, ax=None,
     if c_text:
         for cell in eptm.cells :
             ax.text(xcoord[cell], ycoord[cell], str(cell))
+    if j_text:
+        for jv in eptm.graph.vertices() :
+            if eptm.is_cell_vert[jv]: continue
+            ax.text(xcoord[jv], ycoord[jv], str(jv))
+
     if cell_colors is not None:
         draw_polygons(eptm, xcoord,
                       ycoord,

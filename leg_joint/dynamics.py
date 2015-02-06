@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 
 from __future__ import unicode_literals
@@ -118,7 +117,7 @@ class Dynamics(object):
         return junctions_energy, radial_energy
 
     @active
-    def gradient_array(self, gtol=1e-8):
+    def gradient_array(self, gtol=1e-13):
         gradient = np.zeros(self.graph.num_vertices() * 3)
         log.debug('Gradient shape: %s' % gradient.shape)
         gradient[::3] = self.grad_ix.fa
