@@ -59,7 +59,7 @@ def test_gradient():
     eptm.set_local_mask(mother_cell)
     grad_err = lj.optimizers.check_local_grad(eptm)
     print('gradient_error: {}'.format(grad_err))
-    assert abs(grad_err) < 1 #TODO gradient is badly dimensioned
+    assert abs(grad_err) < 1. #TODO gradient is badly dimensioned
 
 
 def test_fmin():
@@ -77,4 +77,4 @@ def test_fmin():
     pos0, pos1 = lj.find_energy_min(eptm)
     print(eptm.cells.areas[mother_cell] / area0)
     assert_almost_equal(eptm.cells.areas[mother_cell] / area0,
-                       1.5664, decimal=3)
+                        1.60169, decimal=3)
