@@ -161,8 +161,7 @@ class Dynamics(object):
                 except KeyError:
                     log.error('Invalid edge {} for cell {} in volume gradient computation'.format(j_edge, cell))
                     pass
-            vol_grad *= self.volume_grad_radial[cell]\
-                        / self.cells.num_sides[cell]
+            vol_grad *= self.volume_grad_radial[cell] / self.cells.num_sides[cell]
         self.volume_grad_cell[cell] = vol_grad
 
     def _update_junctions_grad(self):
