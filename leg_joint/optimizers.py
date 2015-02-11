@@ -14,8 +14,37 @@ from .filters import active
 from .utils import local_subgraph
 from .epithelium import hdf_snapshot
 
+from .pandas_geometry import opt_gradient as opt_gradient_pd
+from .pandas_geometry import opt_energy as opt_energy_pd
+from .pandas_geometry import parse_graph, update_graph
+from .pandas_geometry import Triangles
+
+from graph_tool import GraphView
+
+
 import logging
 log = logging.getLogger(__name__)
+
+def find_energy_min_pd(eptm):
+
+    local_graph = GraphView(eptm.graph,
+                            vfilt=eptm.is_local_vert,
+                            efilt=eptm.is_local_edge)
+    vertex_df, edges_df, triangles = parse_graph(local_graph)
+    coords = ['ixs', 'wys', 'zeds']
+
+    trgles = Triangles(vertex_df, edges_df, triangles, coords)
+    pos0 = trgles.vertex_df.loc[trgles.uix_active, coords].values.flatten()
+    p_out = optimize.minimize(opt_energy_pd,
+                              pos0, method='BFGS',
+                              jac=opt_gradient_pd,
+                              args=(trgles, eptm.norm_factor, eptm.rho_lumen),
+                              options={'gtol': 1e-4, 'disp': False})
+    eptm.graph.set_vertex_filter(eptm.is_local_vert)
+    eptm.graph.set_edge_filter(eptm.is_local_edge)
+    update_graph(trgles, eptm.graph)
+    eptm.graph.set_vertex_filter(None)
+    eptm.graph.set_edge_filter(None)
 
 
 @active
@@ -125,6 +154,10 @@ def check_local_grad(eptm):
                                    pos0.flatten(),
                                    eptm)
     return grad_err
+
+
+
+
 
 ## For consistency, the first argument must be the postion
 def opt_energy(pos, eptm):

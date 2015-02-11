@@ -21,15 +21,34 @@ As those computations are vectorial calculus, we use pandas to perform them
 
 '''
 
-def opt_energy(pos0, triangles):
-    pass
+def update_graph(triangles, graph):
 
+    for col in triangles.vertex_df.columns:
+        data = triangles.vertex_df[col]
+        try:
+            graph.vp[col].fa = data
+        except KeyError:
+            log.debug('Vertex Property {} not found'.format(col))
+    for col in triangles.edges_df.columns:
+        data = triangles.edges_df[col]
+        try:
+            graph.ep[col].fa = data
+        except KeyError:
+            log.debug('Edge Property {} not found'.format(col))
 
-class Unique_index:
-    ''' constructor class to retrieve unique indices from the faces'''
-    def __init__(self, idx):
-        self._full_idx = idx
-        self.idx = self._full_idx.unique()
+def opt_energy(pos, trgles, norm_factor, rho_lumen):
+
+    _pos = pos.reshape((pos.size//3, 3))
+    trgles.vertex_df.loc[trgles.uix_active, trgles.coords] = _pos
+    trgles.geometry(rho_lumen)
+    energy = trgles.energy()
+    return energy/norm_factor
+
+def opt_gradient(pos, trgles, norm_factor, rho_lumen):
+    # _pos = pos.reshape((pos.size//3, 3))
+    # trgles.vertex_df.loc[trgles.uix_active, trgles.coords] = _pos
+    grad = trgles.gradient()
+    return grad.values.flatten()/norm_factor
 
 class DataView:
     '''constructor class to get and set
@@ -76,15 +95,38 @@ class Triangles:
     of the geometrical network - in the cristalography sense of unit
     cell.
 
+    Methods
+    -------
+
+
+
     '''
 
     def __init__(self, vertex_df, edges_df, triangles, coords):
         '''
         Creates a container class for the triangles geometry
 
-        Parameters:
-        -----------
-        vertex_df:  :class:`pandas.DataFrame` class
+        Parameters
+        ----------
+
+        vertex_df:  :class:`pandas.DataFrame` table
+          This data frame should the vertices data. It is indexed by the vertices indices
+          in the graph. See `self.mandatory_vcols` for a list of columns of this dataframe
+        edges_df:  :class:`pandas.DataFrame` table
+          DataFrame with the edges data. It is indexed by a :class:`pandas.MultiIndex` object
+          indexed by (source, target) pairs. For a list of columns, see `self.mandatory_ecols`
+        triangles: ndarray
+          trianges is a (N_t, 3) 2D array where each line contains a triple with the indices of
+          the cell, the source (jv_i) and the target (jv_j) junction vertices.
+        coords: list of strings
+          the names of the three columns corresponding to the 3D positions
+
+        See Also
+        --------
+
+        hdfgraph.graph_to_dataframes: utility to convert a graph_tool.Graph to a dataframe pairs
+        leg_joint.objects.get_faces: utility to obtain  the triangles list from a graph
+
 
         '''
 
@@ -105,8 +147,7 @@ class Triangles:
     def _init_gradient(self):
 
         self.grad_coords = ['g'+c for c in self.coords]
-        jv_idx = set(self.uix_i).union(self.uix_j)
-        self.grad_i = pd.DataFrame(0, index=jv_idx,
+        self.grad_i = pd.DataFrame(0, index=self.uix_active,
                                    columns=self.grad_coords).sort_index()
 
 
@@ -136,12 +177,12 @@ class Triangles:
             dv = DataView(self.vertex_df, idx)
             setattr(self, view_name, dv)
 
-            unique = Unique_index(idx)
+            unique = idx.unique()
             unique_name = 'uix_{}'.format(letter)
-            setattr(self, unique_name, unique.idx)
+            setattr(self, unique_name, unique)
 
             view_name = 'udf_{}'.format(name)
-            dv = DataView(self.vertex_df, unique.idx)
+            dv = DataView(self.vertex_df, unique)
             setattr(self, view_name, dv)
 
             ### 2 level MultiIndex on the oriented edge opposed
@@ -160,15 +201,20 @@ class Triangles:
 
             self.indices[tuple(other_names)] = idx
             unique_name = 'uix_{}{}'.format(*other_letters)
-            unique = Unique_index(idx)
-            setattr(self, unique_name, unique.idx)
+            unique = idx.unique()
+            setattr(self, unique_name, unique)
             view_name = 'udf_{}to{}'.format(*other_letters)
-            dv = DataView(self.edges_df, unique.idx)
+            dv = DataView(self.edges_df, unique)
             setattr(self, view_name, dv)
+
+        self.uix_active_i = np.array(list(set(self.uix_active).intersection(self.uix_i)))
+        self.uix_active_j = np.array(list(set(self.uix_active).intersection(self.uix_j)))
+
 
     @property
     def mandatory_vcols(self):
-
+        ''' List of vertex data used in the computations
+        '''
         cols = set(self.coords)
         topology = {'is_cell_vert',
                     'num_sides'}
@@ -186,6 +232,8 @@ class Triangles:
 
     @property
     def mandatory_ecols(self):
+        ''' List of edge data used in the computations
+        '''
         cols = set(self.dcoords)
         cols.update({'edge_length',
                      'line_tensions'})
@@ -295,8 +343,8 @@ class Triangles:
         tensions.index.names = ('jv_i', 'jv_j')
 
         _grad_t = self.grad_i_lij * _to_3d(tensions)
-        grad_t.loc[self.uix_i] = _grad_t.sum(level='jv_i').loc[self.uix_i].values
-        grad_t.loc[self.uix_j] -= _grad_t.sum(level='jv_j').loc[self.uix_j].values
+        grad_t.loc[self.uix_active_i] = _grad_t.sum(level='jv_i').loc[self.uix_active_i].values
+        grad_t.loc[self.uix_active_j] -= _grad_t.sum(level='jv_j').loc[self.uix_active_j].values
         return grad_t
 
     def contractile_grad(self):
@@ -312,13 +360,13 @@ class Triangles:
         gamma_L = gamma_L.loc[self.tix_a]
         gamma_L.index = self.tix_aij
 
-        area_term = gamma_L.groupby(level='jv_i').apply(
-            lambda df: df.sum(level='jv_j'))
+        # area_term = gamma_L.groupby(level='jv_i').apply(
+        #     lambda df: df.sum(level='jv_j'))
+        area_term = gamma_L.groupby(level=('jv_i', 'jv_j')).sum()
 
         _grad_c = self.grad_i_lij.loc[self.uix_ij] * _to_3d(area_term.loc[self.uix_ij])
-        grad_c.loc[self.uix_i] = _grad_c.sum(level='jv_i').loc[self.uix_i].values
-        grad_c.loc[self.uix_j] -= _grad_c.sum(level='jv_j').loc[self.uix_j].values
-
+        grad_c.loc[self.uix_active_i] = _grad_c.sum(level='jv_i').loc[self.uix_active_i].values
+        grad_c.loc[self.uix_active_j] -= _grad_c.sum(level='jv_j').loc[self.uix_active_j].values
         return grad_c
 
     def volume_grad(self):
@@ -344,10 +392,10 @@ class Triangles:
         cell_term_i = grad_i_V_cell.loc[self.tix_a].set_index(self.tix_ai)
         cell_term_j = grad_i_V_cell.loc[self.tix_a].set_index(self.tix_aj)
 
-        grad_v.loc[self.uix_i] += cell_term_i.loc[self.uix_ai].sum(
-            level='jv_i').loc[self.uix_i].values/2
-        grad_v.loc[self.uix_j] += cell_term_j.loc[self.uix_aj].sum(
-            level='jv_j').loc[self.uix_j].values/2
+        grad_v.loc[self.uix_active_i] += cell_term_i.loc[self.uix_ai].sum(
+            level='jv_i').loc[self.uix_active_i].values/2
+        grad_v.loc[self.uix_active_j] += cell_term_j.loc[self.uix_aj].sum(
+            level='jv_j').loc[self.uix_active_j].values/2
 
         _r_to_rho_i = self.udf_jv_i[self.coords] / _to_3d(self.udf_jv_i['rhos'])
         _r_to_rho_j = self.udf_jv_j[self.coords] / _to_3d(self.udf_jv_j['rhos'])
@@ -370,12 +418,10 @@ class Triangles:
         _jk_term = _to_3d(tri_KV_V0) *(_to_3d(sub_areas / 2) * r_to_rho_j
                                        + _to_3d(tri_heights / 2) * cross_ai)
 
-        ij_term = _ij_term.groupby(level='jv_i').apply(
-            lambda df: df.sum(level='jv_j'))
-        jk_term = _jk_term.groupby(level='jv_j').apply(
-            lambda df: df.sum(level='jv_i'))
+        ij_term = _ij_term.groupby(level=('jv_i', 'jv_j')).sum()
+        jk_term = _jk_term.groupby(level=('jv_j', 'jv_i')).sum()
 
-        grad_v.loc[self.uix_i] += ij_term.sum(level='jv_i').loc[self.uix_i].values
-        grad_v.loc[self.uix_j] += jk_term.sum(level='jv_j').loc[self.uix_j].values
+        grad_v.loc[self.uix_active_i] += ij_term.sum(level='jv_i').loc[self.uix_active_i].values
+        grad_v.loc[self.uix_active_j] += jk_term.sum(level='jv_j').loc[self.uix_active_j].values
 
         return grad_v

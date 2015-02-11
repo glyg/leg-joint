@@ -45,7 +45,7 @@ tau = 2 * np.pi
 
 def get_faces(graph, as_array=True):
     '''
-    Retrieves all the triangle subgraphs of the form
+    Retrieves all the triangular subgraphs of the form
 
        1 -- > 2
         ^   ^
@@ -55,16 +55,16 @@ def get_faces(graph, as_array=True):
     In our context, vertex 0 always corresponds to a cell
     and vertices 1 and 2 to junction vertices
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
 
     graph : a :class:`GraphTool` graph instance
     as_array: bool, optional, default `True`
-      if `True`, the output of `subraph_isomorphism is converted
+      if `True`, the output of `subraph_isomorphism` is converted
       to a (N, 3) ndarray.
 
-    Returns:
-    --------
+    Returns
+    -------
 
     triangles:  list of gt.PropertyMaps or (N, 3) ndarray
       each line corresponds to a triplet (cell, jv0, jv1)
@@ -76,7 +76,6 @@ def get_faces(graph, as_array=True):
     verts = tri_graph.add_vertex(3)
     ## edges
     tri_graph.add_edge_list([(0, 1), (0, 2), (1, 2)])
-    ##_cj0, _cj1, _je = (e for e in tri_graph.edges())
     _triangles = gt.subgraph_isomorphism(tri_graph, graph)
     if not as_array:
         return _triangles
@@ -103,7 +102,7 @@ class AbstractRTZGraph(object):
 
 
     Methods:
-    ===========
+    ========
 
     scale()
 
