@@ -110,23 +110,29 @@ class Triangles:
         ----------
 
         vertex_df:  :class:`pandas.DataFrame` table
-          This data frame should the vertices data. It is indexed by the vertices indices
-          in the graph. See `self.mandatory_vcols` for a list of columns of this dataframe
+          This data frame should the vertices data. It is indexed by the
+          vertices indices in the graph. See `self.mandatory_vcols` for a
+          list of columns of this dataframe
         edges_df:  :class:`pandas.DataFrame` table
-          DataFrame with the edges data. It is indexed by a :class:`pandas.MultiIndex` object
-          indexed by (source, target) pairs. For a list of columns, see `self.mandatory_ecols`
+          DataFrame with the edges data. It is indexed by a
+          :class:`pandas.MultiIndex` object indexed by
+          (source, target) pairs. For a list of columns,
+          see `self.mandatory_ecols`
         triangles: ndarray
-          trianges is a (N_t, 3) 2D array where each line contains a triple with the indices of
-          the cell, the source (jv_i) and the target (jv_j) junction vertices.
+          trianges is a (N_t, 3) 2D array where each line contains
+          a triple with the indices of the cell, the source (jv_i)
+          and the target (jv_j) junction vertices.
         coords: list of strings
-          the names of the three columns corresponding to the 3D positions
+          the names of the three columns corresponding to the
+          3D positions
 
         See Also
         --------
 
-        hdfgraph.graph_to_dataframes: utility to convert a graph_tool.Graph to a dataframe pairs
-        leg_joint.objects.get_faces: utility to obtain  the triangles list from a graph
-
+        hdfgraph.graph_to_dataframes: utility to convert a graph_tool.Graph
+          to a dataframe pairs
+        leg_joint.objects.get_faces: utility to obtain  the triangles list
+          from a graph
 
         '''
 
@@ -305,6 +311,7 @@ class Triangles:
 
         junction_data = self.udf_itoj[['line_tensions', 'edge_lengths']]
         E_t = junction_data['line_tensions'] * junction_data['edge_lengths']
+
         cell_data = self.udf_cell[['vol_elasticities', 'vols', 'prefered_vol',
                                    'contractilities', 'perimeters']]
         E_v =  0.5 * (cell_data['vol_elasticities']

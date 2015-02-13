@@ -156,9 +156,6 @@ def check_local_grad(eptm):
     return grad_err
 
 
-
-
-
 ## For consistency, the first argument must be the postion
 def opt_energy(pos, eptm):
     """
