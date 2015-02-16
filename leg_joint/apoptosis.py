@@ -14,7 +14,7 @@ from .topology import remove_cell, solve_rosette, find_rosettes
 from .graph_representation import png_snapshot
 from .epithelium import hdf_snapshot
 
-from .optimizers import find_energy_min, running_local_optimum
+from .optimizers import find_energy_min, running_local_optimum, find_energy_min_pd
 from .topology import type1_transition
 
 import logging
@@ -60,14 +60,14 @@ def apoptosis_step(eptm, a_cell,
     if radial_tension is not None:
         for jv in a_cell.out_neighbours():
             eptm.junctions.radial_tensions[jv] += radial_tension * mean_lt
-    find_energy_min(eptm)
+    find_energy_min_pd(eptm, local=False)
 
 def get_apoptotic_cells(eptm, **kwargs):
     '''Returns the specified number of apoptotic cells around the
     joint.
 
-    Parameters:
-    ===========
+    Parameters
+    ==========
 
     eptm: a :class:`Epithelium` instance
 
@@ -83,8 +83,8 @@ def get_apoptotic_cells(eptm, **kwargs):
     **kwargs are passed to the functions `random_apoptotic cells`
         and `regular_apoptotic_cells`
 
-    See also:
-    =========
+    See also
+    ========
 
     random_apoptotic_cells, regular_apoptotic_cells
 
@@ -215,7 +215,7 @@ def post_apoptosis(eptm, a_cell, fold_cells, mode='shorter', **kwargs):
                              max_ci=kwargs['max_ci'],
                              rate_ci=kwargs['rate_ci'],
                              span=kwargs['span_ci'])
-        out = find_energy_min(eptm)
+        out = find_energy_min_pd(eptm, local=False)
     except KeyError:
         pass
     eptm.set_local_mask(None)
@@ -240,7 +240,7 @@ def post_apoptosis(eptm, a_cell, fold_cells, mode='shorter', **kwargs):
                                   if (not je in new_edges)
                                   and eptm.is_junction_edge[je]])
         new_jv = remove_cell(eptm, a_cell)
-    wide_relax(eptm)
+    find_energy_min_pd(eptm, local=False)
 
 def solve_all_rosettes(eptm, **kwargs):
 
@@ -259,7 +259,7 @@ def solve_all_rosettes(eptm, **kwargs):
 def solve_rosette_opt(eptm, central_vert, **kwargs):
 
     new_jv  = solve_rosette(eptm, central_vert, **kwargs)
-    find_energy_min(eptm)
+    find_energy_min_pd(eptm, local=False)
     return new_jv
 
 @hdf_snapshot
@@ -273,7 +273,7 @@ def type1_at_shorter(eptm, local_edges):
                                                        shorter_edge)
     eptm.set_local_mask(modified_cells[0], wider=True)
     eptm.set_local_mask(modified_cells[1], wider=True)
-    out = find_energy_min(eptm)
+    out = find_energy_min_pd(eptm, local=False)
     return modified_cells, modified_jverts
 
 # def increase_contractility(eptm, cells, contractility_increase):
@@ -407,4 +407,3 @@ def show_death_pattern(eptm):
             alpha = 0.3 + 0.7 * (eptm.ixs[cell] - x_min)/(x_max - x_min)
             axes.plot(eptm.zeds[cell], eptm.wys[cell], 'ro', alpha=alpha)
     return axes
-

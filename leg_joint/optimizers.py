@@ -25,15 +25,19 @@ from graph_tool import GraphView
 import logging
 log = logging.getLogger(__name__)
 
-def find_energy_min_pd(eptm):
+def find_energy_min_pd(eptm, local=True, update_topology=True):
 
-    local_graph = GraphView(eptm.graph,
-                            vfilt=eptm.is_local_vert,
-                            efilt=eptm.is_local_edge)
-    vertex_df, edges_df, triangles = parse_graph(local_graph)
+    if local:
+        graph = GraphView(eptm.graph,
+                          vfilt=eptm.is_local_vert,
+                          efilt=eptm.is_local_edge)
+    else:
+        graph = eptm.graph
+    vertex_df, edges_df, triangles = parse_graph(graph)
     coords = ['ixs', 'wys', 'zeds']
 
     trgles = Triangles(vertex_df, edges_df, triangles, coords)
+    trgles.geometry(eptm.rho_lumen)
     pos0 = trgles.vertex_df.loc[trgles.uix_active, coords].values.flatten()
     p_out = optimize.minimize(opt_energy_pd,
                               pos0, method='BFGS',
@@ -45,7 +49,7 @@ def find_energy_min_pd(eptm):
     update_graph(trgles, eptm.graph)
     eptm.graph.set_vertex_filter(None)
     eptm.graph.set_edge_filter(None)
-
+    return p_out
 
 @active
 def precondition(eptm):

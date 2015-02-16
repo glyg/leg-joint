@@ -50,26 +50,6 @@ def opt_gradient(pos, trgles, norm_factor, rho_lumen):
     grad = trgles.gradient()
     return grad.values.flatten()/norm_factor
 
-class DataView:
-    '''constructor class to get and set
-    columns on **views** of a subset of a dataframe '''
-    def __init__(self, df, ix):
-        self._data = df
-        self._ix = ix
-
-    @property
-    def values(self):
-        return self._data.loc[self._ix]
-
-    def __getitem__(self, key):
-        return self._data.loc[self._ix, key]
-
-    def __setitem__(self, key, data):
-        self._data.loc[self._ix, key] = data
-
-def _to_3d(df):
-    return df.repeat(3).reshape((df.size, 3))
-
 def parse_graph(graph):
 
     vertex_df, edges_df  = hdfgraph.graph_to_dataframes(graph)
@@ -377,7 +357,9 @@ class Triangles:
         return grad_c
 
     def volume_grad(self):
-
+        '''
+        Computes :math:`\sum_\alpha\nabla_i \left(K (V_\alpha - V_0)^2\right)`
+        '''
         grad_v = self.grad_i.copy()
         grad_v[:] = 0
 
@@ -432,3 +414,24 @@ class Triangles:
         grad_v.loc[self.uix_active_j] += jk_term.sum(level='jv_j').loc[self.uix_active_j].values
 
         return grad_v
+
+
+class DataView:
+    '''constructor class to get and set
+    columns on **views** of a subset of a dataframe '''
+    def __init__(self, df, ix):
+        self._data = df
+        self._ix = ix
+
+    @property
+    def values(self):
+        return self._data.loc[self._ix]
+
+    def __getitem__(self, key):
+        return self._data.loc[self._ix, key]
+
+    def __setitem__(self, key, data):
+        self._data.loc[self._ix, key] = data
+
+def _to_3d(df):
+    return df.repeat(3).reshape((df.size, 3))

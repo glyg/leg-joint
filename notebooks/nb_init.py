@@ -40,8 +40,8 @@ def before_after(func):
 @before_after
 def show_optimisation(eptm, **kwargs):
     #eptm.update_gradient()
-    pos0, pos1 = lj.find_energy_min(eptm, **kwargs)
-    return pos0, pos1
+    opt_out = lj.optimizers.find_energy_min_pd(eptm, **kwargs)
+    return opt_out
 
 
 def local_optimum(*arg, **kwargs):
