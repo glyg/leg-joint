@@ -29,7 +29,6 @@ ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = default_params()
 GRAPH_SAVE_DIR = '.'
 
-
 # See [the tau manifesto](http://tauday.com/tau-manifesto)
 tau = 2. * np.pi
 
