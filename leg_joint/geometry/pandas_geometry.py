@@ -8,7 +8,9 @@ from __future__ import print_function
 import pandas as pd
 import numpy as np
 import hdfgraph
-from .objects import get_faces
+from ..objects import get_faces
+from ..utils import _to_3d
+
 import logging
 log = logging.getLogger(__name__)
 
@@ -21,6 +23,8 @@ As those computations are vectorial calculus, we use pandas to perform them
 
 '''
 
+
+
 def update_graph(triangles, graph):
 
     for col in triangles.vertex_df.columns:
@@ -29,26 +33,13 @@ def update_graph(triangles, graph):
             graph.vp[col].fa = data
         except KeyError:
             log.debug('Vertex Property {} not found'.format(col))
+
     for col in triangles.edges_df.columns:
         data = triangles.edges_df[col]
         try:
             graph.ep[col].fa = data
         except KeyError:
             log.debug('Edge Property {} not found'.format(col))
-
-def opt_energy(pos, trgles, norm_factor, rho_lumen):
-
-    _pos = pos.reshape((pos.size//3, 3))
-    trgles.vertex_df.loc[trgles.uix_active, trgles.coords] = _pos
-    trgles.geometry(rho_lumen)
-    energy = trgles.energy()
-    return energy/norm_factor
-
-def opt_gradient(pos, trgles, norm_factor, rho_lumen):
-    # _pos = pos.reshape((pos.size//3, 3))
-    # trgles.vertex_df.loc[trgles.uix_active, trgles.coords] = _pos
-    grad = trgles.gradient()
-    return grad.values.flatten()/norm_factor
 
 def parse_graph(graph):
 
@@ -82,7 +73,8 @@ class Triangles:
 
     '''
 
-    def __init__(self, vertex_df, edges_df, triangles, coords):
+    def __init__(self, vertex_df, edges_df,
+                 triangles, coords):
         '''
         Creates a container class for the triangles geometry
 
@@ -129,6 +121,9 @@ class Triangles:
         self._ucells = None
         self._init_gradient()
 
+    def copy(self):
+        return Triangles(self.vertex_df.copy(), self.edges_df.copy(),
+                         self.triangles.copy(), self.coords)
 
     def _init_gradient(self):
 
@@ -202,11 +197,11 @@ class Triangles:
         ''' List of vertex data used in the computations
         '''
         cols = set(self.coords)
+        cols.update({'rhos', 'heights'})
         topology = {'is_cell_vert',
                     'num_sides'}
         cols.update(topology)
-        cell_geom = {'heights',
-                     'perimeters',
+        cell_geom = {'perimeters',
                      'areas',
                      'vols'}
         cols.update(cell_geom)
@@ -253,9 +248,9 @@ class Triangles:
         cell_data[self.coords] = (
             self.tdf_jv_i[self.coords].set_index(self.tix_aij).mean(level='cell')
             +self.tdf_jv_j[self.coords].set_index(self.tix_aij).mean(level='cell'))/2
-
-        cell_data['rhos'] = np.hypot(cell_data[self.coords[0]],
-                                     cell_data[self.coords[1]])
+        ### update rhos
+        self.vertex_df['rhos'] = np.hypot(self.vertex_df[self.coords[0]],
+                                          self.vertex_df[self.coords[1]])
         ### update lengths
         srcs = self.edges_df.index.get_level_values('source')
         trgts = self.edges_df.index.get_level_values('target')
@@ -286,134 +281,65 @@ class Triangles:
 
         self.udf_cell[cell_columns] = cell_data
 
+    def scale(self, scaling_factor):
 
-    def energy(self, full_output=False):
+        '''Multiply all the distances by a factor `scaling_factor`
 
-        junction_data = self.udf_itoj[['line_tensions', 'edge_lengths']]
-        E_t = junction_data['line_tensions'] * junction_data['edge_lengths']
+        Parameter
+        =========
+        scaling_factor: float
+        '''
+        self.vertex_df[self.coords] *= scaling_factor
+        self.vertex_df['heights'] *= scaling_factor
+        self.rho_lumen *= scaling_factor
+        self.geometry()
 
-        cell_data = self.udf_cell[['vol_elasticities', 'vols', 'prefered_vol',
-                                   'contractilities', 'perimeters']]
-        E_v =  0.5 * (cell_data['vol_elasticities']
-                      * (cell_data['vols']
-                         - cell_data['prefered_vol'])**2)
-        E_c = 0.5 * (cell_data['contractilities']
-                     * cell_data['perimeters']**2)
-        if full_output:
-            return E_t, E_c, E_v
+    def update_polar(self):
+        self.vertex_df['thetas'] = np.arctan2(self.vertex_df[self.coords[1]],
+                                              self.vertex_df[self.coords[0]])
+        self.vertex_df['rhos'] = np.hypot(self.vertex_df[self.coords[0]],
+                                          self.vertex_df[self.coords[1]])
+
+    def update_heights(self):
+        self.vertex_df['heights'] = self.vertex_df['rhos'] - self.rho_lumen
+
+    def update_cartesian(self):
+
+        rhos = self.vertex_df['rhos']
+        thetas = self.vertex_df['thetas']
+        self.vertex_df[self.coords[0]] = rhos * np.cos(thetas)
+        self.vertex_df[self.coords[1]] = rhos * np.sin(thetas)
+
+    def rotate(self, angle, inplace=False):
+        '''Rotates the epithelium by an angle `angle` around
+        the :math:`z` axis
+        '''
+
+        self.update_polar()
+        if inplace:
+            self.vertex_df['thetas'] += angle
+            self.update_cartesian()
+            return self
         else:
-            return E_t.sum()+(E_c+E_v).sum()
+            new = self.copy()
+            new.vertex_df['thetas'] += angle
+            new.update_cartesian()
+            return new
 
-    def gradient(self, components=False):
-        '''
-        If components is True, returns the individual terms
-        (grad_t, grad_c, grad_v)
-        '''
-        self.grad_i_lij = - self.udf_itoj[self.dcoords] / _to_3d(self.udf_itoj['edge_lengths'])
-        self.grad_i_lij.index = pd.MultiIndex.from_tuples(self.uix_ij, names=('jv_i', 'jv_j'))
+    def translate(self, vector):
+        raise NotImplementedError
 
-        grad_t = self.tension_grad()
-        grad_c = self.contractile_grad()
-        grad_v = self.volume_grad()
+    def closest_vert(self, position, condition=None):
 
-        grad_i = grad_t + grad_c + grad_v
-        if components:
-            return grad_i, grad_t, grad_c, grad_v
-        return grad_i
+        relative_pos = pd.DataFrame([self.vertex_df[coord] - u
+                                     for coord, u in zip(self.coords, position)])
+        relative_pos.set_index(self.vertex_df.index)
+        if condition is not None:
+            relative_pos = relative_pos[condition]
 
-    def tension_grad(self):
+        dist = np.linalg.norm(relative_pos)
+        return dist.argmin()
 
-        grad_t = self.grad_i.copy()
-        grad_t[:] = 0
-
-        tensions = self.udf_itoj['line_tensions']
-        tensions.index.names = ('jv_i', 'jv_j')
-
-        _grad_t = self.grad_i_lij * _to_3d(tensions)
-        grad_t.loc[self.uix_active_i] = _grad_t.sum(level='jv_i').loc[self.uix_active_i].values
-        grad_t.loc[self.uix_active_j] -= _grad_t.sum(level='jv_j').loc[self.uix_active_j].values
-        return grad_t
-
-    def contractile_grad(self):
-
-        grad_c = self.grad_i.copy()
-        grad_c[:] = 0
-
-        contract = self.udf_cell['contractilities']
-        contract.index.name = 'cell'
-        perimeters = self.udf_cell['perimeters']
-
-        gamma_L = contract * perimeters
-        gamma_L = gamma_L.loc[self.tix_a]
-        gamma_L.index = self.tix_aij
-
-        # area_term = gamma_L.groupby(level='jv_i').apply(
-        #     lambda df: df.sum(level='jv_j'))
-        area_term = gamma_L.groupby(level=('jv_i', 'jv_j')).sum()
-
-        _grad_c = self.grad_i_lij.loc[self.uix_ij] * _to_3d(area_term.loc[self.uix_ij])
-        grad_c.loc[self.uix_active_i] = _grad_c.sum(level='jv_i').loc[self.uix_active_i].values
-        grad_c.loc[self.uix_active_j] -= _grad_c.sum(level='jv_j').loc[self.uix_active_j].values
-        return grad_c
-
-    def volume_grad(self):
-        '''
-        Computes :math:`\sum_\alpha\nabla_i \left(K (V_\alpha - V_0)^2\right)`
-        '''
-        grad_v = self.grad_i.copy()
-        grad_v[:] = 0
-
-        elasticity = self.udf_cell['vol_elasticities']
-        pref_V = self.udf_cell['prefered_vol']
-        V = self.udf_cell['vols']
-        KV_V0 = elasticity * (V - pref_V)
-        tri_KV_V0 = KV_V0.loc[self.tix_a]
-        tri_KV_V0.index = self.tix_aij
-
-        r_ijs = self.tdf_itoj[self.dcoords]
-        cross_ur = pd.DataFrame(np.cross(self.faces[self.normal_coords], r_ijs),
-                                index=self.tix_aij, columns=self.coords)
-
-        h_nu = self.udf_cell['heights'] / (2 * self.udf_cell['num_sides'])
-
-        grad_i_V_cell = cross_ur.sum(level='cell') * _to_3d(KV_V0 * h_nu)
-
-        cell_term_i = grad_i_V_cell.loc[self.tix_a].set_index(self.tix_ai)
-        cell_term_j = grad_i_V_cell.loc[self.tix_a].set_index(self.tix_aj)
-
-        grad_v.loc[self.uix_active_i] += cell_term_i.loc[self.uix_ai].sum(
-            level='jv_i').loc[self.uix_active_i].values/2
-        grad_v.loc[self.uix_active_j] += cell_term_j.loc[self.uix_aj].sum(
-            level='jv_j').loc[self.uix_active_j].values/2
-
-        _r_to_rho_i = self.udf_jv_i[self.coords] / _to_3d(self.udf_jv_i['rhos'])
-        _r_to_rho_j = self.udf_jv_j[self.coords] / _to_3d(self.udf_jv_j['rhos'])
-        r_to_rho_i = _r_to_rho_i.loc[self.tix_i].set_index(self.tix_aij)
-        r_to_rho_j = _r_to_rho_j.loc[self.tix_j].set_index(self.tix_aij)
-        r_ai = self.tdf_atoi[self.dcoords]
-        r_aj = self.tdf_atoj[self.dcoords]
-        normals = self.faces[self.normal_coords]
-        cross_ai = pd.DataFrame(np.cross(normals, r_ai),
-                                index=self.tix_aij, columns=self.coords)
-        cross_aj = pd.DataFrame(np.cross(normals, r_aj),
-                                index=self.tix_aij, columns=self.coords)
-
-        tri_heights = self.tdf_cell['heights']
-        tri_heights.index = self.tix_aij
-        sub_areas = self.faces['sub_areas']
-
-        _ij_term = _to_3d(tri_KV_V0) *(_to_3d(sub_areas / 2) * r_to_rho_i
-                                       - _to_3d(tri_heights / 2) * cross_aj)
-        _jk_term = _to_3d(tri_KV_V0) *(_to_3d(sub_areas / 2) * r_to_rho_j
-                                       + _to_3d(tri_heights / 2) * cross_ai)
-
-        #ij_term = _ij_term.groupby(level=('jv_i', 'jv_j')).sum()
-        #jk_term = _jk_term.groupby(level=('jv_j', 'jv_i')).sum()
-
-        grad_v.loc[self.uix_active_i] += _ij_term.sum(level='jv_i').loc[self.uix_active_i].values
-        grad_v.loc[self.uix_active_j] += _jk_term.sum(level='jv_j').loc[self.uix_active_j].values
-
-        return grad_v
 
 
 class DataView:
@@ -432,6 +358,3 @@ class DataView:
 
     def __setitem__(self, key, data):
         self._data.loc[self._ix, key] = data
-
-def _to_3d(df):
-    return df.repeat(3).reshape((df.size, 3))

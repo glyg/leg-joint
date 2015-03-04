@@ -117,12 +117,8 @@ class AbstractRTZGraph(object):
         self.current_angle = 0
         if self.new :
             self._init_edge_bool_props()
-            self._init_vertex_geometry()
-            self._init_edge_geometry()
         else:
             self._get_edge_bool_props()
-            self._get_vertex_geometry()
-            self._get_edge_geometry()
 
         ## Properties that are not internalized
         ### edge properties from vertex properties
@@ -144,88 +140,6 @@ class AbstractRTZGraph(object):
     def _get_edge_bool_props(self):
         self.at_boundary = self.graph.edge_properties["at_boundary"]
         self.is_new_edge = self.graph.edge_properties["is_new_edge"]
-
-    def _init_vertex_geometry(self):
-        '''Creates the vertices geometric property maps
-        '''
-        # Position in the rho theta zed space
-        self.rhos = self.graph.new_vertex_property('float')
-        self.graph.vertex_properties["rhos"] = self.rhos
-        self.thetas = self.graph.new_vertex_property('float')
-        self.graph.vertex_properties["thetas"] = self.thetas
-        self.zeds = self.graph.new_vertex_property('float')
-        self.graph.vertex_properties["zeds"] = self.zeds
-        self.sigmas = self.graph.new_vertex_property('float')
-        self.graph.vertex_properties["sigmas"] = self.sigmas
-        self.ixs = self.graph.new_vertex_property('float')
-        self.graph.vertex_properties["ixs"] = self.ixs
-        self.wys = self.graph.new_vertex_property('float')
-        self.graph.vertex_properties["wys"] = self.wys
-
-    def _get_vertex_geometry(self):
-        '''Creates attributes from the vertices geometric property maps
-        '''
-        # Position in the rho theta zed space
-        self.rhos = self.graph.vertex_properties["rhos"]
-        self.thetas = self.graph.vertex_properties["thetas"]
-        self.zeds = self.graph.vertex_properties["zeds"]
-        self.sigmas = self.graph.vertex_properties["sigmas"]
-        self.ixs = self.graph.vertex_properties["ixs"]
-        self.wys = self.graph.vertex_properties["wys"]
-
-    def _init_edge_geometry(self):
-        '''Creates the edge geometric property maps
-        '''
-        # deltas
-        self.dthetas = self.graph.new_edge_property('float')
-        self.graph.edge_properties["dthetas"] = self.dthetas
-        self.dsigmas = self.graph.new_edge_property('float')
-        self.graph.edge_properties["dsigmas"] = self.dsigmas
-        self.dzeds = self.graph.new_edge_property('float')
-        self.graph.edge_properties["dzeds"] = self.dzeds
-        self.drhos = self.graph.new_edge_property('float')
-        self.graph.edge_properties["drhos"] = self.drhos
-        self.dixs = self.graph.new_edge_property('float')
-        self.graph.edge_properties["dixs"] = self.dixs
-        self.dwys = self.graph.new_edge_property('float')
-        self.graph.edge_properties["dwys"] = self.dwys
-
-        # Edge lengths
-        self.edge_lengths = self.graph.new_edge_property('float')
-        self.graph.edge_properties["edge_lengths"] = self.edge_lengths
-
-        # unitary vectors
-        self.u_dsigmas = self.graph.new_edge_property('float')
-        self.graph.edge_properties["u_dsigmas"] = self.u_dsigmas
-        self.u_dzeds = self.graph.new_edge_property('float')
-        self.graph.edge_properties["u_dzeds"] = self.u_dzeds
-        self.u_drhos = self.graph.new_edge_property('float')
-        self.graph.edge_properties["u_drhos"] = self.u_drhos
-        self.u_dixs = self.graph.new_edge_property('float')
-        self.graph.edge_properties["u_dixs"] = self.u_dixs
-        self.u_dwys = self.graph.new_edge_property('float')
-        self.graph.edge_properties["u_dwys"] = self.u_dwys
-
-    def _get_edge_geometry(self):
-        '''
-        Creates attributes from  the  geometric property maps
-        '''
-        # deltas
-        self.dthetas = self.graph.edge_properties["dthetas"]
-        self.dsigmas = self.graph.edge_properties["dsigmas"]
-        self.dzeds = self.graph.edge_properties["dzeds"]
-        self.drhos = self.graph.edge_properties["drhos"]
-        self.dixs = self.graph.edge_properties["dixs"]
-        self.dwys = self.graph.edge_properties["dwys"]
-
-        # Edge lengths
-        self.edge_lengths = self.graph.edge_properties["edge_lengths"]
-        # unitary vectors
-        self.u_dsigmas = self.graph.edge_properties["u_dsigmas"]
-        self.u_dzeds = self.graph.edge_properties["u_dzeds"]
-        self.u_drhos = self.graph.edge_properties["u_drhos"]
-        self.u_dixs = self.graph.edge_properties["u_dixs"]
-        self.u_dwys = self.graph.edge_properties["u_dwys"]
 
     def new_edge(self, vertex0, vertex1, source_edge):
         '''Adds an edge between vertex0 and vertex1 and copies the properties
@@ -719,6 +633,7 @@ class Cells():
         return graph
 
     def update_junctions(self, cell):
+
         self.junctions[cell] = self.get_cell_junctions(cell)
         self.num_sides[cell] = self.eptm.graph.degree_property_map('out')[cell]
 

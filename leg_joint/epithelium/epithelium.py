@@ -17,8 +17,8 @@ import graph_tool.all as gt
 import numpy as np
 import hdfgraph
 
+from ..data import default_params
 
-from .data import default_params
 from .objects import  AbstractRTZGraph, Cells, ApicalJunctions
 from .xml_handler import ParamTree
 from .dynamics import Dynamics

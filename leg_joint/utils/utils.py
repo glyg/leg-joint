@@ -5,6 +5,10 @@ import numpy as np
 from scipy.interpolate import splrep, splev
 
 
+def _to_3d(df):
+    return df.repeat(3).reshape((df.size, 3))
+
+
 def to_xy(rho, theta):
     x = rho * np.cos(theta)
     y = rho * np.sin(theta)
@@ -87,4 +91,3 @@ def local_subgraph(meth):
 
         return out
     return new_function
-
