@@ -407,11 +407,11 @@ class Triangles:
         _jk_term = _to_3d(tri_KV_V0) *(_to_3d(sub_areas / 2) * r_to_rho_j
                                        + _to_3d(tri_heights / 2) * cross_ai)
 
-        ij_term = _ij_term.groupby(level=('jv_i', 'jv_j')).sum()
-        jk_term = _jk_term.groupby(level=('jv_j', 'jv_i')).sum()
+        #ij_term = _ij_term.groupby(level=('jv_i', 'jv_j')).sum()
+        #jk_term = _jk_term.groupby(level=('jv_j', 'jv_i')).sum()
 
-        grad_v.loc[self.uix_active_i] += ij_term.sum(level='jv_i').loc[self.uix_active_i].values
-        grad_v.loc[self.uix_active_j] += jk_term.sum(level='jv_j').loc[self.uix_active_j].values
+        grad_v.loc[self.uix_active_i] += _ij_term.sum(level='jv_i').loc[self.uix_active_i].values
+        grad_v.loc[self.uix_active_j] += _jk_term.sum(level='jv_j').loc[self.uix_active_j].values
 
         return grad_v
 
