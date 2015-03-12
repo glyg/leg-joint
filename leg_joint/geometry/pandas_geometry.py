@@ -138,7 +138,8 @@ class Triangles:
         names =('cell', 'jv_i', 'jv_j')
         letters = ('a', 'i', 'j')
 
-        self.uix_active = self.vertex_df[self.vertex_df.is_active_vert==1].index
+        self.uix_active = self.vertex_df[
+            self.vertex_df.is_active_vert==1].index
 
         ### MultiIndex named (cell, jv_i, jv_j) for each triangle
         ### Those indices must be coherent with the original graph
@@ -188,8 +189,10 @@ class Triangles:
             dv = DataView(self.edges_df, unique)
             setattr(self, view_name, dv)
 
-        self.uix_active_i = np.array(list(set(self.uix_active).intersection(self.uix_i)))
-        self.uix_active_j = np.array(list(set(self.uix_active).intersection(self.uix_j)))
+        self.uix_active_i = np.array(
+            list(set(self.uix_active).intersection(self.uix_i)))
+        self.uix_active_j = np.array(
+            list(set(self.uix_active).intersection(self.uix_j)))
 
 
     @property
@@ -319,12 +322,32 @@ class Triangles:
         if inplace:
             self.vertex_df['thetas'] += angle
             self.update_cartesian()
-            return self
         else:
             new = self.copy()
             new.vertex_df['thetas'] += angle
             new.update_cartesian()
             return new
+
+    def periodic_boundary_condition(self):
+        '''
+        Applies the periodic boundary condition
+        to the vertices positions along the sigma axis,
+        with their curent value for rho.
+        '''
+        self.update_polar()
+        buf_theta = self.vertex_df['thetas'] + np.pi
+        buf_theta = (buf_theta % (2 * np.pi)) - np.pi
+        self.vertex_df['thetas'] = buf_theta
+        self.update_cartesian()
+
+    def proj_sigma(self):
+        ''' return an array of the positions projected on the
+        cylinder with average rho radius
+        '''
+        self.update_polar()
+        rho_mean = self.vertex_df.rhos.mean()
+        sigmas = self.vertex_df.thetas * rho_mean
+        return sigmas
 
     def translate(self, vector):
         raise NotImplementedError
@@ -339,8 +362,6 @@ class Triangles:
 
         dist = np.linalg.norm(relative_pos)
         return dist.argmin()
-
-
 
 class DataView:
     '''constructor class to get and set
