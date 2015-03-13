@@ -10,7 +10,7 @@
   </param>
   <param max="10." min="0.1" name="lambda_0" step="0.1" value="4.3">
     <unit>um</unit>
-    <description>Average cell to cell distance</description>
+    <description>Average junction length</description>
   </param>
   <param max="100." min="0.1" name="rho0" step="0.1" value="13.">
     <unit>um</unit>

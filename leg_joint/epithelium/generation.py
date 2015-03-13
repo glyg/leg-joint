@@ -52,8 +52,24 @@ def cylindrical(n_cells_circum, n_cells_length, l_0, h_0):
 
     is_junction_edge = graph.new_edge_property('bool')
     is_junction_edge.a = 1
-    to_remove = []
+    reorient_edges(graph, is_cell_vert, is_junction_edge)
 
+    edges_idx = [(graph.vertex_index[s], graph.vertex_index[t])
+                 for (s, t) in graph.edges()]
+    edges_idx = pd.MultiIndex.from_tuples(edges_idx,
+                                          names=('source', 'target'))
+    edges_df = pd.DataFrame(index=edges_idx)
+    edges_df['is_junction_edge'] = is_junction_edge.fa
+
+    return graph, vertex_df, edges_df
+
+def reorient_edges(graph, is_cell_vert, is_junction_edge):
+    '''Reorient the graph such that cell to junction edges
+    are always from cell to junction. Modifies `graph` and
+    `is_junction_edge` inplace
+
+    '''
+    to_remove = []
     for edge in graph.edges():
         srce, trgt = edge
         if is_cell_vert[srce] and not is_cell_vert[trgt]:
@@ -64,15 +80,9 @@ def cylindrical(n_cells_circum, n_cells_length, l_0, h_0):
             new = graph.add_edge(trgt, srce)
             is_junction_edge[edge] = 0
         elif is_cell_vert[srce] and is_cell_vert[trgt]:
-            raise ValueError('Invalid cell to cell edge {}'.format(edge))
-
+            raise ValueError(
+                'Invalid cell to cell edge {}'.format(edge))
+        else:
+            is_junction_edge[edge] = 1
     for edge in to_remove:
         graph.remove_edge(edge)
-
-    edges_idx = [(graph.vertex_index[s], graph.vertex_index[t])
-                 for (s, t) in graph.edges()]
-    edges_idx = pd.MultiIndex.from_tuples(edges_idx, names=('source', 'target'))
-    edges_df = pd.DataFrame(index=edges_idx)
-    edges_df['is_junction_edge'] = is_junction_edge.fa
-
-    return graph, vertex_df, edges_df

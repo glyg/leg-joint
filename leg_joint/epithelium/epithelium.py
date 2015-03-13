@@ -19,29 +19,37 @@ import hdfgraph
 
 from ..data import default_params
 
-from .objects import  AbstractRTZGraph, Cells, ApicalJunctions
-from .xml_handler import ParamTree
-from .dynamics import Dynamics
-from .filters import active, j_edges_in, EpitheliumFilters
+from .generation import cylindrical
+
+from .objects import  Cells, ApicalJunctions
+from ..io.xml_handler import ParamTree
+
+from ..topology import Topology
+from ..topology.topology import get_faces
+from ..geometry import Triangles
+from ..dynamics import Dynamics
+from ..topology.filters import active, j_edges_in
 
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
 PARAMFILE = default_params()
-GRAPH_SAVE_DIR = '.'
+
+import tempfile
+GRAPH_SAVE_DIR = tempfile.gettempdir()
 
 # See [the tau manifesto](http://tauday.com/tau-manifesto)
 tau = 2. * np.pi
 
 
-class Epithelium(EpitheliumFilters,
-                 AbstractRTZGraph,
+class Epithelium(Topology,
+                 Triangles,
                  Dynamics):
     """The :class:`Epithelium` class is the container for all the simulation.
     It inherits attributes form the following classes:
 
     * :class:`EpitheliumFilters`, providing utilities to create and
         filter the graph edges and vertices.
-    * :class:`AbstractRTZGraph` containing the geometrical aspects of
+    * :class:`GraphWrapper` containing the geometrical aspects of
         the simulation in 3D space (e.g. coordinate systems)
     * :class:`Dynamics` containing the dynamical aspects, i.e. the
         functions to compute the energy and the gradients.
@@ -66,10 +74,14 @@ class Epithelium(EpitheliumFilters,
 
     """
 
-    def __init__(self, graphXMLfile=None, identifier='0',
+    def __init__(self,
+                 identifier='0',
                  paramtree=None,
                  paramfile=PARAMFILE, copy=True,
-                 graph=None, verbose=False,
+                 graph=None,
+                 graphXMLfile=None,
+                 hdfstore=None, stamp=-1,
+                 verbose=False,
                  save_dir=GRAPH_SAVE_DIR,
                  **params):
         """
@@ -121,46 +133,45 @@ class Epithelium(EpitheliumFilters,
         self.log = log
 
         # Graph instanciation
-        if graph is None and graphXMLfile is None:
-            log.info('Created new graph')
-            self.graph = gt.Graph(directed=True)
-            self.new = True
-            self.generate = True
-        elif graphXMLfile is not None :
+        if graph is not None: ### From an existing graph
+            self.graph = graph
+            self.vertex_df, self.edge_df = hdfgraph.graph_to_dataframes(self.graph)
+            self.new = False
+            self.generate = False
+        elif graphXMLfile is not None: ### From a graphML file
             self.graph = gt.load_graph(graphXMLfile)
+            self.vertex_df, self.edge_df = hdfgraph.graph_to_dataframes(self.graph)
             self.new = False
             self.generate = False
             self.xmlfname = graphXMLfile
-        elif graph is not None:
-            self.graph = graph
+        elif hdfstore is not None: ### From a h5 file
+            self.vertex_df, self.edge_df = hdfgraph.frames_from_hdf(hdfstore, stamp=stamp)
+            self.graph = hdfgraph.graph_from_dataframes(self.vertex_df, self.edge_df)
             self.new = False
             self.generate = False
+        else: #create
+            log.info('Created new graph')
+            self.new = True
+            self.generate = True
+            n_cells_circum = self.params['n_sigmas']
+            n_cells_length = self.params['n_zeds']
+            l_0 = self.params['lambda_0']
+            h_0 = self.params['rho0']
+            self.graph, self.vertex_df, self.edge_df = cylindrical(
+                n_cells_circum, n_cells_length, l_0, h_0)
 
-        self.__verbose__ = verbose
-        EpitheliumFilters.__init__(self)
+        Topology.__init__(self)
+        self._properties_to_attributes()
+
         # All the geometrical properties are packed here
-        AbstractRTZGraph.__init__(self)
-        self.diamonds = self.graph.new_edge_property('object')
+        triangles = get_faces(self.graph)
+        Triangles.__init__(self, triangles, )
 
         # Cells and Junctions initialisation
         log.info('Initial cells')
         self.cells = Cells(self)
         log.info('Initial junctions')
         self.junctions = ApicalJunctions(self)
-        if self.generate:
-            self.is_alive.a = 1
-            # Remove cell to cell edges after graph construction
-            efilt = self.is_ctoj_edge.copy()
-            efilt.a += self.is_junction_edge.a
-            if self.__verbose__ == True:
-                total_edges = self.graph.num_edges()
-                good_edges = efilt.a.sum()
-                log.info('removing %i cell to cell edges '
-                      % (total_edges - good_edges))
-            self.graph.set_edge_filter(efilt)
-            self.graph.purge_edges()
-            self.graph.set_vertex_filter(None)
-            self.graph.set_edge_filter(None)
 
         self.reset_topology(local=False)
         # Dynamical components
@@ -172,6 +183,12 @@ class Epithelium(EpitheliumFilters,
             self.periodic_boundary_condition()
         log.info('Update geometry')
         self.update_geometry()
+
+    def _properties_to_attributes(self):
+        for name, vp in self.graph.vertex_properties.items():
+            setattr(self, name, vp)
+        for name, ep in self.graph.edge_properties.items():
+            setattr(self, name, ep)
 
     def __str__(self):
 
@@ -205,10 +222,11 @@ class Epithelium(EpitheliumFilters,
         fh = logging.FileHandler(self.paths['log'])
         fh.setLevel(logging.INFO)
         # create formatter and add it to the handlers
-        formatter = logging.Formatter('%(asctime)s - %(name)s -'
-                                      '%(levelname)s - {} :'
-                                      ' %(message)s @ stamp {}'.format(self.identifier,
-                                                                       self.stamp))
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s -'
+            '%(levelname)s - {} :'
+            ' %(message)s @ stamp {}'.format(self.identifier,
+                                             self.stamp))
         fh.setFormatter(formatter)
         # add the handlers to the logger
         log.addHandler(fh)
@@ -336,185 +354,3 @@ class Epithelium(EpitheliumFilters,
         if len(j_xyz) < 3:
             return
         self.ixs[cell], self.wys[cell], self.zeds[cell] = j_xyz.mean(axis=0)
-
-    def reset_topology(self, local=True):
-        '''Computes the epithelium topology, by finding *de novo* the
-        cell's junction edges and the adjacent cells for each junction
-        edge.  If `local` is `True`, performs this operation only over
-        local cells and junction edges.
-        '''
-        if local:
-            for cell in self.cells.local_cells():
-                self.cells.update_junctions(cell)
-            for j_edge in self.junctions.local_junctions():
-                self.junctions.update_adjacent(j_edge)
-        else:
-            for cell in self.cells:
-                self.cells.update_junctions(cell)
-            for j_edge in self.junctions:
-                self.junctions.update_adjacent(j_edge)
-
-    def add_junction(self, j_verta, j_vertb, cell0, cell1):
-        '''Adds a junction to the epithelium, creating a junction edge
-        between `j_verta` and `j_vertb`, cell to junction edges
-        between `cell0` and `j_edgea`, `cell0` and `j_edgeb`, `cell1`
-        and `j_edgea` and `cell1` and `j_edgeb`
-        '''
-        ##### TODO: This block should go in a decorator
-        valid = np.array([obj.is_valid() for obj in
-                          (cell0, j_verta, j_vertb)])
-        if not valid.all():
-            raise ValueError("invalid elements in the argument list"
-                             "with cell0 => %s"
-                             "     vertex a => %s "
-                             "     vertex b => %s " % (str(v) for v in valid)
-                             )
-        ####
-        j_edgeab = self.graph.edge(j_verta, j_vertb)
-        if j_edgeab is not None:
-            if self.__verbose__:
-                warnings.warn('''Previous %s to %s
-                             edge is re-created.'''
-                             % (str(j_verta), str(j_vertb)))
-            self.graph.remove_edge(j_edgeab)
-        j_edgeab = self.graph.add_edge(j_verta, j_vertb)
-        j_edge_old = self.cells.junctions[cell0][0]
-        for e_prop in self.graph.edge_properties.values():
-            e_prop[j_edgeab] = e_prop[j_edge_old]
-        self.junctions.adjacent_cells[j_edgeab] = cell0, cell1
-
-        self.cells.junctions[cell0].append(j_edgeab)
-
-        if self.cells.junctions[cell1] is None:
-            self.cells.junctions[cell1] = [j_edgeab,]
-        else:
-            self.cells.junctions[cell1].append(j_edgeab)
-
-        prev_ctojs = [ctoj for ctoj in cell0.out_edges()]
-        ctoj_old = prev_ctojs[0]
-
-        ctoj_0a = self.graph.edge(cell0, j_verta)
-        if ctoj_0a is not None:
-            self.graph.remove_edge(ctoj_0a)
-        ctoj_0a = self.graph.add_edge(cell0, j_verta)
-
-        ctoj_0b = self.graph.edge(cell0, j_vertb)
-        if ctoj_0b is not None:
-            self.graph.remove_edge(ctoj_0b)
-        ctoj_0b = self.graph.add_edge(cell0, j_vertb)
-
-        for e_prop in self.graph.edge_properties.values():
-            e_prop[ctoj_0a] = e_prop[ctoj_old]
-            e_prop[ctoj_0b] = e_prop[ctoj_old]
-        self._set_cell_pos(cell0)
-
-        if cell1 is not None:
-            ctoj_1a = self.graph.edge(cell1, j_verta)
-            if ctoj_1a is not None:
-                self.graph.remove_edge(ctoj_1a)
-            ctoj_1a = self.graph.add_edge(cell1, j_verta)
-
-            ctoj_1b = self.graph.edge(cell1, j_vertb)
-            if ctoj_1b is not None:
-                self.graph.remove_edge(ctoj_1b)
-            ctoj_1b = self.graph.add_edge(cell1, j_vertb)
-            for e_prop in self.graph.edge_properties.values():
-                e_prop[ctoj_1a] = e_prop[ctoj_old]
-                e_prop[ctoj_1b] = e_prop[ctoj_old]
-
-            self._set_cell_pos(cell1)
-        return j_verta, j_vertb, cell0, cell1
-
-    def remove_junction(self, j_verta, j_vertb, cell0, cell1):
-        '''Removes junction between `j_edgea` and `j_edgeb`, and the
-        corresponding cell to junction edges for `cell0` and
-        `cell1`
-        '''
-
-        #This block should go in a decorator
-        valid = np.array([element.is_valid() for element in
-                          (cell0, j_verta, j_vertb)])
-        if not valid.all():
-            raise ValueError("invalid elements in the argument list"
-                             "with cell0 => %s"
-                             "     vertex a => %s "
-                             "     vertex b => %s " % (str(v) for v in valid))
-        ####
-        j_edgeab = self.graph.edge(j_verta, j_vertb)
-        if j_edgeab is None:
-            j_edgeab = self.graph.edge(j_vertb, j_verta)
-        if j_edgeab is None:
-            warnings.warn("Junction from %s to %s doesn't exist"
-                         % (str(j_edgeab.source()), str(j_edgeab.target())))
-            return
-        # self.cells.junctions[cell0].remove(j_edgeab)
-        # self.cells.junctions[cell1].remove(j_edgeab)
-        # self.junctions.adjacent_cells[j_edgeab] = []
-
-        self.graph.remove_edge(j_edgeab)
-        self.cells.update_junctions(cell0)
-        self.cells.update_junctions(cell1)
-        #self.junctions.update_adjacent()
-        ctoj_0a = self.graph.edge(cell0, j_verta)
-        if ctoj_0a is not None:
-            self.graph.remove_edge(ctoj_0a)
-        ctoj_0b = self.graph.edge(cell0, j_vertb)
-        if ctoj_0b is not None:
-            self.graph.remove_edge(ctoj_0b)
-        if cell1 is not None:
-            ctoj_1a = self.graph.edge(cell1, j_verta)
-            if ctoj_1a is not None:
-                self.graph.remove_edge(ctoj_1a)
-            ctoj_1b = self.graph.edge(cell1, j_vertb)
-            if ctoj_1b is not None:
-                self.graph.remove_edge(ctoj_1b)
-
-    @j_edges_in
-    def merge_j_verts(self, jv0, jv1):
-        '''Merge junction vertices `jv0` and `jv1`. Raises an error if
-        those vertices are not connected
-        '''
-        vertex_trash = []
-        edge_trash = []
-        je = self.any_edge(jv0, jv1)
-        if je is None:
-            raise ValueError('Can only merge connected edges')
-
-        edge_trash.append(je)
-        for vert in jv1.out_neighbours():
-            old_edge = self.graph.edge(jv1, vert)
-            if vert != jv0:
-                new_edge = self.graph.add_edge(jv0, vert)
-            for prop in self.graph.edge_properties.values():
-                prop[new_edge] = prop[old_edge]
-            edge_trash.append(old_edge)
-        for vert in jv1.in_neighbours():
-            old_edge = self.graph.edge(vert, jv1)
-            if vert != jv0:
-                new_edge = self.graph.add_edge(vert, jv0)
-            for prop in self.graph.edge_properties.values():
-                prop[new_edge] = prop[old_edge]
-            edge_trash.append(old_edge)
-        vertex_trash.append(jv1)
-        return vertex_trash, edge_trash
-
-
-def hdf_snapshot(func, *args, **kwargs):
-    '''
-    Decorator for :class:`Epithelium` objects that store
-    the object's graph in an HDF5 file, by appending the
-    :class:`gt.Graph` PropertyMaps values, indexed by the
-    :class:`Epithelium` `stamp` attribute.
-    '''
-    def new_func(self, *args, **kwargs):
-        out = func(self, *args, **kwargs)
-        store = self.paths['hdf']
-        try:
-            hdfgraph.graph_to_hdf(self.graph, store,
-                                  stamp=self.stamp,
-                                  reset=False,
-                                  vert_kwargs={'data_columns':['ixs', 'wys', 'zeds', 'thetas']})
-        except:
-            self.log.error('HDF snapshot failed at stamp %i' % self.stamp)
-        return out
-    return new_func

@@ -21,11 +21,11 @@ log.propagate = False
 
 ## Import matplotlib here to avoid instabilities
 ## with graph-tool
-import matplotlib.pylab as plt
+# import matplotlib.pylab as plt
 
 # from .epithelium import Epithelium
-# from .optimizers import find_energy_min, isotropic_optimum
-# from .optimizers import approx_grad, check_local_grad, running_local_optimum
+# from .dynamics.optimizers import find_energy_min, isotropic_optimum
+# from .dynamics.optimizers import approx_grad, check_local_grad, running_local_optimum
 # from .topology import cell_division, type1_transition
 # from .topology import type3_transition
 # from .topology import remove_cell, resolve_small_edges

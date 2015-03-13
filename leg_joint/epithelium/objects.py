@@ -26,16 +26,7 @@ log = logging.getLogger(__name__)
 
 import graph_tool.all as gt
 #from scipy import weave, spatial
-from .filters import EpitheliumFilters
-from .utils import to_xy, to_rhotheta
-try:
-    from .circumcircle import c_circumcircle
-except ImportError:
-    log.warning('''Compiling circumcircle failed - tissue generation won't work''')
-from .data import default_params
-from sklearn.decomposition import PCA
-
-
+from ..data import default_params
 
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
@@ -43,153 +34,15 @@ PARAMFILE = default_params()
 tau = 2 * np.pi
 
 
-def get_faces(graph, as_array=True):
-    '''
-    Retrieves all the triangular subgraphs of the form
-
-       1 -- > 2
-        ^   ^
-         \ /
-          0
-
-    In our context, vertex 0 always corresponds to a cell
-    and vertices 1 and 2 to junction vertices
-
-    Parameters
-    ----------
-
-    graph : a :class:`GraphTool` graph instance
-    as_array: bool, optional, default `True`
-      if `True`, the output of `subraph_isomorphism` is converted
-      to a (N, 3) ndarray.
-
-    Returns
-    -------
-
-    triangles:  list of gt.PropertyMaps or (N, 3) ndarray
-      each line corresponds to a triplet (cell, jv0, jv1)
-      where cell, jv0 and jv1 are indices of the input graph
-      if
-    '''
-    tri_graph = gt.Graph()
-    ## the vertices
-    verts = tri_graph.add_vertex(3)
-    ## edges
-    tri_graph.add_edge_list([(0, 1), (0, 2), (1, 2)])
-    _triangles = gt.subgraph_isomorphism(tri_graph, graph)
-    if not as_array:
-        return _triangles
-    triangles = np.array([tri.a for tri in _triangles], dtype=np.int)
-    return triangles
-
-class AbstractRTZGraph(object):
-    '''
-    Wrapper of a (`graph_tool`)[http://projects.skewed.de/graph-tool]
-    for a geometric graph in a 3D coordinate system
-
-    Properties
-    ===========
-    ixs, wys, rhos, thetas, zeds, sigmas: vertex PropertyMaps
-        of the vertices positions along the different axes.
-
-    dixs, dwys, dzeds, drhos, dthetas, dsigmas : edge PropertyMaps of the
-        edge components along the various axis. For exemple:
-        `self.dixs[edge] = self.ixs[edge.source()] - self.ixs[edge.target()]`
-
-    edge_lengths: edge PropertyMap giving the edge lengths
-
-    u_dixs, u_dwys, ...: Coordinates of the unitary vector colinear to an edge
-
-
-    Methods:
-    ========
-
-    scale()
-
-    '''
-
-    def __init__(self):
-        '''
-        Create an `AbstractRTZGraph` object. This is not ment as
-        a stand alone object, but should rather be sublcassed.
-        '''
-        self.graph.set_directed(True) #So each edge is a defined vector
-        self.current_angle = 0
-        if self.new :
-            self._init_edge_bool_props()
-        else:
-            self._get_edge_bool_props()
-
-        ## Properties that are not internalized
-        ### edge properties from vertex properties
-        self.edge_src_rhos = self.graph.new_edge_property('float')
-        self.edge_trgt_rhos = self.graph.new_edge_property('float')
-        self.rho_lumen = self.params['rho_lumen']
-
-    def _init_edge_bool_props(self):
-        '''
-        Creates the edge boolean PropertyMaps
-        '''
-        self.at_boundary = self.graph.new_edge_property('bool')
-        self.at_boundary.a[:] = 0
-        self.graph.edge_properties["at_boundary"] = self.at_boundary
-        self.is_new_edge = self.graph.new_edge_property('bool')
-        self.is_new_edge.a[:] = 1
-        self.graph.edge_properties["is_new_edge"] = self.is_new_edge
-
-    def _get_edge_bool_props(self):
-        self.at_boundary = self.graph.edge_properties["at_boundary"]
-        self.is_new_edge = self.graph.edge_properties["is_new_edge"]
-
-    def new_edge(self, vertex0, vertex1, source_edge):
-        '''Adds an edge between vertex0 and vertex1 and copies the properties
-        of source_edge to this new edge
-        '''
-        if self.any_edge(vertex0, vertex1) is None:
-            new_edge = self.graph.add_edge(vertex0, vertex1)
-            for prop in self.graph.edge_properties.values():
-                prop[new_edge] = prop[source_edge]
-            return new_edge
-        else:
-            return self.any_edge(vertex0, vertex1)
-
-    def new_vertex(self, source_vertex):
-        '''Adds a vertex and copies the properties
-        of source_vertex to this new vertex
-        '''
-        new_v = self.graph.add_vertex()
-        for prop in self.graph.vertex_properties.values():
-            prop[new_v] = prop[source_vertex]
-        return new_v
-
-    def any_edge(self, v0, v1):
-        '''
-        Returns the edge between vertices v0 and v1 if it exists,
-        whether it goes from v0 to v1 or from v1 to v0 and None otherwize
-        '''
-        e = self.graph.edge(v0, v1)
-        if e is None:
-            e = self.graph.edge(v1, v0)
-        return e
-
-    def edge_difference(self, vprop, eprop=None):
-        eprop = gt.edge_difference(self.graph, vprop)
-        return eprop
-
 class Cells():
     '''
 
     '''
     def __init__(self, eptm):
         self.eptm = eptm
-        self.__verbose__ = self.eptm.__verbose__
         self.params = eptm.params
-
-        if self.eptm.new :
-            raise NotImplementedError
         self.junctions = self.eptm.graph.new_vertex_property('object')
         self.num_sides = self.eptm.graph.new_vertex_property('int')
-
 
     def __iter__(self):
         # for vertex in gt.find_vertex(self.eptm.graph,
@@ -206,11 +59,12 @@ class Cells():
 
     def _init_cell_params(self):
         '''
-        Creates the parameter dependant propery maps
+        Creates the parameter dependant data
         '''
         area0 = self.params['prefered_area']
         height0 = self.params['prefered_height']
         vol0 = area0 * height0
+
         self.prefered_vol = self.eptm.graph.new_vertex_property('float')
         self.prefered_vol.a[:] = vol0
         self.eptm.graph.vertex_properties["prefered_vol"] = self.prefered_vol

@@ -8,7 +8,8 @@ from __future__ import print_function
 import pandas as pd
 import numpy as np
 import hdfgraph
-from ..objects import get_faces
+
+from ..topology.topology import get_faces
 from ..utils import _to_3d
 
 import logging
@@ -22,30 +23,6 @@ the geometrical and dynamical properties of the epithelium graph.
 As those computations are vectorial calculus, we use pandas to perform them
 
 '''
-
-
-
-def update_graph(triangles, graph):
-
-    for col in triangles.vertex_df.columns:
-        data = triangles.vertex_df[col]
-        try:
-            graph.vp[col].fa = data
-        except KeyError:
-            log.debug('Vertex Property {} not found'.format(col))
-
-    for col in triangles.edges_df.columns:
-        data = triangles.edges_df[col]
-        try:
-            graph.ep[col].fa = data
-        except KeyError:
-            log.debug('Edge Property {} not found'.format(col))
-
-def parse_graph(graph):
-
-    vertex_df, edges_df  = hdfgraph.graph_to_dataframes(graph)
-    triangles = get_faces(graph)
-    return vertex_df, edges_df, triangles
 
 class Triangles:
     '''
@@ -73,14 +50,22 @@ class Triangles:
 
     '''
 
-    def __init__(self, vertex_df, edges_df,
-                 triangles, coords):
+    def __init__(self, triangles, coords,
+                 vertex_df=None,
+                 edges_df=None,):
         '''
         Creates a container class for the triangles geometry
 
         Parameters
         ----------
 
+        triangles: ndarray
+          trianges is a (N_t, 3) 2D array where each line contains
+          a triple with the indices of the cell, the source (jv_i)
+          and the target (jv_j) junction vertices.
+        coords: list of strings
+          the names of the three columns corresponding to the
+          3D positions
         vertex_df:  :class:`pandas.DataFrame` table
           This data frame should the vertices data. It is indexed by the
           vertices indices in the graph. See `self.mandatory_vcols` for a
@@ -90,26 +75,21 @@ class Triangles:
           :class:`pandas.MultiIndex` object indexed by
           (source, target) pairs. For a list of columns,
           see `self.mandatory_ecols`
-        triangles: ndarray
-          trianges is a (N_t, 3) 2D array where each line contains
-          a triple with the indices of the cell, the source (jv_i)
-          and the target (jv_j) junction vertices.
-        coords: list of strings
-          the names of the three columns corresponding to the
-          3D positions
 
         See Also
         --------
 
         hdfgraph.graph_to_dataframes: utility to convert a graph_tool.Graph
           to a dataframe pairs
-        leg_joint.objects.get_faces: utility to obtain  the triangles list
+        leg_joint.topology.get_faces: utility to obtain  the triangles list
           from a graph
 
         '''
+        if vertex_df is not None:
+            self.vertex_df = vertex_df
+            self.edges_df = edges_df
 
-        self.vertex_df = vertex_df.copy()
-        self.edges_df = edges_df.copy()
+        self.triangles_array = triangles
 
         self.coords = coords
         self.dcoords = ['d'+c for c in self.coords]
@@ -122,8 +102,8 @@ class Triangles:
         self._init_gradient()
 
     def copy(self):
-        return Triangles(self.vertex_df.copy(), self.edges_df.copy(),
-                         self.triangles.copy(), self.coords)
+        return Triangles(self.triangles_array.copy(), self.coords,
+                         self.vertex_df.copy(), self.edges_df.copy())
 
     def _init_gradient(self):
 
