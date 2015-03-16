@@ -29,6 +29,8 @@ from ..topology.topology import get_faces
 from ..geometry import Triangles
 from ..dynamics import Dynamics
 from ..topology.filters import active, j_edges_in
+from .graph_dataframe_interface import complete_pmaps, update_pmaps, update_dframes
+
 
 CURRENT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
@@ -159,13 +161,14 @@ class Epithelium(Topology,
             h_0 = self.params['rho0']
             self.graph, self.vertex_df, self.edge_df = cylindrical(
                 n_cells_circum, n_cells_length, l_0, h_0)
+        self.rho_lumen = self.params['rho_lumen']
 
         Topology.__init__(self)
         self._properties_to_attributes()
 
         # All the geometrical properties are packed here
-        triangles = get_faces(self.graph)
-        Triangles.__init__(self, triangles, )
+        _triangles = get_faces(self.graph)
+        Triangles.__init__(self, _triangles)
 
         # Cells and Junctions initialisation
         log.info('Initial cells')
@@ -174,6 +177,9 @@ class Epithelium(Topology,
         self.junctions = ApicalJunctions(self)
 
         self.reset_topology(local=False)
+        self._dataframes_to_properties()
+        self._properties_to_attributes()
+
         # Dynamical components
         Dynamics.__init__(self)
         if self.new:
@@ -184,11 +190,20 @@ class Epithelium(Topology,
         log.info('Update geometry')
         self.update_geometry()
 
+    def _dataframes_to_properties(self):
+        complete_pmaps(self.graph, self.vertex_df, self.edge_df)
+        update_pmaps(self.graph, self.vertex_df, self.edge_df)
+
     def _properties_to_attributes(self):
         for name, vp in self.graph.vertex_properties.items():
             setattr(self, name, vp)
         for name, ep in self.graph.edge_properties.items():
             setattr(self, name, ep)
+
+    def _update_dframes(self):
+        update_dframes(self.graph, self.vertex_df, self.edge_df)
+
+
 
     def __str__(self):
 
@@ -236,7 +251,7 @@ class Epithelium(Topology,
 
         with open(self.paths['json'], 'w+') as json_file:
             json.dump(parameters, json_file, sort_keys=True)
-            log.info('Wrote %s' % self.paths['json'])
+            log.info('Wrote {}'.format(self.paths['json']))
 
     def _init_paths(self, copy):
         '''Creates the paths where graphs will be saved.
@@ -274,83 +289,3 @@ class Epithelium(Topology,
                                          'params_%s.json' % self.identifier)
         self.paths['log'] = os.path.join(self.save_dir,
                                          '%s.log' % self.identifier)
-
-
-    def update_geometry(self):
-        '''
-        Computes cell positions (at the geometrical center
-        of the junction vertices), the edge lengths and the
-        cell geometry (area and volume)
-        '''
-
-        self.update_cells_pos()
-        self.update_rhotheta()
-        self.update_deltas()
-        self.update_edge_lengths()
-        # self.update_dsigmas()
-        # Edges
-        for j_edge in self.junctions:
-            self.diamonds[j_edge].update_geometry()
-        # cells
-        for cell in self.cells:
-            self._one_cell_geom(cell)
-
-    def _one_cell_geom(self, cell):
-        """
-        """
-        j_edges = self.cells.junctions[cell]
-        if len(j_edges) < 3:
-            if not self.is_alive[cell]:
-                return
-            log.error('''Two edges ain't enough to compute
-                      area for cell %s''' % cell)
-            self.cells.vols[cell] = self.cells.prefered_vol[cell]
-            self.cells.perimeters[cell] = 0.
-            self.is_alive[cell] = 0
-        else:
-            self.cells.areas[cell] = 0.
-            self.cells.perimeters[cell] = 0.
-            self.cells.vols[cell] = 0.
-            for j_edge in j_edges:
-                try:
-                    tr = self.diamonds[j_edge].triangles[cell]
-                    self.cells.areas[cell] += tr.area
-                    self.cells.perimeters[cell] += tr.length
-                    self.cells.vols[cell] += tr.vol
-                except KeyError:
-                    pass
-
-    def set_new_pos(self, new_xyz_pos):
-        '''
-        Modifies the position of the **active** junction vertices
-
-        Parameters:
-        ----------
-        new_xyz_pos: ndarray with shape (N, 3)
-            where N is the number of active vertices, containing the
-            new positions in the cartesian coordinate system
-        '''
-        self._set_junction_pos(new_xyz_pos)
-
-    @active
-    def _set_junction_pos(self, new_xyz_pos):
-        new_xyz_pos = new_xyz_pos.flatten()
-
-        if not np.all(np.isfinite(new_xyz_pos)):
-            log.critical('''Non finite value for vertices {}'''.format(
-                ', '.join(str(jv) for jv in self.graph.vertices())))
-            return
-        self.ixs.fa = new_xyz_pos[::3]
-        self.wys.fa = new_xyz_pos[1::3]
-        self.zeds.fa = new_xyz_pos[2::3]
-
-    def update_cells_pos(self):
-        for cell in self.cells:
-            self._set_cell_pos(cell)
-
-    def _set_cell_pos(self, cell):
-        j_xyz = np.array([[self.ixs[jv], self.wys[jv], self.zeds[jv]]
-                          for jv in cell.out_neighbours()])
-        if len(j_xyz) < 3:
-            return
-        self.ixs[cell], self.wys[cell], self.zeds[cell] = j_xyz.mean(axis=0)

@@ -50,7 +50,8 @@ class Triangles:
 
     '''
 
-    def __init__(self, triangles, coords,
+    def __init__(self, triangles,
+                 coords=['x', 'y', 'z'],
                  vertex_df=None,
                  edges_df=None,):
         '''
@@ -70,7 +71,7 @@ class Triangles:
           This data frame should the vertices data. It is indexed by the
           vertices indices in the graph. See `self.mandatory_vcols` for a
           list of columns of this dataframe
-        edges_df:  :class:`pandas.DataFrame` table
+        edge_df:  :class:`pandas.DataFrame` table
           DataFrame with the edges data. It is indexed by a
           :class:`pandas.MultiIndex` object indexed by
           (source, target) pairs. For a list of columns,
@@ -87,7 +88,7 @@ class Triangles:
         '''
         if vertex_df is not None:
             self.vertex_df = vertex_df
-            self.edges_df = edges_df
+            self.edge_df = edge_df
 
         self.triangles_array = triangles
 
@@ -103,7 +104,7 @@ class Triangles:
 
     def copy(self):
         return Triangles(self.triangles_array.copy(), self.coords,
-                         self.vertex_df.copy(), self.edges_df.copy())
+                         self.vertex_df.copy(), self.edge_df.copy())
 
     def _init_gradient(self):
 
@@ -158,7 +159,7 @@ class Triangles:
             idx = self.tix_aij.droplevel(name)
             setattr(self, idx_name, idx)
             view_name = 'tdf_{}to{}'.format(*other_letters)
-            dv = DataView(self.edges_df, idx)
+            dv = DataView(self.edge_df, idx)
             setattr(self, view_name, dv)
 
             self.indices[tuple(other_names)] = idx
@@ -166,7 +167,7 @@ class Triangles:
             unique = idx.unique()
             setattr(self, unique_name, unique)
             view_name = 'udf_{}to{}'.format(*other_letters)
-            dv = DataView(self.edges_df, unique)
+            dv = DataView(self.edge_df, unique)
             setattr(self, view_name, dv)
 
         self.uix_active_i = np.array(
@@ -211,39 +212,35 @@ class Triangles:
             log.debug('appending null column {}'.format(col),
                       'to vertex_df')
             self.vertex_df[col] = 0
-        missing = self.mandatory_ecols.difference(self.edges_df.columns)
+        missing = self.mandatory_ecols.difference(self.edge_df.columns)
         for col in missing:
             log.debug('appending null column {}'.format(col),
-                      'to edges_df')
-            self.edges_df[col] = 0
+                      'to edge_df')
+            self.edge_df[col] = 0
 
         for c in self.normal_coords:
             self.faces[c] = 0
 
-    def geometry(self, rho_lumen):
+    def update_geometry(self):
 
         cell_columns = ['rhos', 'heights', 'num_sides',
                         'areas', 'perimeters', 'vols']
         cell_columns.extend(self.coords)
         cell_data = self.udf_cell[cell_columns]
-
         ### update cell pos
         cell_data[self.coords] = (
             self.tdf_jv_i[self.coords].set_index(self.tix_aij).mean(level='cell')
             +self.tdf_jv_j[self.coords].set_index(self.tix_aij).mean(level='cell'))/2
         ### update rhos
-        self.vertex_df['rhos'] = np.hypot(self.vertex_df[self.coords[0]],
-                                          self.vertex_df[self.coords[1]])
+        self.update_polar()
+        self.update_heights()
         ### update lengths
-        srcs = self.edges_df.index.get_level_values('source')
-        trgts = self.edges_df.index.get_level_values('target')
-        self.edges_df[self.dcoords] = self.vertex_df.loc[trgts, self.coords].values\
+        srcs = self.edge_df.index.get_level_values('source')
+        trgts = self.edge_df.index.get_level_values('target')
+        self.edge_df[self.dcoords] = self.vertex_df.loc[trgts, self.coords].values\
                                       - self.vertex_df.loc[srcs, self.coords].values
-        self.edges_df['edge_lengths'] = np.linalg.norm(self.edges_df[self.dcoords], axis=1)
+        self.edge_df['edge_lengths'] = np.linalg.norm(self.edge_df[self.dcoords], axis=1)
         self.faces['ell_ij'] = self.tdf_itoj['edge_lengths'].values
-
-        ### This should be computed before hand
-        cell_data['heights'] = cell_data['rhos'] - rho_lumen
 
         num_sides = self.tix_aij.get_level_values('cell').value_counts()
         cell_data['num_sides'] = num_sides.loc[self.uix_a]
@@ -275,7 +272,7 @@ class Triangles:
         self.vertex_df[self.coords] *= scaling_factor
         self.vertex_df['heights'] *= scaling_factor
         self.rho_lumen *= scaling_factor
-        self.geometry()
+        self.update_geometry()
 
     def update_polar(self):
         self.vertex_df['thetas'] = np.arctan2(self.vertex_df[self.coords[1]],

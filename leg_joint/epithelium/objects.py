@@ -158,13 +158,10 @@ class ApicalJunctions():
     def __init__(self, eptm):
 
         self.eptm = eptm
-        self.__verbose__ = self.eptm.__verbose__
         self.graph = self.eptm.graph
         self.params = eptm.params
         self.adjacent_cells = self.eptm.graph.new_edge_property('object')
         if self.eptm.new :
-            if self.eptm.generate:
-                self._compute_voronoi()
             self._init_junction_params()
         else:
             self._get_junction_params()
@@ -200,13 +197,6 @@ class ApicalJunctions():
         self.radial_tensions\
             = self.eptm.graph.vertex_properties["radial_tensions"]
 
-
-    def update_adjacent(self, j_edge):
-        adj_cells = self.get_adjacent_cells(j_edge)
-        self.adjacent_cells[j_edge] = adj_cells
-        self.eptm.diamonds[j_edge] = Diamond(self.eptm,
-                                             j_edge, adj_cells)
-
     def get_adjacent_cells(self, j_edge):
         jv0 = j_edge.source()
         jv1 = j_edge.target()
@@ -216,105 +206,6 @@ class ApicalJunctions():
                    if self.eptm.is_cell_vert[cell]]
         common_cells = [cell for cell in cells_a if cell in cells_b]
         return common_cells
-
-    def _compute_voronoi(self):
-        n_dropped = 0
-        eptm = self.eptm
-        self.visited_cells = []
-
-        for cell in self.eptm.cells:
-            self.visited_cells.append(cell)
-            new_jvs, new_ctoj_edges, ndrp = self._voronoi_nodes(cell)
-            n_dropped += ndrp
-        log.info("%i triangles were dropped" % n_dropped)
-        # Cell to junction graph
-        n_jdropped = 0
-        eptm.update_xy()
-        eptm.update_dsigmas()
-        eptm.update_deltas()
-        eptm.update_edge_lengths()
-        self.visited_cells = []
-        for ctoj_edge in eptm.graph.edges():
-            if not eptm.is_ctoj_edge[ctoj_edge]:
-                continue
-            new_edge, dropped = self._voronoi_edges(ctoj_edge)
-            n_jdropped += dropped
-        log.info("%i junction edges were dropped" % n_dropped)
-        del self.visited_cells
-
-    def _voronoi_nodes(self, cell):
-
-        eptm = self.eptm
-        cutoff = eptm.params['pos_cutoff']
-        vecinos = [v for v in eptm.ordered_neighbours(cell)
-                   if eptm.is_cell_vert[v]]#that's ordered
-
-        num_vecinos = len(vecinos)
-        new_jvs = []
-        new_ctoj_edges = []
-        n_dropped = 0
-        n_visited = 0
-        for n0 in range(num_vecinos):
-            # Loop over
-            n1 = (n0 + 1) % num_vecinos
-            vecino0, vecino1 = vecinos[n0], vecinos[n1]
-            if vecino0 in self.visited_cells or vecino1 in self.visited_cells:
-                n_visited += 1
-                continue
-            v0_sz = eptm.out_delta_sz(cell, vecino0)
-            v1_sz = eptm.out_delta_sz(cell, vecino1)
-            sigma, zed = c_circumcircle(np.array([0., 0.]),
-                                        v0_sz, v1_sz, cutoff)
-            sigma += eptm.sigmas[cell]
-            zed += eptm.zeds[cell]
-            if not np.isfinite(sigma) or sigma > 1e8:
-                n_dropped += 1
-                continue
-            rho = (eptm.rhos[cell]
-                   + eptm.rhos[vecino0] + eptm.rhos[vecino1]) / 3.
-            try:
-                theta = sigma / rho
-            except ZeroDivisionError:
-                log.warning('Error computing thetas')
-                theta = 0
-            # new junction vertex here
-            # **directly** in the eptm graph
-            j_vertex = eptm.graph.add_vertex()
-            new_jvs.append(j_vertex)
-            eptm.is_cell_vert[j_vertex] = 0
-            eptm.rhos[j_vertex] = rho
-            eptm.thetas[j_vertex] = theta
-            eptm.zeds[j_vertex] = zed
-            eptm.sigmas[j_vertex] = sigma
-            new_ctoj_edges.extend([(cell, j_vertex),
-                                   (vecino0, j_vertex),
-                                   (vecino1, j_vertex)])
-        for (cell, jv) in new_ctoj_edges:
-            eptm.new_ctoj_edge(cell, jv)
-        return new_jvs, new_ctoj_edges, n_dropped
-
-    def _voronoi_edges(self, ctoj_edge):
-        eptm = self.eptm
-        cell0 = ctoj_edge.source()
-        self.visited_cells.append(cell0)
-
-        j_verts0 = [jv for jv in cell0.out_neighbours()
-                    if not eptm.is_cell_vert[jv]]
-        new_edges = []
-        dropped = 0
-        for cell1 in cell0.all_neighbours():
-            if not eptm.is_cell_vert[cell1]: continue
-            if cell1 in self.visited_cells:
-                continue
-            j_verts1 = [jv for jv in cell1.out_neighbours()
-                        if not eptm.is_cell_vert[jv]]
-            common_jvs = [jv for jv in j_verts0 if jv in j_verts1]
-            if len(common_jvs) == 2:
-                jv0, jv1 = common_jvs[0], common_jvs[1]
-                new_edges.append(eptm.new_j_edge(jv0, jv1))
-            else:
-                dropped += 1
-        return new_edges, dropped
 
 
 def cell_polygon(cell, coords, step):

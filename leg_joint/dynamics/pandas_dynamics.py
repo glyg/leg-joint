@@ -14,7 +14,7 @@ def opt_energy(pos, trgles, norm_factor):
 
     _pos = pos.reshape((pos.size//3, 3))
     trgles.vertex_df.loc[trgles.uix_active, trgles.coords] = _pos
-    trgles.geometry()
+    trgles.update_geometry()
     energy = compute_energy(trgles)
     return energy/norm_factor
 

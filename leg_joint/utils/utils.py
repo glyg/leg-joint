@@ -14,17 +14,17 @@ def deprecated(func):
     when the function is used.
     from https://wiki.python.org/moin/PythonDecoratorLibrary (GPL licenced)
     '''
-
-    @functools.wraps(func)
-    def new_func(*args, **kwargs):
-        warnings.warn_explicit(
-            "Call to deprecated function {}.".format(func.__name__),
-            category=DeprecationWarning,
-            filename=func.func_code.co_filename,
-            lineno=func.func_code.co_firstlineno + 1
-        )
-        return func(*args, **kwargs)
-    return new_func
+    pass
+    # @functools.wraps(func)
+    # def new_func(*args, **kwargs):
+    #     warnings.warn_explicit(
+    #         "Call to deprecated function {}.".format(func.__name__),
+    #         category=DeprecationWarning,
+    #         filename=func.func_code.co_filename,
+    #         lineno=func.func_code.co_firstlineno + 1
+    #     )
+    #     return func(*args, **kwargs)
+    # return new_func
 
 def _to_3d(df):
     return df.repeat(3).reshape((df.size, 3))

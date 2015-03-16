@@ -15,7 +15,6 @@ def cylindrical(n_cells_circum, n_cells_length, l_0, h_0):
     n_circum = n_cells_circum * 3
     n_length = n_cells_length * 3
     rho_c = n_circum * l_0 / (2 * np.pi)
-    rho_lumen = rho_c - h_0
 
     delta_theta = 2 * np.pi / n_circum
     delta_z = delta_theta * rho_c * np.sqrt(3)/2.
@@ -43,6 +42,8 @@ def cylindrical(n_cells_circum, n_cells_length, l_0, h_0):
     vertex_df['x'] = np.cos(vertex_df.theta) * rho_c
     vertex_df['y'] = np.sin(vertex_df.theta) * rho_c
     vertex_df['is_cell_vert'] = is_cell_vert
+    vertex_df['is_active_vert'] = 1 - is_cell_vert
+
     graph, pos_vp = gt.geometric_graph(vertex_df[['x', 'y', 'z']], l_0*1.1)
     graph.set_directed(True)
 
@@ -60,7 +61,6 @@ def cylindrical(n_cells_circum, n_cells_length, l_0, h_0):
                                           names=('source', 'target'))
     edges_df = pd.DataFrame(index=edges_idx)
     edges_df['is_junction_edge'] = is_junction_edge.fa
-
     return graph, vertex_df, edges_df
 
 def reorient_edges(graph, is_cell_vert, is_junction_edge):

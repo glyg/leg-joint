@@ -25,7 +25,7 @@ from graph_tool import GraphView
 import logging
 log = logging.getLogger(__name__)
 
-def find_energy_min_pd(eptm, local=True, update_topology=True):
+def find_energy_min(eptm, local=True, update_topology=True):
 
     if local:
         graph = GraphView(eptm.graph,
@@ -33,10 +33,10 @@ def find_energy_min_pd(eptm, local=True, update_topology=True):
                           efilt=eptm.is_local_edge)
     else:
         graph = eptm.graph
-    vertex_df, edges_df, triangles = parse_graph(graph)
+    vertex_df, edge_df, triangles = parse_graph(graph)
     coords = ['ixs', 'wys', 'zeds']
 
-    trgles = Triangles(vertex_df, edges_df, triangles, coords)
+    trgles = Triangles(vertex_df, edge_df, triangles, coords)
     trgles.geometry(eptm.rho_lumen)
     pos0 = trgles.vertex_df.loc[trgles.uix_active, coords].values.flatten()
     p_out = optimize.minimize(opt_energy_pd,
@@ -158,7 +158,6 @@ def check_local_grad(eptm):
                                    pos0.flatten(),
                                    eptm)
     return grad_err
-
 
 ## For consistency, the first argument must be the postion
 def opt_energy(pos, eptm):
