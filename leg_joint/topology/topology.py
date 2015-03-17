@@ -132,22 +132,8 @@ class Topology(object):
             prop[new_v] = prop[source_vertex]
         return new_v
 
-    def reset_topology(self, local=True):
-        '''Computes the epithelium topology, by finding *de novo* the
-        cell's junction edges and the adjacent cells for each junction
-        edge.  If `local` is `True`, performs this operation only over
-        local cells and junction edges.
-        '''
-        if local:
-            for cell in self.cells.local_cells():
-                self.cells.update_junctions(cell)
-            for j_edge in self.junctions.local_junctions():
-                self.junctions.update_adjacent(j_edge)
-        else:
-            for cell in self.cells:
-                self.cells.update_junctions(cell)
-            for j_edge in self.junctions:
-                self.junctions.update_adjacent(j_edge)
+    def reset_topology(self):
+        raise NotImplementedError
 
     def add_junction(self, j_verta, j_vertb, cell0, cell1):
         '''Adds a junction to the epithelium, creating a junction edge

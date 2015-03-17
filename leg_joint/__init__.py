@@ -19,11 +19,12 @@ log.setLevel(logging.INFO)
 log.propagate = False
 
 
+from .data import default_params, before_apoptosis_xml, get_image
 ## Import matplotlib here to avoid instabilities
 ## with graph-tool
 # import matplotlib.pylab as plt
 
-# from .epithelium import Epithelium
+from .epithelium import Epithelium
 # from .dynamics.optimizers import find_energy_min, isotropic_optimum
 # from .dynamics.optimizers import approx_grad, check_local_grad, running_local_optimum
 # from .topology import cell_division, type1_transition

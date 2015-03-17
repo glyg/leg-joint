@@ -24,12 +24,12 @@ def update_dframes(graph, vertex_df, edge_df, vcols=None, ecols=None):
         try:
             vertex_df[col] = prop.fa
         except KeyError:
-            log.debug('Property {} not in vertex dataframe'.format(col))
+            log.info('Property {} not in vertex dataframe'.format(col))
     for col, prop in eitems:
         try:
             edge_df[col] = prop.fa
         except KeyError:
-            log.debug('Property {} not in edge dataframe'.format(col))
+            log.info('Property {} not in edge dataframe'.format(col))
 
 
 

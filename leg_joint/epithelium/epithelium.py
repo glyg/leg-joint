@@ -175,18 +175,19 @@ class Epithelium(Topology,
         self.cells = Cells(self)
         log.info('Initial junctions')
         self.junctions = ApicalJunctions(self)
-
-        self.reset_topology(local=False)
+        self._update_dframes()
+        # Dynamical components
+        Dynamics.__init__(self)
         self._dataframes_to_properties()
         self._properties_to_attributes()
 
-        # Dynamical components
-        Dynamics.__init__(self)
         if self.new:
-            log.info('Isotropic relaxation')
-            self.isotropic_relax()
-            log.info('Periodic boundary')
-            self.periodic_boundary_condition()
+            pass
+            # log.info('Isotropic relaxation')
+            # self.isotropic_relax()
+            # self._update_dframes()
+            # log.info('Periodic boundary')
+            # self.periodic_boundary_condition()
         log.info('Update geometry')
         self.update_geometry()
 
@@ -203,7 +204,10 @@ class Epithelium(Topology,
     def _update_dframes(self):
         update_dframes(self.graph, self.vertex_df, self.edge_df)
 
-
+    def reset_triangles(self):
+        self.vertex_df, self.edge_df = hdfgraph.graph_to_dataframes(self.graph)
+        _triangles = get_faces(self.graph)
+        Triangles.__init__(self, _triangles)
 
     def __str__(self):
 

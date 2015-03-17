@@ -53,7 +53,7 @@ class Triangles:
     def __init__(self, triangles,
                  coords=['x', 'y', 'z'],
                  vertex_df=None,
-                 edges_df=None,):
+                 edge_df=None,):
         '''
         Creates a container class for the triangles geometry
 
@@ -175,7 +175,6 @@ class Triangles:
         self.uix_active_j = np.array(
             list(set(self.uix_active).intersection(self.uix_j)))
 
-
     @property
     def mandatory_vcols(self):
         ''' List of vertex data used in the computations
@@ -253,12 +252,10 @@ class Triangles:
         self.faces['sub_areas'] = sub_areas
         normals = crosses / _to_3d(2 * sub_areas)
         self.faces[self.normal_coords] = normals.values
-
         cell_data['areas'] = self.faces.sub_areas.sum(level='cell').loc[self.uix_a]
         cell_data['perimeters'] = self.faces.ell_ij.sum(level='cell').loc[self.uix_a]
         ### We're neglecting curvature here
         cell_data['vols'] = cell_data['heights'] * cell_data['areas']
-
         self.udf_cell[cell_columns] = cell_data
 
     def scale(self, scaling_factor):
