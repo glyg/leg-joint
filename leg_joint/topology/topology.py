@@ -54,33 +54,7 @@ def get_faces(graph, as_array=True):
     return triangles
 
 
-class Topology(object):
-
-    def __init__(self):
-        if self.new:
-            self._init_edge_filters()
-            self._init_vertex_filters()
-
-    def _init_edge_filters(self):
-
-
-        self.graph.edge_properties["is_ctoj_edge"] = self.graph.new_edge_property('bool')
-        self.graph.edge_properties["is_junction_edge"] = self.graph.new_edge_property('bool')
-        self.graph.edge_properties["is_local_edge"] = self.graph.new_edge_property('bool')
-        self.graph.edge_properties["is_active_edge"] = self.graph.new_edge_property('bool')
-
-        self.graph.edge_properties["at_boundary"] = self.graph.new_edge_property('bool')
-        self.graph.edge_properties["is_new_edge"] = self.graph.new_edge_property('bool')
-
-    def _init_vertex_filters(self):
-        # Is a cell
-        self.graph.vertex_properties["is_cell_vert"] = self.graph.new_vertex_property('bool')
-        self.graph.vertex_properties["is_alive"] = self.graph.new_vertex_property('bool')
-        # Locality
-        self.graph.vertex_properties["is_local_vert"] = self.graph.new_vertex_property('bool')
-        # Active verts can move
-        self.graph.vertex_properties["is_active_vert"] = self.graph.new_vertex_property('bool')
-
+class Topology:
 
     def any_edge(self, v0, v1):
         '''
@@ -392,9 +366,9 @@ class Topology(object):
         new_jv = self.new_vertex(jvs[0])
         self.log.info('new vertex %s' % str(new_jv))
         self.is_local_vert[new_jv] = 1
-        self.ixs[new_jv] = self.ixs[cell]
-        self.wys[new_jv] = self.wys[cell]
-        self.zeds[new_jv] = self.zeds[cell]
+        self.x[new_jv] = self.x[cell]
+        self.y[new_jv] = self.y[cell]
+        self.z[new_jv] = self.z[cell]
         adjacent_cells = []
         for jv in jvs:
             vertex_trash.append(jv)

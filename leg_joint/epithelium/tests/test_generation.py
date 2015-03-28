@@ -6,14 +6,26 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import numpy as np
-from leg_joint.epithelium import generation
+from leg_joint.epithelium.generation import cylindrical
+from leg_joint.epithelium.epithelium import Epithelium
 
-def test_cell_generation():
+
+def test_cylindrical():
 
     n_circum, n_length = 7, 8
-    pos, cells_graph = generation.generate_cells(n_circum, n_length,
-                                                 l_0=1, h_0=1)
-    degrees = np.bincount(cells_graph.degree_property_map('out').a)
+    graph, vertex_df, edge_df = cylindrical(
+        n_circum, n_length, 1., 1.)
+
+    degrees = np.bincount(graph.degree_property_map('out').a)
 
     assert degrees[4] == 2 * n_circum
     assert degrees[6] == (n_length - 2) * n_circum
+
+
+
+def test_new_eptm():
+
+    eptm = Epithelium()
+    n_zeds = eptm.params['n_zeds']
+    n_sigmas = eptm.params['n_sigmas']
+    assert eptm.is_cell_vert.a.sum() == n_zeds * n_sigmas

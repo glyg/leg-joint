@@ -25,6 +25,8 @@ from .data import default_params, before_apoptosis_xml, get_image
 # import matplotlib.pylab as plt
 
 from .epithelium import Epithelium
+from .draw import graph_representation
+
 # from .dynamics.optimizers import find_energy_min, isotropic_optimum
 # from .dynamics.optimizers import approx_grad, check_local_grad, running_local_optimum
 # from .topology import cell_division, type1_transition

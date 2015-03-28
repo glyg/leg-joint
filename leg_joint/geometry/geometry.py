@@ -180,13 +180,13 @@ class Triangles:
         ''' List of vertex data used in the computations
         '''
         cols = set(self.coords)
-        cols.update({'rhos', 'heights'})
+        cols.update({'rho', 'height'})
         topology = {'is_cell_vert',
                     'num_sides'}
         cols.update(topology)
-        cell_geom = {'perimeters',
-                     'areas',
-                     'vols'}
+        cell_geom = {'perimeter',
+                     'area',
+                     'vol'}
         cols.update(cell_geom)
 
         dyn_parameters = ['contractilities',
@@ -210,56 +210,64 @@ class Triangles:
         for col in missing:
             log.debug('appending null column {}'.format(col),
                       'to vertex_df')
-            self.vertex_df[col] = 0
+            self.vertex_df[col] = np.nan
         missing = self.mandatory_ecols.difference(self.edge_df.columns)
         for col in missing:
             log.debug('appending null column {}'.format(col),
                       'to edge_df')
-            self.edge_df[col] = 0
+            self.edge_df[col] = np.nan
 
         for c in self.normal_coords:
-            self.faces[c] = 0
+            self.faces[c] = np.nan
 
     def update_geometry(self):
 
-        cell_columns = ['rhos', 'heights', 'num_sides',
-                        'areas', 'perimeters', 'vols']
-        cell_columns.extend(self.coords)
-        cell_data = self.udf_cell[cell_columns]
-        ### update cell pos
-        cell_data[self.coords] = (
-            self.tdf_jv_i[self.coords].set_index(self.tix_aij).mean(level='cell')
-            +self.tdf_jv_j[self.coords].set_index(self.tix_aij).mean(level='cell'))/2
-        ### update rhos
+        ### update rho
         self.update_polar()
-        self.update_heights()
+        self.update_height()
         ### update lengths
         srcs = self.edge_df.index.get_level_values('source')
         trgts = self.edge_df.index.get_level_values('target')
         self.edge_df[self.dcoords] = self.vertex_df.loc[trgts, self.coords].values\
-                                      - self.vertex_df.loc[srcs, self.coords].values
-        self.edge_df['edge_lengths'] = np.linalg.norm(self.edge_df[self.dcoords], axis=1)
-        self.faces['ell_ij'] = self.tdf_itoj['edge_lengths'].values
+                                     - self.vertex_df.loc[srcs, self.coords].values
+        self.edge_df['edge_length'] = np.linalg.norm(self.edge_df[self.dcoords],
+                                                     axis=1)
+        self.faces['ell_ij'] = self.tdf_itoj['edge_length'].values
 
         num_sides = self.tix_aij.get_level_values('cell').value_counts()
+
+        cell_columns = ['rho', 'height', 'num_sides',
+                        'area', 'perimeter', 'vol']
+        cell_columns.extend(self.coords)
+        cell_data = self.udf_cell[cell_columns]
+        ### update cell pos
+        cell_data[self.coords] = (
+            self.tdf_jv_i[
+                self.coords].set_index(self.tix_aij).mean(level='cell')
+            + self.tdf_jv_j[
+                self.coords].set_index(self.tix_aij).mean(level='cell'))/2
         cell_data['num_sides'] = num_sides.loc[self.uix_a]
         r_ak = self.tdf_atoi[self.dcoords].set_index(self.tix_aij)
         r_am = self.tdf_atoj[self.dcoords].set_index(self.tix_aij)
 
         crosses = pd.DataFrame(np.cross(r_ak, r_am), index=self.tix_a)
 
-        sub_areas = np.linalg.norm(crosses, axis=1)/2
-        self.faces['sub_areas'] = sub_areas
-        normals = crosses / _to_3d(2 * sub_areas)
+        sub_area = np.linalg.norm(crosses, axis=1) / 2
+        self.faces['sub_area'] = sub_area
+        normals = crosses / _to_3d(2 * sub_area)
         self.faces[self.normal_coords] = normals.values
-        cell_data['areas'] = self.faces.sub_areas.sum(level='cell').loc[self.uix_a]
-        cell_data['perimeters'] = self.faces.ell_ij.sum(level='cell').loc[self.uix_a]
+        cell_data['area'] = self.faces.sub_area.sum(level='cell').loc[self.uix_a]
+        cell_data['perimeter'] = self.faces.ell_ij.sum(level='cell').loc[self.uix_a]
         ### We're neglecting curvature here
-        cell_data['vols'] = cell_data['heights'] * cell_data['areas']
+        cell_data['vol'] = cell_data['height'] * cell_data['area']
         self.udf_cell[cell_columns] = cell_data
 
-    def scale(self, scaling_factor):
+    def set_new_pos(self, pos):
+        _pos = pos.reshape((pos.size//3, 3))
+        self.vertex_df.loc[self.uix_active, self.coords] = _pos
 
+
+    def scale(self, scaling_factor):
         '''Multiply all the distances by a factor `scaling_factor`
 
         Parameter
@@ -267,25 +275,28 @@ class Triangles:
         scaling_factor: float
         '''
         self.vertex_df[self.coords] *= scaling_factor
-        self.vertex_df['heights'] *= scaling_factor
+        self.vertex_df['height'] *= scaling_factor
         self.rho_lumen *= scaling_factor
         self.update_geometry()
+        self.update_polar()
+        self.update_pmaps()
+
 
     def update_polar(self):
-        self.vertex_df['thetas'] = np.arctan2(self.vertex_df[self.coords[1]],
+        self.vertex_df['theta'] = np.arctan2(self.vertex_df[self.coords[1]],
                                               self.vertex_df[self.coords[0]])
-        self.vertex_df['rhos'] = np.hypot(self.vertex_df[self.coords[0]],
+        self.vertex_df['rho'] = np.hypot(self.vertex_df[self.coords[0]],
                                           self.vertex_df[self.coords[1]])
 
-    def update_heights(self):
-        self.vertex_df['heights'] = self.vertex_df['rhos'] - self.rho_lumen
+    def update_height(self):
+        self.vertex_df['height'] = self.vertex_df['rho'] - self.rho_lumen
 
     def update_cartesian(self):
 
-        rhos = self.vertex_df['rhos']
-        thetas = self.vertex_df['thetas']
-        self.vertex_df[self.coords[0]] = rhos * np.cos(thetas)
-        self.vertex_df[self.coords[1]] = rhos * np.sin(thetas)
+        rho = self.vertex_df['rho']
+        theta = self.vertex_df['theta']
+        self.vertex_df[self.coords[0]] = rho * np.cos(theta)
+        self.vertex_df[self.coords[1]] = rho * np.sin(theta)
 
     def rotate(self, angle, inplace=False):
         '''Rotates the epithelium by an angle `angle` around
@@ -294,11 +305,11 @@ class Triangles:
 
         self.update_polar()
         if inplace:
-            self.vertex_df['thetas'] += angle
+            self.vertex_df['theta'] += angle
             self.update_cartesian()
         else:
             new = self.copy()
-            new.vertex_df['thetas'] += angle
+            new.vertex_df['theta'] += angle
             new.update_cartesian()
             return new
 
@@ -309,9 +320,9 @@ class Triangles:
         with their curent value for rho.
         '''
         self.update_polar()
-        buf_theta = self.vertex_df['thetas'] + np.pi
+        buf_theta = self.vertex_df['theta'] + np.pi
         buf_theta = (buf_theta % (2 * np.pi)) - np.pi
-        self.vertex_df['thetas'] = buf_theta
+        self.vertex_df['theta'] = buf_theta
         self.update_cartesian()
 
     def proj_sigma(self):
@@ -319,8 +330,8 @@ class Triangles:
         cylinder with average rho radius
         '''
         self.update_polar()
-        rho_mean = self.vertex_df.rhos.mean()
-        sigmas = self.vertex_df.thetas * rho_mean
+        rho_mean = self.vertex_df.rho.mean()
+        sigmas = self.vertex_df.theta * rho_mean
         return sigmas
 
     def translate(self, vector):

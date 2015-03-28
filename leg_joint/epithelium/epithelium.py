@@ -28,8 +28,8 @@ from ..topology import Topology
 from ..topology.topology import get_faces
 from ..geometry import Triangles
 from ..dynamics import Dynamics
-from ..topology.filters import active, j_edges_in
-from .graph_dataframe_interface import complete_pmaps, update_pmaps, update_dframes
+from hdfgraph import complete_pmaps, update_pmaps
+from hdfgraph import update_dframes
 
 
 CURRENT_DIR = os.path.dirname(__file__)
@@ -147,7 +147,8 @@ class Epithelium(Topology,
             self.generate = False
             self.xmlfname = graphXMLfile
         elif hdfstore is not None: ### From a h5 file
-            self.vertex_df, self.edge_df = hdfgraph.frames_from_hdf(hdfstore, stamp=stamp)
+            self.vertex_df, self.edge_df = hdfgraph.frames_from_hdf(
+                hdfstore, stamp=stamp)
             self.graph = hdfgraph.graph_from_dataframes(self.vertex_df, self.edge_df)
             self.new = False
             self.generate = False
@@ -161,11 +162,12 @@ class Epithelium(Topology,
             h_0 = self.params['rho0']
             self.graph, self.vertex_df, self.edge_df = cylindrical(
                 n_cells_circum, n_cells_length, l_0, h_0)
+            complete_pmaps(self.graph, self.vertex_df, self.edge_df)
+            update_pmaps(self.graph, self.vertex_df, self.edge_df)
+
         self.rho_lumen = self.params['rho_lumen']
 
         Topology.__init__(self)
-        self._properties_to_attributes()
-
         # All the geometrical properties are packed here
         _triangles = get_faces(self.graph)
         Triangles.__init__(self, _triangles)
@@ -186,10 +188,13 @@ class Epithelium(Topology,
             # log.info('Isotropic relaxation')
             # self.isotropic_relax()
             # self._update_dframes()
-            # log.info('Periodic boundary')
-            # self.periodic_boundary_condition()
         log.info('Update geometry')
         self.update_geometry()
+        update_pmaps(self.graph, self.vertex_df,
+                     self.edge_df)
+
+    def update_pmaps(self):
+        update_pmaps(self.graph, self.vertex_df, self.edge_df)
 
     def _dataframes_to_properties(self):
         complete_pmaps(self.graph, self.vertex_df, self.edge_df)
