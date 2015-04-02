@@ -32,14 +32,11 @@ class Dynamics(object):
         height = self.params["prefered_height"]
         prefered_vol = prefered_area * height
         self.norm_factor = vol_elasticity0 * prefered_vol**2
-        vcols = self.vertex_df.columns
-        if not 'contractility' in vcols:
+
+        if self.new:
             self.vertex_df['contractility'] = self.params['contractility']
-        if not 'vol_elasticity' in vcols:
             self.vertex_df['vol_elasticity'] = self.params['vol_elasticity']
-        if not 'prefered_vol' in vcols:
             self.vertex_df['prefered_vol'] = prefered_vol
-        if not 'line_tension' in self.edge_df.columns:
             self.edge_df['line_tension'] = self.params['line_tension']
 
 

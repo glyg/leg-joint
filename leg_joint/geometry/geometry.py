@@ -51,7 +51,6 @@ class Triangles:
     '''
 
     def __init__(self, triangles,
-                 coords=['x', 'y', 'z'],
                  vertex_df=None,
                  edge_df=None,):
         '''
@@ -64,18 +63,13 @@ class Triangles:
           trianges is a (N_t, 3) 2D array where each line contains
           a triple with the indices of the cell, the source (jv_i)
           and the target (jv_j) junction vertices.
-        coords: list of strings
-          the names of the three columns corresponding to the
-          3D positions
         vertex_df:  :class:`pandas.DataFrame` table
           This data frame should the vertices data. It is indexed by the
-          vertices indices in the graph. See `self.mandatory_vcols` for a
-          list of columns of this dataframe
+          vertices indices in the graph.
         edge_df:  :class:`pandas.DataFrame` table
           DataFrame with the edges data. It is indexed by a
           :class:`pandas.MultiIndex` object indexed by
-          (source, target) pairs. For a list of columns,
-          see `self.mandatory_ecols`
+          (source, target) pairs.
 
         See Also
         --------
@@ -89,29 +83,20 @@ class Triangles:
         if vertex_df is not None:
             self.vertex_df = vertex_df
             self.edge_df = edge_df
-
         self.triangles_array = triangles
-
-        self.coords = coords
+        self.coords = ['x', 'y', 'z']
         self.dcoords = ['d'+c for c in self.coords]
         self.normal_coords = ['u'+c for c in self.coords]
 
         self._build_indices(triangles)
         self.faces = pd.DataFrame(index=self.tix_aij)
-        self._complete_df_cols()
         self._ucells = None
         self._init_gradient()
 
     def copy(self):
-        return Triangles(self.triangles_array.copy(), self.coords,
-                         self.vertex_df.copy(), self.edge_df.copy())
-
-    def _init_gradient(self):
-
-        self.grad_coords = ['g'+c for c in self.coords]
-        self.grad_i = pd.DataFrame(0, index=self.uix_active,
-                                   columns=self.grad_coords).sort_index()
-
+        return Triangles(self.triangles_array.copy(),
+                         self.vertex_df.copy(),
+                         self.edge_df.copy())
 
     def _build_indices(self, faces):
 
@@ -175,50 +160,6 @@ class Triangles:
         self.uix_active_j = np.array(
             list(set(self.uix_active).intersection(self.uix_j)))
 
-    @property
-    def mandatory_vcols(self):
-        ''' List of vertex data used in the computations
-        '''
-        cols = set(self.coords)
-        cols.update({'rho', 'height'})
-        topology = {'is_cell_vert',
-                    'num_sides'}
-        cols.update(topology)
-        cell_geom = {'perimeter',
-                     'area',
-                     'vol'}
-        cols.update(cell_geom)
-
-        dyn_parameters = ['contractilities',
-                          'vol_elasticities']
-        cols.update(dyn_parameters)
-        return cols
-
-    @property
-    def mandatory_ecols(self):
-        ''' List of edge data used in the computations
-        '''
-        cols = set(self.dcoords)
-        cols.update({'edge_length',
-                     'line_tensions'})
-        return cols
-
-    def _complete_df_cols(self):
-
-        ### mendatory columns
-        missing = self.mandatory_vcols.difference(self.vertex_df.columns)
-        for col in missing:
-            log.debug('appending null column {}'.format(col),
-                      'to vertex_df')
-            self.vertex_df[col] = np.nan
-        missing = self.mandatory_ecols.difference(self.edge_df.columns)
-        for col in missing:
-            log.debug('appending null column {}'.format(col),
-                      'to edge_df')
-            self.edge_df[col] = np.nan
-
-        for c in self.normal_coords:
-            self.faces[c] = np.nan
 
     def update_geometry(self):
 
@@ -234,7 +175,6 @@ class Triangles:
                                                      axis=1)
         self.faces['ell_ij'] = self.tdf_itoj['edge_length'].values
 
-        num_sides = self.tix_aij.get_level_values('cell').value_counts()
 
         cell_columns = ['rho', 'height', 'num_sides',
                         'area', 'perimeter', 'vol']
@@ -246,7 +186,6 @@ class Triangles:
                 self.coords].set_index(self.tix_aij).mean(level='cell')
             + self.tdf_jv_j[
                 self.coords].set_index(self.tix_aij).mean(level='cell'))/2
-        cell_data['num_sides'] = num_sides.loc[self.uix_a]
         r_ak = self.tdf_atoi[self.dcoords].set_index(self.tix_aij)
         r_am = self.tdf_atoj[self.dcoords].set_index(self.tix_aij)
 
@@ -261,6 +200,12 @@ class Triangles:
         ### We're neglecting curvature here
         cell_data['vol'] = cell_data['height'] * cell_data['area']
         self.udf_cell[cell_columns] = cell_data
+
+    def update_num_sides(self):
+        num_sides = self.tix_aij.get_level_values('cell').value_counts()
+        self.udf_cell['num_sides'] = num_sides.loc[self.uix_a]
+
+
 
     def set_new_pos(self, pos):
         _pos = pos.reshape((pos.size//3, 3))

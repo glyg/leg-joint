@@ -43,6 +43,9 @@ GRAPH_SAVE_DIR = tempfile.gettempdir()
 tau = 2. * np.pi
 
 
+
+
+
 class Epithelium(Topology,
                  Triangles,
                  Dynamics):
@@ -75,6 +78,50 @@ class Epithelium(Topology,
     in a :class:`Junctions` instance.
 
     """
+    vertex_data = {
+        ## Coordinates
+        'x': (0., np.float),
+        'y': (0., np.float),
+        'z': (0., np.float),
+        'rho': (0., np.float),
+        'theta': (0., np.float),
+        'height': (0., np.float),
+        ## Geometry
+        'perimeter': (0., np.float),
+        'area': (0., np.float),
+        'vol': (0., np.float),
+        ## Topology
+        'is_cell_vert': (0, np.bool),
+        'is_alive': (1, np.bool),
+        'is_active': (1, np.bool),
+        'num_sides': (1, np.uint16),
+        ## Dynamical
+        'contractility': (0.014, np.float),
+        'vol_elasticity': (0.014, np.float)}
+    edge_data = {
+        ## Coordinates
+        'dx': (0., np.float),
+        'dy': (0., np.float),
+        'dz': (0., np.float),
+        'edge_length': (0., np.float),
+        ## Gradients
+        'gx': (0., np.float),
+        'gy': (0., np.float),
+        'gz': (0., np.float),
+        ## Topological
+        'is_junction_edge': (0, np.bool),
+        ## Dynamical parameters
+        'line_tension': (0., np.float),
+        'radial_tension': (0., np.float)}
+    face_data = {
+        ## Normal
+        'ux': (0., np.float),
+        'uy': (0., np.float),
+        'uz': (0., np.float),
+        ## Geometry
+        'sub_area': (0., np.float),
+        'ell_ij': (0., np.float),
+        'height': (0., np.float)}
 
     def __init__(self,
                  identifier='0',
@@ -162,43 +209,53 @@ class Epithelium(Topology,
             h_0 = self.params['rho0']
             self.graph, self.vertex_df, self.edge_df = cylindrical(
                 n_cells_circum, n_cells_length, l_0, h_0)
-            complete_pmaps(self.graph, self.vertex_df, self.edge_df)
-            update_pmaps(self.graph, self.vertex_df, self.edge_df)
+            self.complete_dframes()
+            self.complete_pmaps()
+            self.update_pmaps()
+
 
         self.rho_lumen = self.params['rho_lumen']
 
         Topology.__init__(self)
         # All the geometrical properties are packed here
+        #self.graph.set_vertex_filter(self.graph.vertex_properties['is_alive'])
         _triangles = get_faces(self.graph)
         Triangles.__init__(self, _triangles)
+        #self.graph.set_vertex_filter(None)
+        log.info('Update geometry')
+        self.update_geometry()
+        self.update_num_sides()
+        self.complete_pmaps()
+        self.update_pmaps()
+        print(self.vertex_df['num_sides'])
+
 
         # Cells and Junctions initialisation
         log.info('Initial cells')
         self.cells = Cells(self)
         log.info('Initial junctions')
         self.junctions = ApicalJunctions(self)
-        self._update_dframes()
+        self.update_dframes()
         # Dynamical components
         Dynamics.__init__(self)
-        self._dataframes_to_properties()
-        self._properties_to_attributes()
-
+        self.complete_pmaps()
+        self.update_pmaps()
         if self.new:
-            pass
-            # log.info('Isotropic relaxation')
-            # self.isotropic_relax()
-            # self._update_dframes()
-        log.info('Update geometry')
-        self.update_geometry()
-        update_pmaps(self.graph, self.vertex_df,
-                     self.edge_df)
+            self.mark_border_as_dead()
+            log.info('Isotropic relaxation')
+            self.isotropic_relax()
+            self.update_dframes()
+
+        print(self.graph.vertex_properties['num_sides'])
+
 
     def update_pmaps(self):
+        self.graph.set_vertex_filter(self.graph.vertex_properties['is_alive'])
         update_pmaps(self.graph, self.vertex_df, self.edge_df)
+        self.graph.set_vertex_filter(None)
 
-    def _dataframes_to_properties(self):
+    def complete_pmaps(self):
         complete_pmaps(self.graph, self.vertex_df, self.edge_df)
-        update_pmaps(self.graph, self.vertex_df, self.edge_df)
 
     def _properties_to_attributes(self):
         for name, vp in self.graph.vertex_properties.items():
@@ -206,12 +263,31 @@ class Epithelium(Topology,
         for name, ep in self.graph.edge_properties.items():
             setattr(self, name, ep)
 
-    def _update_dframes(self):
+    def update_dframes(self):
+        self.graph.set_vertex_filter(self.graph.vertex_properties['is_alive'])
         update_dframes(self.graph, self.vertex_df, self.edge_df)
+        self.graph.set_vertex_filter(None)
+
+    def mark_border_as_dead(self):
+        '''
+        Border cells have more cell to junction edges than
+        sides - here we remove them from the active data
+        '''
+        self.graph.set_edge_filter(self.is_junction_edge, inverted=True)
+        n_out = self.graph.degree_property_map('out').copy()
+        self.graph.set_edge_filter(None)
+        for cell in self.cells:
+            if n_out[cell] != self.num_sides[cell]:
+                self.is_alive[cell] = 0
+                self.is_cell_vert[cell] = 0
+        self.reset_triangles()
 
     def reset_triangles(self):
+
+        self.graph.set_vertex_filter(self.graph.vertex_properties['is_alive'])
         self.vertex_df, self.edge_df = hdfgraph.graph_to_dataframes(self.graph)
         _triangles = get_faces(self.graph)
+        self.graph.set_vertex_filter(None)
         Triangles.__init__(self, _triangles)
 
     def __str__(self):

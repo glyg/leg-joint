@@ -18,10 +18,10 @@ mpl.rcParams['savefig.dpi'] = 100             #72
 mpl.rcParams['figure.subplot.bottom'] = .1    #.125
 
 import graph_tool.all as gt
-#import matplotlib.pyplot as plt
-# import leg_joint as lj
+import matplotlib.pyplot as plt
+import leg_joint as lj
 
-# import numpy as np
+import numpy as np
 
 # def before_after(func):
 #     def new_func(eptm, *args, **kwargs):

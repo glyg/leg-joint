@@ -50,12 +50,15 @@ def cylindrical(n_cells_circum, n_cells_length, l_0, h_0):
     vertex_df['theta'] = np.arctan2(vertex_df.y, vertex_df.x)
     vertex_df['height'] = h_0
 
-    graph, pos_vp = gt.geometric_graph(vertex_df[['x', 'y', 'z']], l_0*1.1)
+    graph, pos_vp = gt.geometric_graph(vertex_df[['x', 'y', 'z']],
+                                       l_0*1.1)
     graph.set_directed(True)
 
     _is_cv = graph.new_vertex_property('bool')
     _is_cv.a = is_cell_vert
     is_cell_vert = _is_cv
+
+
 
     is_junction_edge = graph.new_edge_property('bool')
     is_junction_edge.a = 1
