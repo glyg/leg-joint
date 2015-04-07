@@ -16,7 +16,8 @@ def compute_energy(trgles, full_output=False):
     E_t = junction_data['line_tension'] * junction_data['edge_length']
 
     cell_data = trgles.udf_cell[['vol_elasticity', 'vol', 'prefered_vol',
-                                 'contractility', 'perimeter']]
+                                 'contractility', 'perimeter', 'is_alive']]
+    cell_data = cell_data[cell_data.is_alive == 1]
     E_v =  0.5 * (cell_data['vol_elasticity']
                   * (cell_data['vol']
                      - cell_data['prefered_vol'])**2)
@@ -48,8 +49,7 @@ def compute_gradient(trgles, components=False):
 
 def tension_grad(trgles):
 
-    grad_t = trgles.grad_i.copy()
-    grad_t[:] = 0
+    grad_t = trgles.grad_array.copy()
 
     tensions = trgles.udf_itoj['line_tension']
     tensions.index.names = ('jv_i', 'jv_j')
@@ -63,7 +63,7 @@ def tension_grad(trgles):
 
 def contractile_grad(trgles):
 
-    grad_c = trgles.grad_i.copy()
+    grad_c = trgles.grad_array.copy()
     grad_c[:] = 0
 
     contract = trgles.udf_cell['contractility']
@@ -90,7 +90,7 @@ def volume_grad(trgles):
     '''
     Computes :math:`\sum_\alpha\nabla_i \left(K (V_\alpha - V_0)^2\right)`
     '''
-    grad_v = trgles.grad_i.copy()
+    grad_v = trgles.grad_array.copy()
     grad_v[:] = 0
 
     elasticity = trgles.udf_cell['vol_elasticity']

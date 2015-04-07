@@ -53,6 +53,7 @@ class Dynamics(object):
     def isotropic_relax(self):
 
         self.update_polar()
+        self.update_pmaps()
         area0 = self.params['prefered_area']
         h_0 = self.params['prefered_height']
         ### Cells only area and height
@@ -67,7 +68,6 @@ class Dynamics(object):
         scale = (area0 / area_avg)**0.5
         self.scale(scale)
         self.rho_lumen = rho_avg * scale - h_0
-        self.update_geometry()
 
         ### Optimal value for delta
         delta_o = self.find_grad_roots()
@@ -76,9 +76,9 @@ class Dynamics(object):
         self.delta_o = delta_o
         self.ground_energy = self.isotropic_energy(delta_o)
         ### Scaling
-
         self.scale(delta_o)
-        self.update_geometry()
+        self.update_pmaps()
+
 
     def isotropic_energy(self, delta):
         """

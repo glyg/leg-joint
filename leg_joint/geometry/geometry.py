@@ -24,6 +24,18 @@ As those computations are vectorial calculus, we use pandas to perform them
 
 '''
 
+face_data = {
+    ## Normal
+    'ux': (0., np.float),
+    'uy': (0., np.float),
+    'uz': (0., np.float),
+    ## Geometry
+    'sub_area': (0., np.float),
+    'ell_ij': (0., np.float),
+    'height': (0., np.float)}
+
+
+
 class Triangles:
     '''
     Data structure defined to index the ensembles of sub-graph homologue to
@@ -64,7 +76,7 @@ class Triangles:
           a triple with the indices of the cell, the source (jv_i)
           and the target (jv_j) junction vertices.
         vertex_df:  :class:`pandas.DataFrame` table
-          This data frame should the vertices data. It is indexed by the
+          This data frame should contain the vertices data. It is indexed by the
           vertices indices in the graph.
         edge_df:  :class:`pandas.DataFrame` table
           DataFrame with the edges data. It is indexed by a
@@ -89,9 +101,11 @@ class Triangles:
         self.normal_coords = ['u'+c for c in self.coords]
 
         self._build_indices(triangles)
-        self.faces = pd.DataFrame(index=self.tix_aij)
-        self._ucells = None
-        self._init_gradient()
+        self.faces = pd.DataFrame(index=self.tix_aij,
+                                  columns=face_data.keys())
+        self.grad_array = pd.DataFrame(index=self.uix_active,
+                                       columns=self.coords)
+        self.grad_array[:] = 0
 
     def copy(self):
         return Triangles(self.triangles_array.copy(),
@@ -169,12 +183,12 @@ class Triangles:
         ### update lengths
         srcs = self.edge_df.index.get_level_values('source')
         trgts = self.edge_df.index.get_level_values('target')
-        self.edge_df[self.dcoords] = self.vertex_df.loc[trgts, self.coords].values\
-                                     - self.vertex_df.loc[srcs, self.coords].values
-        self.edge_df['edge_length'] = np.linalg.norm(self.edge_df[self.dcoords],
-                                                     axis=1)
+        self.edge_df[self.dcoords] = (
+            self.vertex_df.loc[trgts, self.coords].values
+            - self.vertex_df.loc[srcs, self.coords].values)
+        self.edge_df['edge_length'] = np.linalg.norm(
+            self.edge_df[self.dcoords], axis=1)
         self.faces['ell_ij'] = self.tdf_itoj['edge_length'].values
-
 
         cell_columns = ['rho', 'height', 'num_sides',
                         'area', 'perimeter', 'vol']
@@ -195,8 +209,10 @@ class Triangles:
         self.faces['sub_area'] = sub_area
         normals = crosses / _to_3d(2 * sub_area)
         self.faces[self.normal_coords] = normals.values
-        cell_data['area'] = self.faces.sub_area.sum(level='cell').loc[self.uix_a]
-        cell_data['perimeter'] = self.faces.ell_ij.sum(level='cell').loc[self.uix_a]
+        cell_data['area'] = self.faces.sub_area.sum(
+            level='cell').loc[self.uix_a]
+        cell_data['perimeter'] = self.faces.ell_ij.sum(
+            level='cell').loc[self.uix_a]
         ### We're neglecting curvature here
         cell_data['vol'] = cell_data['height'] * cell_data['area']
         self.udf_cell[cell_columns] = cell_data
@@ -205,12 +221,9 @@ class Triangles:
         num_sides = self.tix_aij.get_level_values('cell').value_counts()
         self.udf_cell['num_sides'] = num_sides.loc[self.uix_a]
 
-
-
     def set_new_pos(self, pos):
         _pos = pos.reshape((pos.size//3, 3))
         self.vertex_df.loc[self.uix_active, self.coords] = _pos
-
 
     def scale(self, scaling_factor):
         '''Multiply all the distances by a factor `scaling_factor`
@@ -220,18 +233,15 @@ class Triangles:
         scaling_factor: float
         '''
         self.vertex_df[self.coords] *= scaling_factor
-        self.vertex_df['height'] *= scaling_factor
         self.rho_lumen *= scaling_factor
         self.update_geometry()
-        self.update_polar()
         self.update_pmaps()
-
 
     def update_polar(self):
         self.vertex_df['theta'] = np.arctan2(self.vertex_df[self.coords[1]],
-                                              self.vertex_df[self.coords[0]])
+                                             self.vertex_df[self.coords[0]])
         self.vertex_df['rho'] = np.hypot(self.vertex_df[self.coords[0]],
-                                          self.vertex_df[self.coords[1]])
+                                         self.vertex_df[self.coords[1]])
 
     def update_height(self):
         self.vertex_df['height'] = self.vertex_df['rho'] - self.rho_lumen
