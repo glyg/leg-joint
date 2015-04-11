@@ -9,8 +9,8 @@ import os
 import warnings
 import datetime
 import json
-import logging
 
+import logging
 log = logging.getLogger(__name__)
 
 import graph_tool.all as gt
@@ -179,7 +179,6 @@ class Epithelium(Topology,
         log.info('Update geometry')
         self.update_geometry()
         self.update_num_sides()
-        self.complete_pmaps()
         self.update_pmaps()
 
 
@@ -191,7 +190,6 @@ class Epithelium(Topology,
         self.update_dframes()
         # Dynamical components
         Dynamics.__init__(self)
-        self.complete_pmaps()
         self.update_pmaps()
         if self.new:
             self._mark_border_as_dead()
@@ -217,7 +215,7 @@ class Epithelium(Topology,
         # self.graph.set_vertex_filter(self.graph.vertex_properties['is_alive'])
         self.vertex_df, self.edge_df = graph_to_dataframes(self.graph)
         # self.graph.set_vertex_filter(None)
-        Triangles.__init__(self, self.triangles_array)
+        #Triangles.__init__(self, self.triangles_array)
 
     def _mark_border_as_dead(self):
         '''

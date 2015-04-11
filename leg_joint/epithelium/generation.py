@@ -9,6 +9,10 @@ import numpy as np
 import pandas as pd
 import graph_tool.all as gt
 
+
+import logging
+log = logging.getLogger(__name__)
+
 vertex_data = {
     ## Coordinates
     'x': (0., np.float),
@@ -121,10 +125,15 @@ def cylindrical(n_cells_length,
                                        l_0*1.1)
     graph.set_directed(True)
 
+
     is_cell_vert = graph.new_vertex_property('bool')
     is_cell_vert.a = vertex_df.is_cell_vert
+
     is_junction_edge = graph.new_edge_property('bool')
     is_junction_edge.a = 1
+    graph.edge_properties['is_junction_edge'] = is_junction_edge
+    graph.vertex_properties['is_cell_vert'] = is_cell_vert
+
     reorient_edges(graph, is_cell_vert, is_junction_edge)
 
     edge_idx = [(graph.vertex_index[s], graph.vertex_index[t])
@@ -132,12 +141,11 @@ def cylindrical(n_cells_length,
     edge_idx = pd.MultiIndex.from_tuples(edge_idx,
                                          names=('source', 'target'))
     edge_df = pd.DataFrame(index=edge_idx)
-    edge_df['is_junction_edge'] = is_junction_edge.fa.astype(np.bool)
     complete_dframes(vertex_df, edge_df,
                      vertex_data, edge_data)
 
+    edge_df.is_junction_edge = graph.edge_properties['is_junction_edge'].fa
     return graph, vertex_df, edge_df
-
 
 
 def reorient_edges(graph, is_cell_vert, is_junction_edge):
@@ -161,5 +169,6 @@ def reorient_edges(graph, is_cell_vert, is_junction_edge):
                 'Invalid cell to cell edge {}'.format(edge))
         else:
             is_junction_edge[edge] = 1
+    log.info('filpped {} edges'.format(len(to_remove)))
     for edge in to_remove:
         graph.remove_edge(edge)

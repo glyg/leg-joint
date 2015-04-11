@@ -49,7 +49,7 @@ def get_faces(graph, as_array=True):
     tri_graph.add_edge_list([(0, 1), (0, 2), (1, 2)])
     _triangles = gt.subgraph_isomorphism(tri_graph, graph)
     if not as_array:
-        return _triangles
+        return tri_graph, _triangles
     triangles = np.array([tri.a for tri in _triangles], dtype=np.int)
     return triangles
 
