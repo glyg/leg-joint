@@ -174,7 +174,6 @@ class Triangles:
         self.uix_active_j = np.array(
             list(set(self.uix_active).intersection(self.uix_j)))
 
-
     def update_geometry(self):
 
         ### update rho
