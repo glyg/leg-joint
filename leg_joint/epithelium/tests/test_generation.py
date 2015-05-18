@@ -6,65 +6,42 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import numpy as np
-from leg_joint.epithelium.generation import cylindrical
+from leg_joint.epithelium.generation import base_grid, cylindrical
+
 from leg_joint.epithelium.epithelium import Epithelium
 
 
-vertex_data = {
-    ## Coordinates
-    'x': (0., np.float),
-    'y': (0., np.float),
-    'z': (0., np.float),
-    'rho': (0., np.float),
-    'theta': (0., np.float),
-    'height': (0., np.float),
-    ## Geometry
-    'perimeter': (0., np.float),
-    'area': (0., np.float),
-    'vol': (0., np.float),
-    ## Topology
-    'is_cell_vert': (0, np.bool),
-    'is_alive': (1, np.bool),
-    'is_active': (1, np.bool),
-    'num_sides': (1, np.uint16),
-    ## Dynamical
-    'contractility': (0.014, np.float),
-    'vol_elasticity': (0.014, np.float)}
-edge_data = {
-    ## Coordinates
-    'dx': (0., np.float),
-    'dy': (0., np.float),
-    'dz': (0., np.float),
-    'edge_length': (0., np.float),
-    ## Gradients
-    'gx': (0., np.float),
-    'gy': (0., np.float),
-    'gz': (0., np.float),
-    ## Topological
-    'is_junction_edge': (0, np.bool),
-    ## Dynamical parameters
-    'line_tension': (0., np.float),
-    'radial_tension': (0., np.float)}
-face_data = {
-    ## Normal
-    'ux': (0., np.float),
-    'uy': (0., np.float),
-    'uz': (0., np.float),
-    ## Geometry
-    'sub_area': (0., np.float),
-    'ell_ij': (0., np.float),
-    'height': (0., np.float)}
 
+def test_base_grid():
 
+    pos, is_cell_vert = base_grid(3, 3, delta_x=1, delta_y=1)
+    assert pos.shape == (27, 2)
+    assert is_cell_vert.shape == (27, 2)
+
+    np.testing.assert_array_almost_equal(
+        pos[:3, :],
+        np.array([[ 0. ,  0.5],
+                  [ 0. ,  1.5],
+                  [ 0. ,  2.5]]))
+
+    np.testing.assert_array_almost_equal(
+        is_cell_vert[:3, :],
+        np.array([[ 0. ,  0.5],
+                  [ 0. ,  1.5],
+                  [ 0. ,  2.5]]))
+
+    np.testing.assert_array_equal(
+        is_cell_vert[:3],
+        np.array([ True, False, False], dtype=bool))
 
 def test_cylindrical():
 
     n_circum, n_length = 7, 8
-    graph, vertex_df, edge_df = cylindrical(
-        n_circum, n_length, 1., 1.)
-
-    degrees = np.bincount(graph.degree_property_map('out').a)
-
+    graph = cylindrical(n_circum, n_length, 1., 1.)
+    graph.set_edge_filter(graph.ep['is_junction_edge'], inverted=True)
+    degrees = np.bincount(graph.degree_property_map('out').fa)
+    graph.clear_filters()
+    assert degrees[0] == graph.num_vertices() - degrees[4] - degrees[6]
     assert degrees[4] == 2 * n_circum
     assert degrees[6] == (n_length - 2) * n_circum
 

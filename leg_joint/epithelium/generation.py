@@ -1,4 +1,31 @@
 # -*- coding: utf-8 -*-
+'''This module contains the elements necessary to build an epithelium.
+
+`vertex_data`, `cell_data`, `edge_data`, `junction_data` and
+`facea
+_data` are dictionnaries of the form:
+
+```python
+    {'data_name': (default_value, data_type)}.
+```
+
+They are used to instanciate all the necessary property maps over the graph.
+
+
+`vertex_data` and `edge_data` contain data unspecific to the vertex or
+edge type (here cell vertices, junction edges, and triangular
+faces). Specific data for cells and junction edges will be instanciated as
+PropertyMaps of the corresponding GraphView, except for faces.
+Note that graphviews inherits the parent graphs propertymaps
+**at instanciation time**.
+
+
+It is recommanded to add new properties by specifying them here,
+although they can also be specified when `Epithelium` is instanciated.
+Adding properties dynamically is possible but can lead to inconsitencies
+between graphviews and the parent graph's propery maps.
+
+'''
 
 from __future__ import unicode_literals
 from __future__ import division
@@ -13,59 +40,111 @@ import graph_tool.all as gt
 import logging
 log = logging.getLogger(__name__)
 
+
+
+
 vertex_data = {
     ## Coordinates
-    'x': (0., np.float),
-    'y': (0., np.float),
-    'z': (0., np.float),
-    'rho': (0., np.float),
-    'theta': (0., np.float),
-    'height': (0., np.float),
-    ## Geometry
-    'perimeter': (0., np.float),
-    'area': (0., np.float),
-    'vol': (0., np.float),
+    'x': (0., 'float'),
+    'y': (0., 'float'),
+    'z': (0., 'float'),
+    'rho': (0., 'float'),
+    'theta': (0., 'float'),
+    'height': (0., 'float'),
     ## Topology
-    'is_cell_vert': (0, np.bool),
-    'is_alive': (1, np.bool),
-    'is_active_vert': (1, np.bool),
-    'num_sides': (1, np.int),
+    'is_cell_vert': (0, 'bool'),
+    'is_alive': (1, 'bool'),
+    'is_active_vert': (1, 'bool')}
+
+### Cell vertices are at the apical surface center of mass
+cell_data = {
+    ## Cell Geometry
+    'perimeter': (0., 'float'),
+    'area': (0., 'float'),
+    'vol': (0., 'float'),
     ## Dynamical
-    'contractility': (0.014, np.float),
-    'vol_elasticity': (0.014, np.float)}
+    'contractility': (0.014, 'float'),
+    'vol_elasticity': (0.014, 'float'),
+    ## Topology
+    'num_sides': (1, np.int)}
+
 edge_data = {
     ## Coordinates
-    'dx': (0., np.float),
-    'dy': (0., np.float),
-    'dz': (0., np.float),
-    'edge_length': (0., np.float),
+    'dx': (0., 'float'),
+    'dy': (0., 'float'),
+    'dz': (0., 'float'),
+    'edge_length': (0., 'float'),
     ## Gradients
-    'gx': (0., np.float),
-    'gy': (0., np.float),
-    'gz': (0., np.float),
-    ## Topological
-    'is_junction_edge': (0, np.bool),
+    'gx': (0., 'float'),
+    'gy': (0., 'float'),
+    'gz': (0., 'float'),
+    ## Topology
+    'is_junction_edge': (0, 'bool')}
+
+junction_data = {
     ## Dynamical parameters
-    'line_tension': (0., np.float),
-    'radial_tension': (0., np.float)}
+    'line_tension': (0., 'float'),
+    'radial_tension': (0., 'float')}
 
 
-def complete_dframes(vertex_df, edge_df,
-                     vertex_data, edge_data):
-    for key, (default, dtype) in vertex_data.items():
-        if not key in vertex_df.columns:
-            vertex_df[key] = default
-            vertex_df[key] = vertex_df[key].astype(dtype)
+face_data = {
+    ## Normal Coordinates
+    'ux': (0., 'float'),
+    'uy': (0., 'float'),
+    'uz': (0., 'float'),
+    ## Geometry
+    'sub_area': (0., 'float'),
+    'ell_ij': (0., 'float')}
 
-    for key, (default, dtype) in edge_data.items():
-        if not key in edge_df.columns:
-            edge_df[key] = default
-            edge_df[key] = edge_df[key].astype(dtype)
 
 
 def base_grid(n_cells_x, n_cells_y,
-              delta_x=1, delta_y=1,
-              centered=True):
+              delta_x=1, delta_y=1):
+    """
+    Creates a 2D hexagonal grid with the following geometry:
+
+             j   j
+
+           j   c   j   c
+
+             j   j
+
+    Parameters
+    ----------
+
+    n_cells_x : int
+        Number of cells along the first dimention
+        (i.e the number of cell vertices on an axis
+         parallel to the first dimention)
+
+    n_cells_y : int
+        Number of cells along the second dimention
+        (i.e the number of cell vertices on an axis
+         parallel to the 2nd dimention)
+
+    delta_x : float, optional
+        Spacing between the verticies along first axis,
+        default 1
+    delta_y : float, optional
+        Spacing between the verticies along 2nd axis
+        default 1
+
+    Note
+    ----
+
+    the total number of vertices N_v is given by  (N_v = n_cells_x * n_cells_y * 3)
+    The number of _cell_ verices is n_cells_x * n_cells_y.
+
+    Returns
+    -------
+
+    pos: np.ndarray
+        Two dimentional array with shape `(N_v, 2)` with the vertex positions
+    is_cell_vert: np.ndarray
+        Array with shape `(N_v,)` with the vertex labels
+        (1 if it is a cell vertex, 0 if it is not)
+
+    """
 
     n_x = n_cells_x
     n_y = n_cells_y * 3
@@ -76,76 +155,69 @@ def base_grid(n_cells_x, n_cells_y,
     ys = xy_grid[1].astype('float')
 
     ys[::2, ...] += 0.5
-    is_cell_vert = np.zeros_like(xy_grid[1]).astype(np.bool)
+    is_cell_vert = np.zeros_like(xy_grid[0]).astype(np.bool)
     is_cell_vert[::2, ::3] = 1
     is_cell_vert[1::2, 2::3] = 1
     is_cell_vert = is_cell_vert.flatten()
 
-    vertex_df = np.zeros((n_x * n_y, 2))
-    vertex_df[:, 0] = xs.flatten()
-    vertex_df[:, 1] = ys.flatten()
-    vertex_df = pd.DataFrame(vertex_df, columns=['x', 'y'])
-    vertex_df.index.name = 'vertex_index'
-    vertex_df.x *= delta_x
-    vertex_df.y *= delta_y
-    vertex_df['is_cell_vert'] = is_cell_vert
-    if centered:
-        vertex_df.x -= vertex_df.x.max() / 2
-        vertex_df.y -= vertex_df.y.max() / 2
+    pos = np.zeros((n_x * n_y, 2))
+    pos[:, 0] = xs.flatten() * delta_x
+    pos[:, 1] = ys.flatten() * delta_y
 
-    return vertex_df
+    return pos, is_cell_vert
 
 
 def cylindrical(n_cells_length,
                 n_cells_circum,
                 l_0, h_0):
 
-    n_circum = n_cells_circum * 3
-    rho_c = n_circum * l_0 / (2 * np.pi)
+    ### Compute the cylinder radius from the number of vertices
+    rho_c = n_cells_circum * 3 * l_0 / (2 * np.pi)
+    ### Compute the lumen radius from the prefered height
+    rho_lumen = rho_c - h_0
 
-    delta_theta = 2 * np.pi / n_circum
-    delta_z = delta_theta * rho_c * np.sqrt(3)/2.
+    delta_theta = 2 * np.pi / (n_cells_circum * 3)
+    delta_z = delta_theta * rho_c * np.sqrt(3)/2
 
-    _vertex_df = base_grid(n_cells_length,
-                           n_cells_circum,
-                           delta_x=delta_z,
-                           delta_y=delta_theta)
+    ztheta_pos, is_cell_vert = base_grid(n_cells_length,
+                                         n_cells_circum,
+                                         delta_z, delta_theta)
+    ztheta_pos[:, 0] -= ztheta_pos[:, 0].max()/2
 
-    vertex_df = _vertex_df.copy()
-    vertex_df['z'] = _vertex_df.x
-    vertex_df['theta'] = _vertex_df.y
+    ### Pass to cartesian
+    xyz_pos = np.zeros((is_cell_vert.size, 3))
+    xyz_pos[:, 0] = rho_c * np.cos(ztheta_pos[:, 1])
+    xyz_pos[:, 1] = rho_c * np.sin(ztheta_pos[:, 1])
+    xyz_pos[:, 2] = ztheta_pos[:, 0]
 
-    vertex_df['x'] = np.cos(vertex_df.theta) * rho_c
-    vertex_df['y'] = np.sin(vertex_df.theta) * rho_c
-    vertex_df['rho'] = np.hypot(vertex_df.y, vertex_df.x)
-    vertex_df['theta'] = np.arctan2(vertex_df.y, vertex_df.x)
-    vertex_df['height'] = h_0
+    graph, pos_vp = gt.geometric_graph(xyz_pos,
+                                       delta_z*1.5)
 
-    graph, pos_vp = gt.geometric_graph(vertex_df[['x', 'y', 'z']],
-                                       l_0*1.1)
     graph.set_directed(True)
+    for prop in vertex_data:
+        default, dtype = vertex_data[prop]
+        graph.vp[prop] = graph.new_vertex_property(dtype)
+        graph.vp[prop].a = default
 
+    ### set vertex type mask
+    graph.vp['is_cell_vert'].a = is_cell_vert
+    ### Set coordinates
+    for i, coord in enumerate('xyz'):
+        graph.vp[coord].a = xyz_pos[:, i]
 
-    is_cell_vert = graph.new_vertex_property('bool')
-    is_cell_vert.a = vertex_df.is_cell_vert
+    graph.vp['theta'].a = ztheta_pos[:, 1]
 
-    is_junction_edge = graph.new_edge_property('bool')
-    is_junction_edge.a = 1
-    graph.edge_properties['is_junction_edge'] = is_junction_edge
-    graph.vertex_properties['is_cell_vert'] = is_cell_vert
+    for prop in edge_data:
+        default, dtype = edge_data[prop]
+        graph.ep[prop] = graph.new_edge_property(dtype)
+        graph.ep[prop].a = default
 
-    reorient_edges(graph, is_cell_vert, is_junction_edge)
-
-    edge_idx = [(graph.vertex_index[s], graph.vertex_index[t])
-                 for (s, t) in graph.edges()]
-    edge_idx = pd.MultiIndex.from_tuples(edge_idx,
-                                         names=('source', 'target'))
-    edge_df = pd.DataFrame(index=edge_idx)
-    complete_dframes(vertex_df, edge_df,
-                     vertex_data, edge_data)
-
-    edge_df.is_junction_edge = graph.edge_properties['is_junction_edge'].fa
-    return graph, vertex_df, edge_df
+    ### Set edge type mask
+    graph.ep['is_junction_edge'].a = 1
+    reorient_edges(graph,
+                   graph.vp['is_cell_vert'],
+                   graph.ep['is_junction_edge'])
+    return graph
 
 
 def reorient_edges(graph, is_cell_vert, is_junction_edge):
