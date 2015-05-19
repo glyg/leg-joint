@@ -8,8 +8,11 @@ from __future__ import print_function
 import pandas as pd
 import numpy as np
 import hdfgraph
+import graph_tool.all as gt
 
-from ..topology.topology import get_faces
+from ..epithelium.generation import (vertex_data, cell_data,
+                                     edge_data, junction_data,
+                                     face_data)
 from ..utils import _to_3d
 
 import logging
@@ -24,19 +27,47 @@ As those computations are vectorial calculus, we use pandas to perform them
 
 '''
 
-face_data = {
-    ## Normal
-    'ux': (0., np.float),
-    'uy': (0., np.float),
-    'uz': (0., np.float),
-    ## Geometry
-    'sub_area': (0., np.float),
-    'ell_ij': (0., np.float),
-    'height': (0., np.float)}
+def get_faces(graph, as_array=True):
+    '''
+    Retrieves all the triangular subgraphs of the form
+
+       1 -- > 2
+        ^   ^
+         \ /
+          0
+
+    In our context, vertex 0 always corresponds to a cell
+    and vertices 1 and 2 to junction vertices
+
+    Parameters
+    ----------
+
+    graph : a :class:`GraphTool` graph instance
+    as_array: bool, optional, default `True`
+      if `True`, the output of `subraph_isomorphism` is converted
+      to a (N, 3) ndarray.
+
+    Returns
+    -------
+
+    triangles:  list of gt.PropertyMaps or (N, 3) ndarray
+      each line corresponds to a triplet (cell, jv0, jv1)
+      where cell, jv0 and jv1 are indices of the input graph
+      if
+    '''
+    tri_graph = gt.Graph()
+    ## the vertices
+    verts = tri_graph.add_vertex(3)
+    ## edges
+    tri_graph.add_edge_list([(0, 1), (0, 2), (1, 2)])
+    _triangles = gt.subgraph_isomorphism(tri_graph, graph)
+    if not as_array:
+        return tri_graph, _triangles
+    triangles = np.array([tri.a for tri in _triangles], dtype=np.int)
+    return triangles
 
 
-
-class Triangles:
+class Mesh:
     '''
     Data structure defined to index the ensembles of sub-graph homologue to
     this topology:
@@ -62,9 +93,7 @@ class Triangles:
 
     '''
 
-    def __init__(self, triangles,
-                 vertex_df=None,
-                 edge_df=None,):
+    def __init__(self, graph, rho_lumen):
         '''
         Creates a container class for the triangles geometry
 
@@ -75,13 +104,7 @@ class Triangles:
           trianges is a (N_t, 3) 2D array where each line contains
           a triple with the indices of the cell, the source (jv_i)
           and the target (jv_j) junction vertices.
-        vertex_df:  :class:`pandas.DataFrame` table
-          This data frame should contain the vertices data. It is indexed by the
-          vertices indices in the graph.
-        edge_df:  :class:`pandas.DataFrame` table
-          DataFrame with the edges data. It is indexed by a
-          :class:`pandas.MultiIndex` object indexed by
-          (source, target) pairs.
+        graph: the underlying graph
 
         See Also
         --------
@@ -92,60 +115,72 @@ class Triangles:
           from a graph
 
         '''
-        if vertex_df is not None:
-            self.vertex_df = vertex_df
-            self.edge_df = edge_df
-        self.triangles_array = triangles
+        self.triangles = get_faces(graph)
+        self.graph = graph
         self.coords = ['x', 'y', 'z']
         self.dcoords = ['d'+c for c in self.coords]
         self.normal_coords = ['u'+c for c in self.coords]
-
-        self._build_indices(triangles)
+        self.rho_lumen = rho_lumen
+        self._build_graphviews()
+        self._build_faceviews()
         self.faces = pd.DataFrame(index=self.tix_aij,
                                   columns=face_data.keys())
-        self.grad_array = pd.DataFrame(index=self.uix_active,
-                                       columns=self.coords)
-        self.grad_array[:] = 0
+
+        for key, tup in face_data.items():
+            self.faces[key] = np.ones(self.triangles.shape[0],
+                                      dtype=tup[1]) * tup[0]
 
     def copy(self):
-        return Triangles(self.triangles_array.copy(),
-                         self.vertex_df.copy(),
-                         self.edge_df.copy())
+        return Mesh(self.graph.copy())
 
-    def _build_indices(self, faces):
+    def reset(self):
+        self._build_graphviews()
+        self.triangles = get_faces(self.graph)
+        self._build_indices()
 
-        self.indices = {}
-        names =('cell', 'jv_i', 'jv_j')
-        letters = ('a', 'i', 'j')
+    def _build_graphviews(self):
 
-        self.uix_active = self.vertex_df[
-            self.vertex_df.is_active_vert==1].index
+        live_cells = self.graph.vp['is_cell_vert'].copy()
+        live_cells.a = self.graph.vp['is_cell_vert'].a * self.graph.vp['is_alive'].a
+        self.cell_graph = gt.GraphView(self.graph,
+                                        vfilt=live_cells)
+
+        for key, tup in cell_data.items():
+            self.cell_graph.vp[key] = self.cell_graph.new_vertex_property(tup[1])
+            self.cell_graph.vp[key].a = tup[0]
+
+        self.active_graph = gt.GraphView(self.graph,
+                                         vfilt=self.graph.vp['is_active_vert'])
+
+        self.junction_graph = gt.GraphView(self.graph,
+                                           efilt=self.graph.ep['is_junction_edge'])
+        for key, tup in junction_data.items():
+            self.junction_graph.ep[key] = self.junction_graph.new_edge_property(tup[1])
+            self.junction_graph.ep[key].a = tup[0]
+
+    def _build_faceviews(self):
+
+        names = ['cell', 'jv_i', 'jv_j']
+        letters = ['a', 'i', 'j']
 
         ### MultiIndex named (cell, jv_i, jv_j) for each triangle
         ### Those indices must be coherent with the original graph
-        self.tix_aij = pd.MultiIndex.from_arrays(faces.T,
+        self.tix_aij = pd.MultiIndex.from_arrays(self.triangles.T,
                                                  names=names)
-        self.indices[tuple(names)] = self.tix_aij
         for letter, name  in zip(letters, names):
-
             ### single level index on current
             ### vertex type (contains repeated values)
             idx_name = 'tix_{}'.format(letter)
             idx = self.tix_aij.get_level_values(name)
             setattr(self, idx_name, idx)
-            self.indices[name] = idx
-
-            view_name = 'tdf_{}'.format(name)
-            dv = DataView(self.vertex_df, idx)
-            setattr(self, view_name, dv)
 
             unique = idx.unique()
             unique_name = 'uix_{}'.format(letter)
             setattr(self, unique_name, unique)
 
-            view_name = 'udf_{}'.format(name)
-            dv = DataView(self.vertex_df, unique)
-            setattr(self, view_name, dv)
+            view_name = 'fv_{}'.format(letter)
+            setattr(self, view_name,
+                    VertexFacesView(self.graph, idx))
 
             ### 2 level MultiIndex on the oriented edge opposed
             ### to the current vertex
@@ -157,50 +192,43 @@ class Triangles:
             idx_name = 'tix_{}{}'.format(*other_letters)
             idx = self.tix_aij.droplevel(name)
             setattr(self, idx_name, idx)
-            view_name = 'tdf_{}to{}'.format(*other_letters)
-            dv = DataView(self.edge_df, idx)
-            setattr(self, view_name, dv)
 
-            self.indices[tuple(other_names)] = idx
             unique_name = 'uix_{}{}'.format(*other_letters)
             unique = idx.unique()
             setattr(self, unique_name, unique)
-            view_name = 'udf_{}to{}'.format(*other_letters)
-            dv = DataView(self.edge_df, unique)
-            setattr(self, view_name, dv)
 
-        self.uix_active_i = np.array(
-            list(set(self.uix_active).intersection(self.uix_i)))
-        self.uix_active_j = np.array(
-            list(set(self.uix_active).intersection(self.uix_j)))
+            view_name = 'fv_{}to{}'.format(*other_letters)
+            setattr(self, view_name,
+                    EdgeFacesView(self.graph, idx))
+
+        # self.uix_active_i = np.array(
+        #     list(set(self.uix_active).intersection(self.uix_i)))
+        # self.uix_active_j = np.array(
+        #     list(set(self.uix_active).intersection(self.uix_j)))
 
     def update_geometry(self):
 
         ### update rho
         self.update_polar()
         self.update_height()
-        ### update lengths
-        srcs = self.edge_df.index.get_level_values('source')
-        trgts = self.edge_df.index.get_level_values('target')
-        self.edge_df[self.dcoords] = (
-            self.vertex_df.loc[trgts, self.coords].values
-            - self.vertex_df.loc[srcs, self.coords].values)
-        self.edge_df['edge_length'] = np.linalg.norm(
-            self.edge_df[self.dcoords], axis=1)
-        self.faces['ell_ij'] = self.tdf_itoj['edge_length'].values
+        self.update_length()
+        # self.edge_df['edge_length'] = np.linalg.norm(
+        #     self.edge_df[self.dcoords], axis=1)
+        # self.faces['ell_ij'] = self.tdf_itoj['edge_length'].values
 
         cell_columns = ['rho', 'height', 'num_sides',
                         'area', 'perimeter', 'vol']
         cell_columns.extend(self.coords)
-        cell_data = self.udf_cell[cell_columns]
+        cell_pos = (self.fv_i[self.coords].set_index(self.tix_aij).mean(level='cell')
+                    + self.fv_j[self.coords].set_index(self.tix_aij).mean(level='cell'))/2
+
+
         ### update cell pos
-        cell_data[self.coords] = (
-            self.tdf_jv_i[
-                self.coords].set_index(self.tix_aij).mean(level='cell')
-            + self.tdf_jv_j[
-                self.coords].set_index(self.tix_aij).mean(level='cell'))/2
-        r_ak = self.tdf_atoi[self.dcoords].set_index(self.tix_aij)
-        r_am = self.tdf_atoj[self.dcoords].set_index(self.tix_aij)
+        for coord in self.coords:
+            self.cell_graph.vp[coord].fa = cell_pos[coord].loc[self.uix_a]
+
+        r_ak = self.fv_atoi[self.dcoords].set_index(self.tix_aij)
+        r_am = self.fv_atoj[self.dcoords].set_index(self.tix_aij)
 
         crosses = pd.DataFrame(np.cross(r_ak, r_am), index=self.tix_a)
 
@@ -208,21 +236,34 @@ class Triangles:
         self.faces['sub_area'] = sub_area
         normals = crosses / _to_3d(2 * sub_area)
         self.faces[self.normal_coords] = normals.values
-        cell_data['area'] = self.faces.sub_area.sum(
+
+        self.cell_graph['area'].fa = self.faces.sub_area.sum(
             level='cell').loc[self.uix_a]
-        cell_data['perimeter'] = self.faces.ell_ij.sum(
+        self.cell_graph['perimeter'].fa = self.faces.ell_ij.sum(
             level='cell').loc[self.uix_a]
         ### We're neglecting curvature here
-        cell_data['vol'] = cell_data['height'] * cell_data['area']
-        self.udf_cell[cell_columns] = cell_data
+        self.cell_graph['vol'].fa = self.cell_graph['height'].fa * self.cell_graph['area'].fa
+
+    def update_length(self):
+        for coord in self.coords:
+            self.graph.ep['d'+coord].fa = (
+                gt.edge_endpoint_property(self.graph,
+                                          self.graph.vp[coord], 'target').fa
+                - gt.edge_endpoint_property(self.graph,
+                                            self.graph.vp[coord], 'source').fa)
+        self.graph.ep['edge_length'].fa =  np.sqrt((self.graph.ep['dx'].fa
+                                                   + self.graph.ep['dy'].fa
+                                                   + self.graph.ep['dz'].fa)**2)
 
     def update_num_sides(self):
         num_sides = self.tix_aij.get_level_values('cell').value_counts()
-        self.udf_cell['num_sides'] = num_sides.loc[self.uix_a]
+        self.cell_graph['num_sides'].fa = num_sides.loc[self.uix_a]
 
     def set_new_pos(self, pos):
-        _pos = pos.reshape((pos.size//3, 3))
-        self.vertex_df.loc[self.uix_active, self.coords] = _pos
+        ndim = len(self.coords)
+        _pos = pos.reshape((pos.size//ndim, ndim))
+        for i, coord in enumerate(self.coords):
+            self.active_graph.vp[coord].fa = _pos[:, i]
 
     def scale(self, scaling_factor):
         '''Multiply all the distances by a factor `scaling_factor`
@@ -231,41 +272,35 @@ class Triangles:
         =========
         scaling_factor: float
         '''
-        self.vertex_df[self.coords] *= scaling_factor
+        for coords in self.coords:
+            self.graph.vp[self.coords].fa *= scaling_factor
         self.rho_lumen *= scaling_factor
         self.update_geometry()
         self.update_pmaps()
 
     def update_polar(self):
-        self.vertex_df['theta'] = np.arctan2(self.vertex_df[self.coords[1]],
-                                             self.vertex_df[self.coords[0]])
-        self.vertex_df['rho'] = np.hypot(self.vertex_df[self.coords[0]],
-                                         self.vertex_df[self.coords[1]])
+        self.graph.vp['theta'].fa = np.arctan2(self.graph.vp[self.coords[1]].fa,
+                                               self.graph.vp[self.coords[0]].fa)
+        self.graph.vp['rho'].fa = np.hypot(self.graph.vp[self.coords[0]].fa,
+                                           self.graph.vp[self.coords[1]].fa)
 
     def update_height(self):
-        self.vertex_df['height'] = self.vertex_df['rho'] - self.rho_lumen
+        self.graph.vp['height'].fa = self.graph.vp['rho'].fa - self.rho_lumen
 
     def update_cartesian(self):
 
-        rho = self.vertex_df['rho']
-        theta = self.vertex_df['theta']
-        self.vertex_df[self.coords[0]] = rho * np.cos(theta)
-        self.vertex_df[self.coords[1]] = rho * np.sin(theta)
+        rho = self.graph.vp['rho'].fa
+        theta = self.graph.vp['theta'].fa
+        self.graph.vp[self.coords[0]].fa = rho * np.cos(theta)
+        self.graph.vp[self.coords[1]].fa = rho * np.sin(theta)
 
-    def rotate(self, angle, inplace=False):
+    def rotate(self, angle):
         '''Rotates the epithelium by an angle `angle` around
         the :math:`z` axis
         '''
-
         self.update_polar()
-        if inplace:
-            self.vertex_df['theta'] += angle
-            self.update_cartesian()
-        else:
-            new = self.copy()
-            new.vertex_df['theta'] += angle
-            new.update_cartesian()
-            return new
+        self.graph.vp['theta'].fa += angle
+        self.update_cartesian()
 
     def periodic_boundary_condition(self):
         '''
@@ -274,9 +309,9 @@ class Triangles:
         with their curent value for rho.
         '''
         self.update_polar()
-        buf_theta = self.vertex_df['theta'] + np.pi
+        buf_theta = self.graph.vp['theta'].fa + np.pi
         buf_theta = (buf_theta % (2 * np.pi)) - np.pi
-        self.vertex_df['theta'] = buf_theta
+        self.graph.vp['theta'].fa = buf_theta
         self.update_cartesian()
 
     def proj_sigma(self):
@@ -284,8 +319,9 @@ class Triangles:
         cylinder with average rho radius
         '''
         self.update_polar()
-        rho_mean = self.vertex_df.rho.mean()
-        sigmas = self.vertex_df.theta * rho_mean
+        rho_mean = self.graph.vp['rho'].fa.mean()
+        sigmas = self.graph.new_vertex_property('float')
+        sigmas.fa = self.graph.vp['theta'].fa * rho_mean
         return sigmas
 
     def translate(self, vector):
@@ -293,28 +329,71 @@ class Triangles:
 
     def closest_vert(self, position, condition=None):
 
-        relative_pos = pd.DataFrame([self.vertex_df[coord] - u
-                                     for coord, u in zip(self.coords, position)])
-        relative_pos.set_index(self.vertex_df.index)
+
+        relative_pos = np.array([self.graph.vp[coord].fa - u
+                                 for coord, u
+                                 in zip(self.coords, position)])
         if condition is not None:
             relative_pos = relative_pos[condition]
 
         dist = np.linalg.norm(relative_pos)
-        return dist.argmin()
+        vi = self.graph.vertex_index.copy()
 
-class DataView:
+        return vi.fa[dist.argmin()]
+
+
+class VertexFacesView:
     '''constructor class to get and set
-    columns on **views** of a subset of a dataframe '''
-    def __init__(self, df, ix):
-        self._data = df
-        self._ix = ix
+    data on the columns of a dataframe with repeated values
+    for each vertex of the graph'''
+    def __init__(self, graph, faces_idx):
+        self.graph = graph # Can be a GraphView
+        self._idx = faces_idx
 
-    @property
-    def values(self):
-        return self._data.loc[self._ix]
+    def __getitem__(self, prop_name):
+        if isinstance(prop_name, list):
+            props = np.array([self.graph.vp[prop_n].a[self._idx]
+                              for prop_n in prop_name]).T
+            return pd.DataFrame(data=props, index=self._idx,
+                                columns=prop_name)
+        else:
+            prop = self.graph.vp[prop_name]
+            return pd.Series(prop.a[self._idx],
+                             index=self._idx, name=prop_name)
 
-    def __getitem__(self, key):
-        return self._data.loc[self._ix, key]
+    def __setitem__(self, prop_name, data):
+        if isinstance(prop_name, list):
+            for prop_n, col in zip(prop_name, data):
+                self.graph.vp[prop_n].fa = col
+        else:
+            self.graph.vp[prop_name].fa = data
 
-    def __setitem__(self, key, data):
-        self._data.loc[self._ix, key] = data
+class EdgeFacesView:
+    '''constructor class to get and set
+    data on the columns of a dataframe with repeated values
+    for each vertex of the graph'''
+    def __init__(self, graph, faces_idx):
+
+        self.graph = graph # Can be a GraphView
+        self.faces_idx = faces_idx
+        self._idx = [graph.edge_index[graph.edge(s, t)]
+                     for s, t in faces_idx]
+
+    def __getitem__(self, prop_name):
+        if isinstance(prop_name, list):
+            props = np.array([self.graph.ep[prop_n].a[self._idx]
+                              for prop_n in prop_name]).T
+            return pd.DataFrame(data=props, index=self._idx,
+                                columns=prop_name)
+        else:
+            prop = self.graph.ep[prop_name]
+            return pd.Series(prop.a[self._idx],
+                             index=self.faces_idx,
+                             name=prop_name)
+
+    def __setitem__(self, prop_name, data):
+        if isinstance(prop_name, list):
+            for prop_n, col in zip(prop_name, data):
+                self.graph.ep[prop_n].fa = col
+        else:
+            self.graph.ep[prop_name].fa = data

@@ -1,1 +1,1 @@
-from .geometry import Triangles
+from .geometry import Mesh

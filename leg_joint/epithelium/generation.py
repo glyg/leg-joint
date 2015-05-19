@@ -2,8 +2,7 @@
 '''This module contains the elements necessary to build an epithelium.
 
 `vertex_data`, `cell_data`, `edge_data`, `junction_data` and
-`facea
-_data` are dictionnaries of the form:
+`face_data` are dictionnaries of the form:
 
 ```python
     {'data_name': (default_value, data_type)}.
@@ -66,7 +65,7 @@ cell_data = {
     'contractility': (0.014, 'float'),
     'vol_elasticity': (0.014, 'float'),
     ## Topology
-    'num_sides': (1, np.int)}
+    'num_sides': (1, 'int')}
 
 edge_data = {
     ## Coordinates
@@ -103,11 +102,13 @@ def base_grid(n_cells_x, n_cells_y,
     """
     Creates a 2D hexagonal grid with the following geometry:
 
-             j   j
-
-           j   c   j   c
-
-             j   j
+               j       j       j       j
+           c       c       c       c
+               j       j       j       j
+           j       j       j       j
+               c       c       c       c
+           j       j       j       j
+               j       j       j
 
     Parameters
     ----------

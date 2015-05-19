@@ -16,7 +16,7 @@ def test_base_grid():
 
     pos, is_cell_vert = base_grid(3, 3, delta_x=1, delta_y=1)
     assert pos.shape == (27, 2)
-    assert is_cell_vert.shape == (27, 2)
+    assert is_cell_vert.shape == (27,)
 
     np.testing.assert_array_almost_equal(
         pos[:3, :],
@@ -25,10 +25,8 @@ def test_base_grid():
                   [ 0. ,  2.5]]))
 
     np.testing.assert_array_almost_equal(
-        is_cell_vert[:3, :],
-        np.array([[ 0. ,  0.5],
-                  [ 0. ,  1.5],
-                  [ 0. ,  2.5]]))
+        is_cell_vert[:3],
+        np.array([1, 0, 0]))
 
     np.testing.assert_array_equal(
         is_cell_vert[:3],
@@ -36,20 +34,11 @@ def test_base_grid():
 
 def test_cylindrical():
 
-    n_circum, n_length = 7, 8
-    graph = cylindrical(n_circum, n_length, 1., 1.)
+    n_circum, n_length = 7, 9
+    graph = cylindrical(n_length, n_circum, 1., 1.)
     graph.set_edge_filter(graph.ep['is_junction_edge'], inverted=True)
     degrees = np.bincount(graph.degree_property_map('out').fa)
     graph.clear_filters()
     assert degrees[0] == graph.num_vertices() - degrees[4] - degrees[6]
     assert degrees[4] == 2 * n_circum
     assert degrees[6] == (n_length - 2) * n_circum
-
-
-
-def test_new_eptm():
-
-    eptm = Epithelium()
-    n_zeds = eptm.params['n_zeds']
-    n_sigmas = eptm.params['n_sigmas']
-    assert eptm.is_cell_vert.a.sum() == n_zeds * n_sigmas

@@ -14,44 +14,6 @@ from ..utils import deprecated
 import logging
 log = logging.getLogger(__name__)
 
-def get_faces(graph, as_array=True):
-    '''
-    Retrieves all the triangular subgraphs of the form
-
-       1 -- > 2
-        ^   ^
-         \ /
-          0
-
-    In our context, vertex 0 always corresponds to a cell
-    and vertices 1 and 2 to junction vertices
-
-    Parameters
-    ----------
-
-    graph : a :class:`GraphTool` graph instance
-    as_array: bool, optional, default `True`
-      if `True`, the output of `subraph_isomorphism` is converted
-      to a (N, 3) ndarray.
-
-    Returns
-    -------
-
-    triangles:  list of gt.PropertyMaps or (N, 3) ndarray
-      each line corresponds to a triplet (cell, jv0, jv1)
-      where cell, jv0 and jv1 are indices of the input graph
-      if
-    '''
-    tri_graph = gt.Graph()
-    ## the vertices
-    verts = tri_graph.add_vertex(3)
-    ## edges
-    tri_graph.add_edge_list([(0, 1), (0, 2), (1, 2)])
-    _triangles = gt.subgraph_isomorphism(tri_graph, graph)
-    if not as_array:
-        return tri_graph, _triangles
-    triangles = np.array([tri.a for tri in _triangles], dtype=np.int)
-    return triangles
 
 
 class Topology:

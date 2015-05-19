@@ -25,8 +25,8 @@ from .objects import  Cells, ApicalJunctions
 from ..io.xml_handler import ParamTree
 
 from ..topology import Topology
-from ..topology.topology import get_faces
-from ..geometry import Triangles
+#from ..topology.topology import get_faces
+from ..geometry import Mesh
 from ..dynamics import Dynamics
 from hdfgraph import complete_pmaps#, update_pmaps
 #from hdfgraph import update_dframes
@@ -45,7 +45,7 @@ tau = 2. * np.pi
 
 
 class Epithelium(Topology,
-                 Triangles,
+                 Mesh,
                  Dynamics):
     """The :class:`Epithelium` class is the container for all the simulation.
     It inherits attributes form the following classes:
@@ -173,8 +173,7 @@ class Epithelium(Topology,
         Topology.__init__(self)
         # All the geometrical properties are packed here
         #self.graph.set_vertex_filter(self.graph.vertex_properties['is_alive'])
-        _triangles = get_faces(self.graph)
-        Triangles.__init__(self, _triangles)
+        Mesh.__init__(self, self.graph)
         #self.graph.set_vertex_filter(None)
         log.info('Update geometry')
         self.update_geometry()
@@ -215,7 +214,7 @@ class Epithelium(Topology,
         # self.graph.set_vertex_filter(self.graph.vertex_properties['is_alive'])
         self.vertex_df, self.edge_df = graph_to_dataframes(self.graph)
         # self.graph.set_vertex_filter(None)
-        #Triangles.__init__(self, self.triangles_array)
+        #Mesh.__init__(self, self.triangles_array)
 
     def _mark_border_as_dead(self):
         '''
@@ -235,10 +234,8 @@ class Epithelium(Topology,
     def reset_triangles(self):
 
         # self.graph.set_vertex_filter(self.graph.vertex_properties['is_alive'])
-        self.vertex_df, self.edge_df = hdfgraph.graph_to_dataframes(self.graph)
-        _triangles = get_faces(self.graph)
         # self.graph.set_vertex_filter(None)
-        Triangles.__init__(self, _triangles)
+        Mesh.__init__(self, self.graph)
 
     def __str__(self):
 
