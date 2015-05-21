@@ -208,24 +208,38 @@ class Mesh:
 
     def update_geometry(self):
 
+        #self.update_cell_pos()
         ### update rho
         self.update_polar()
         self.update_height()
         self.update_length()
-        # self.edge_df['edge_length'] = np.linalg.norm(
-        #     self.edge_df[self.dcoords], axis=1)
-        # self.faces['ell_ij'] = self.tdf_itoj['edge_length'].values
-
-        cell_columns = ['rho', 'height', 'num_sides',
-                        'area', 'perimeter', 'vol']
-        cell_columns.extend(self.coords)
-        cell_pos = (self.fv_i[self.coords].set_index(self.tix_aij).mean(level='cell')
-                    + self.fv_j[self.coords].set_index(self.tix_aij).mean(level='cell'))/2
+        self.update_cell_geom()
 
 
+    def update_length(self):
+        for coord in self.coords:
+            c = self.graph.vp[coord]
+            self.graph.ep['d'+coord] = edge_difference(self.graph, c)
+            # self.graph.ep['d'+coord].fa = (
+            #     gt.edge_endpoint_property(self.graph, c, 'target').fa
+            #     - gt.edge_endpoint_property(self.graph, c, 'source').fa)
+
+        self.graph.ep['edge_length'].fa =  np.sqrt((self.graph.ep['dx'].fa**2
+                                                    + self.graph.ep['dy'].fa**2
+                                                    + self.graph.ep['dz'].fa**2))
+        ## Length of each face's junction edge
+        self.faces['ell_ij'] = self.fv_itoj['edge_length'].values
+
+    def update_cell_pos(self):
+
+        cell_pos = (
+            self.fv_i[self.coords].set_index(self.tix_aij).mean(level='cell')
+            + self.fv_j[self.coords].set_index(self.tix_aij).mean(level='cell'))/2
         ### update cell pos
         for coord in self.coords:
             self.cell_graph.vp[coord].fa = cell_pos[coord].loc[self.uix_a]
+
+    def update_cell_geom(self):
 
         r_ak = self.fv_atoi[self.dcoords].set_index(self.tix_aij)
         r_am = self.fv_atoj[self.dcoords].set_index(self.tix_aij)
@@ -237,27 +251,18 @@ class Mesh:
         normals = crosses / _to_3d(2 * sub_area)
         self.faces[self.normal_coords] = normals.values
 
-        self.cell_graph['area'].fa = self.faces.sub_area.sum(
+        self.cell_graph.vp['area'].fa = self.faces.sub_area.sum(
             level='cell').loc[self.uix_a]
-        self.cell_graph['perimeter'].fa = self.faces.ell_ij.sum(
+        self.cell_graph.vp['perimeter'].fa = self.faces.ell_ij.sum(
             level='cell').loc[self.uix_a]
         ### We're neglecting curvature here
-        self.cell_graph['vol'].fa = self.cell_graph['height'].fa * self.cell_graph['area'].fa
+        self.cell_graph.vp['vol'].fa = (self.cell_graph.vp['height'].fa
+                                        * self.cell_graph.vp['area'].fa)
 
-    def update_length(self):
-        for coord in self.coords:
-            self.graph.ep['d'+coord].fa = (
-                gt.edge_endpoint_property(self.graph,
-                                          self.graph.vp[coord], 'target').fa
-                - gt.edge_endpoint_property(self.graph,
-                                            self.graph.vp[coord], 'source').fa)
-        self.graph.ep['edge_length'].fa =  np.sqrt((self.graph.ep['dx'].fa
-                                                   + self.graph.ep['dy'].fa
-                                                   + self.graph.ep['dz'].fa)**2)
 
     def update_num_sides(self):
         num_sides = self.tix_aij.get_level_values('cell').value_counts()
-        self.cell_graph['num_sides'].fa = num_sides.loc[self.uix_a]
+        self.cell_graph.vp['num_sides'].fa = num_sides.loc[self.uix_a]
 
     def set_new_pos(self, pos):
         ndim = len(self.coords)
@@ -340,6 +345,15 @@ class Mesh:
         vi = self.graph.vertex_index.copy()
 
         return vi.fa[dist.argmin()]
+
+
+def edge_difference(graph, vprop):
+
+    eprop = graph.new_edge_property(vprop.value_type())
+    for edge in graph.edges():
+        srce, trgt = edge
+        eprop[edge] = vprop[trgt] - vprop[srce]
+    return eprop
 
 
 class VertexFacesView:

@@ -195,6 +195,8 @@ def cylindrical(n_cells_length,
                                        delta_z*1.5)
 
     graph.set_directed(True)
+    graph.set_fast_edge_removal(True)
+
     for prop in vertex_data:
         default, dtype = vertex_data[prop]
         graph.vp[prop] = graph.new_vertex_property(dtype)
@@ -213,6 +215,7 @@ def cylindrical(n_cells_length,
         graph.ep[prop] = graph.new_edge_property(dtype)
         graph.ep[prop].a = default
 
+
     ### Set edge type mask
     graph.ep['is_junction_edge'].a = 1
     reorient_edges(graph,
@@ -227,21 +230,23 @@ def reorient_edges(graph, is_cell_vert, is_junction_edge):
     `is_junction_edge` inplace
 
     '''
-    to_remove = []
+    to_flip = []
     for edge in graph.edges():
         srce, trgt = edge
         if is_cell_vert[srce] and not is_cell_vert[trgt]:
             is_junction_edge[edge] = 0
         elif not is_cell_vert[srce] and is_cell_vert[trgt]:
             ### Flip the edge
-            to_remove.append(edge)
-            new = graph.add_edge(trgt, srce)
-            is_junction_edge[new] = 0
+            to_flip.append((srce, trgt))
         elif is_cell_vert[srce] and is_cell_vert[trgt]:
             raise ValueError(
                 'Invalid cell to cell edge {}'.format(edge))
         else:
             is_junction_edge[edge] = 1
-    log.info('filpped {} edges'.format(len(to_remove)))
-    for edge in to_remove:
-        graph.remove_edge(edge)
+    log.info('filpped {} edges'.format(len(to_flip)))
+    ### Change edges outside of the loop, else bad things
+    ### occur - e.g. vicious segfaults
+    for (srce, trgt) in to_flip:
+        new = graph.add_edge(trgt, srce)
+        is_junction_edge[new] = 0
+        graph.remove_edge(graph.edge(srce, trgt))
