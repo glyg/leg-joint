@@ -33,12 +33,6 @@ class Dynamics(object):
         prefered_vol = prefered_area * height
         self.norm_factor = vol_elasticity0 * prefered_vol**2
 
-        if self.new:
-            self.vertex_df['contractility'] = self.params['contractility']
-            self.vertex_df['vol_elasticity'] = self.params['vol_elasticity']
-            self.vertex_df['prefered_vol'] = prefered_vol
-            self.edge_df['line_tension'] = self.params['line_tension']
-
 
     def calc_energy(self, full_output=False):
         return compute_energy(self, full_output)
@@ -62,7 +56,7 @@ class Dynamics(object):
         self.graph.set_vertex_filter(live_cells)
         area_avg = self.area.fa.mean()
         rho_avg = self.rho.fa.mean()
-        self.graph.set_vertex_filter(None)
+        self.graph.clear_filters()
 
         ### Set height and area to height0 and area0
         scale = (area0 / area_avg)**0.5
@@ -77,8 +71,7 @@ class Dynamics(object):
         self.ground_energy = self.isotropic_energy(delta_o)
         ### Scaling
         self.scale(delta_o)
-        self.update_pmaps()
-
+        self.update_geometry()
 
     def isotropic_energy(self, delta):
         """

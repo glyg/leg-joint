@@ -2,7 +2,7 @@
 
 copyright Guillaume Gay - 2012 - 2014 - http://damcb.com
 
-This work is part of a research project which has been publish in Nature:
+This work is part of a research project which has been published in Nature:
 
 **Apico-basal forces exerted by apoptotic cells drive epithelium folding**
 

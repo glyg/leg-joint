@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
+import pandas as pd
 
 from scipy.interpolate import splrep, splev
+
 
 import warnings
 import functools
@@ -27,7 +29,9 @@ def deprecated(func):
     # return new_func
 
 def _to_3d(df):
-    return df.repeat(3).reshape((df.size, 3))
+
+    df_3d = np.asarray(df.repeat(3).reshape((df.size, 3)))
+    return df_3d
 
 
 def to_xy(rho, theta):

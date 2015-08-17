@@ -136,14 +136,12 @@ class Mesh:
     def reset(self):
         self._build_graphviews()
         self.triangles = get_faces(self.graph)
-        self._build_indices()
+        self._build_faceviews()
 
     def _build_graphviews(self):
 
-        live_cells = self.graph.vp['is_cell_vert'].copy()
-        live_cells.a = self.graph.vp['is_cell_vert'].a * self.graph.vp['is_alive'].a
         self.cell_graph = gt.GraphView(self.graph,
-                                        vfilt=live_cells)
+                                        vfilt=self.graph.vp['is_cell_vert'])
 
         for key, tup in cell_data.items():
             self.cell_graph.vp[key] = self.cell_graph.new_vertex_property(tup[1])
@@ -152,8 +150,12 @@ class Mesh:
         self.active_graph = gt.GraphView(self.graph,
                                          vfilt=self.graph.vp['is_active_vert'])
 
+        is_junction_vert = self.graph.vp['is_cell_vert'].copy()
+        is_junction_vert.a = 1 - is_junction_vert.a
         self.junction_graph = gt.GraphView(self.graph,
-                                           efilt=self.graph.ep['is_junction_edge'])
+                                           efilt=self.graph.ep['is_junction_edge'],
+                                           vfilt=is_junction_vert)
+
         for key, tup in junction_data.items():
             self.junction_graph.ep[key] = self.junction_graph.new_edge_property(tup[1])
             self.junction_graph.ep[key].a = tup[0]
@@ -208,7 +210,7 @@ class Mesh:
 
     def update_geometry(self):
 
-        #self.update_cell_pos()
+        self.update_cell_pos()
         ### update rho
         self.update_polar()
         self.update_height()
@@ -364,7 +366,17 @@ class VertexFacesView:
         self.graph = graph # Can be a GraphView
         self._idx = faces_idx
 
+    def cast(self, props):
+        if isinstance(props, list):
+            _props = np.array([prop.a[self._idx]
+                               for prop in props]).T
+            return pd.DataFrame(data=_props, index=self._idx)
+        else:
+            return pd.Series(props.a[self._idx],
+                             index=self._idx)
+
     def __getitem__(self, prop_name):
+        log.warning('Use cast instead')
         if isinstance(prop_name, list):
             props = np.array([self.graph.vp[prop_n].a[self._idx]
                               for prop_n in prop_name]).T
@@ -375,13 +387,6 @@ class VertexFacesView:
             return pd.Series(prop.a[self._idx],
                              index=self._idx, name=prop_name)
 
-    def __setitem__(self, prop_name, data):
-        if isinstance(prop_name, list):
-            for prop_n, col in zip(prop_name, data):
-                self.graph.vp[prop_n].fa = col
-        else:
-            self.graph.vp[prop_name].fa = data
-
 class EdgeFacesView:
     '''constructor class to get and set
     data on the columns of a dataframe with repeated values
@@ -389,25 +394,29 @@ class EdgeFacesView:
     def __init__(self, graph, faces_idx):
 
         self.graph = graph # Can be a GraphView
-        self.faces_idx = faces_idx
-        self._idx = [graph.edge_index[graph.edge(s, t)]
-                     for s, t in faces_idx]
+        self._idx = faces_idx
+        self.edge_idx = [graph.edge_index[graph.edge(s, t)]
+                         for s, t in faces_idx]
+
+    def cast(self, props):
+        if isinstance(props, list):
+            _props = np.array([prop.a[self.edge_idx]
+                               for prop in props]).T
+            return pd.DataFrame(data=_props, index=self._idx)
+        else:
+            return pd.Series(props.a[self.edge_idx],
+                             index=self._idx)
+
 
     def __getitem__(self, prop_name):
+        log.warning('Use cast instead')
         if isinstance(prop_name, list):
-            props = np.array([self.graph.ep[prop_n].a[self._idx]
+            props = np.array([self.graph.ep[prop_n].a[self.edge_idx]
                               for prop_n in prop_name]).T
             return pd.DataFrame(data=props, index=self._idx,
                                 columns=prop_name)
         else:
             prop = self.graph.ep[prop_name]
-            return pd.Series(prop.a[self._idx],
-                             index=self.faces_idx,
+            return pd.Series(prop.a[self.edge_idx],
+                             index=self._idx,
                              name=prop_name)
-
-    def __setitem__(self, prop_name, data):
-        if isinstance(prop_name, list):
-            for prop_n, col in zip(prop_name, data):
-                self.graph.ep[prop_n].fa = col
-        else:
-            self.graph.ep[prop_name].fa = data

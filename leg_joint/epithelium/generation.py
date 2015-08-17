@@ -63,7 +63,8 @@ cell_data = {
     'vol': (0., 'float'),
     ## Dynamical
     'contractility': (0.014, 'float'),
-    'vol_elasticity': (0.014, 'float'),
+    'vol_elasticity': (1., 'float'),
+    'prefered_vol': (1., 'float'),
     ## Topology
     'num_sides': (1, 'int')}
 
