@@ -1,3 +1,9 @@
+> This software is no longer maintained, our development efforts have moved to 
+the [tyssue](https://damcb.com/tyssue) library.
+
+> See also those notebooks for the leg-joint formation simulation
+> in tyssue: https://github.com/DamCB/tyssue-notebooks/tree/master/leg_joint
+
 # This is the Drosophilia Leg Joint Simulation - or in short just leg-joint
 
 copyright Guillaume Gay - 2012 - 2014 - http://damcb.com
